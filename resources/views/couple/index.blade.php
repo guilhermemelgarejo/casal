@@ -63,7 +63,7 @@
                                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
                                     Configurações
                                 </button>
-                                <form action="{{ route('couple.leave') }}" method="POST" onsubmit="return confirm('Tem certeza que deseja sair do casal?')">
+                                <form action="{{ route('couple.leave') }}" method="POST" data-confirm-title="{{ __('Sair do casal') }}" data-confirm="{{ __('Tem certeza de que deseja sair do casal?') }}" data-confirm-accept="{{ __('Sim, sair') }}" data-confirm-cancel="{{ __('Cancelar') }}" data-confirm-icon="question">
                                     @csrf
                                     <button type="submit" class="btn btn-danger btn-sm">
                                         Sair do Casal
@@ -139,13 +139,13 @@
                                             $whatsappUrl = "https://wa.me/?text=" . urlencode($whatsappMessage);
                                         @endphp
                                         <div class="d-flex flex-wrap gap-2">
-                                            <a href="{{ $whatsappUrl }}" target="_blank" class="btn btn-success btn-sm">
+                                            <a href="{{ $whatsappUrl }}" target="_blank" class="btn btn-success">
                                                 WhatsApp
                                             </a>
 
                                             <button
                                                 type="button"
-                                                class="btn btn-dark btn-sm"
+                                                class="btn btn-dark"
                                                 id="copy-invite-link"
                                                 data-clipboard-text="{{ $inviteLink }}"
                                                 data-copied-text="Copiado!"

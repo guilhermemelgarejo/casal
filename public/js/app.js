@@ -116,4 +116,165 @@ document.addEventListener('DOMContentLoaded', () => {
     if (delModal?.dataset.showError === '1' && bs?.Modal) {
         bs.Modal.getOrCreateInstance(delModal).show();
     }
+
+    /** Formulários com data-confirm: diálogo SweetAlert2 em vez de window.confirm */
+    document.querySelectorAll('form[data-confirm]').forEach((form) => {
+        form.addEventListener('submit', (e) => {
+            const msg = form.getAttribute('data-confirm');
+            if (!msg) {
+                return;
+            }
+            e.preventDefault();
+            const title = form.getAttribute('data-confirm-title') || 'Confirmar';
+            const confirmText = form.getAttribute('data-confirm-accept') || 'Confirmar';
+            const cancelText = form.getAttribute('data-confirm-cancel') || 'Cancelar';
+            const icon = form.getAttribute('data-confirm-icon') || 'warning';
+
+            const proceed = () => {
+                form.submit();
+            };
+
+            if (typeof Swal === 'undefined') {
+                if (window.confirm(msg)) {
+                    proceed();
+                }
+                return;
+            }
+
+            Swal.fire({
+                title,
+                text: msg,
+                icon,
+                showCancelButton: true,
+                focusCancel: true,
+                confirmButtonText: confirmText,
+                cancelButtonText: cancelText,
+                confirmButtonColor: '#0d6efd',
+                cancelButtonColor: '#6c757d',
+                customClass: {
+                    confirmButton: 'btn btn-primary px-4',
+                    cancelButton: 'btn btn-outline-secondary px-4',
+                },
+                buttonsStyling: false,
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    proceed();
+                }
+            });
+        });
+    });
+
+    document.querySelectorAll('.js-payment-methods-editor').forEach((editor) => {
+        const grid = editor.querySelector('.js-payment-method-grid');
+        if (!grid) {
+            return;
+        }
+        editor.querySelector('.js-pm-check-all')?.addEventListener('click', () => {
+            grid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+                cb.checked = true;
+            });
+        });
+        editor.querySelector('.js-pm-check-none')?.addEventListener('click', () => {
+            grid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+                cb.checked = false;
+            });
+        });
+    });
+
+    const txForm = document.getElementById('form-new-transaction');
+    const accountSelect = document.getElementById('account_id');
+    const paymentSelect = document.getElementById('payment_method');
+    const paymentHint = document.getElementById('payment-method-hint');
+    if (txForm && accountSelect && paymentSelect) {
+        const methodsForSelectedAccount = () => {
+            const opt = accountSelect.selectedOptions[0];
+            if (!opt || !accountSelect.value) {
+                return [];
+            }
+            const raw = opt.getAttribute('data-payment-methods');
+            if (!raw) {
+                return [];
+            }
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        };
+
+        const syncPaymentMethodSelect = () => {
+            const methods = methodsForSelectedAccount();
+            const prev = paymentSelect.value;
+            paymentSelect.replaceChildren();
+
+            if (!accountSelect.value) {
+                const ph = document.createElement('option');
+                ph.value = '';
+                ph.textContent = 'Selecione uma conta primeiro';
+                ph.disabled = true;
+                ph.selected = true;
+                paymentSelect.appendChild(ph);
+                paymentSelect.disabled = true;
+                paymentSelect.required = false;
+                if (paymentHint) {
+                    paymentHint.textContent = 'Escolha a conta para carregar as formas de pagamento permitidas.';
+                }
+                return;
+            }
+
+            if (methods.length === 0) {
+                const ph = document.createElement('option');
+                ph.value = '';
+                ph.textContent = 'Nenhuma forma habilitada nesta conta';
+                ph.disabled = true;
+                ph.selected = true;
+                paymentSelect.appendChild(ph);
+                paymentSelect.disabled = true;
+                paymentSelect.required = false;
+                if (paymentHint) {
+                    paymentHint.textContent = 'Edite a conta em Gerenciar contas e marque ao menos uma forma de pagamento.';
+                }
+                return;
+            }
+
+            paymentSelect.disabled = false;
+            paymentSelect.required = true;
+
+            if (methods.length === 1) {
+                const only = methods[0];
+                const o = document.createElement('option');
+                o.value = only;
+                o.textContent = only;
+                o.selected = true;
+                paymentSelect.appendChild(o);
+                if (paymentHint) {
+                    paymentHint.textContent = 'Esta conta só usa esta forma; ela foi selecionada automaticamente.';
+                }
+                return;
+            }
+
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Selecione a forma';
+            paymentSelect.appendChild(placeholder);
+            methods.forEach((m) => {
+                const o = document.createElement('option');
+                o.value = m;
+                o.textContent = m;
+                paymentSelect.appendChild(o);
+            });
+            if (prev && methods.includes(prev)) {
+                paymentSelect.value = prev;
+            } else {
+                paymentSelect.value = '';
+            }
+            if (paymentHint) {
+                paymentHint.textContent = 'Só listamos as formas habilitadas para a conta selecionada.';
+            }
+        };
+
+        accountSelect.addEventListener('change', syncPaymentMethodSelect);
+        syncPaymentMethodSelect();
+    }
 });

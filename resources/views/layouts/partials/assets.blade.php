@@ -6,3 +6,9 @@
 @if (file_exists(public_path('css/app.css')))
     <link href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}" rel="stylesheet">
 @endif
+@php
+    $swalCss = public_path('vendor/sweetalert2/sweetalert2.min.css');
+@endphp
+@if (file_exists($swalCss))
+    <link href="{{ asset('vendor/sweetalert2/sweetalert2.min.css') }}?v={{ filemtime($swalCss) }}" rel="stylesheet">
+@endif

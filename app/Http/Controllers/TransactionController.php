@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\Category;
 use App\Models\Account;
+use App\Support\PaymentMethods;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class TransactionController extends Controller
 {
@@ -35,17 +37,37 @@ class TransactionController extends Controller
                 return [$account->name => $items->sum('amount')];
             });
 
-        return view('transactions.index', compact('transactions', 'categories', 'accounts', 'byPaymentMethod', 'byAccount'));
+        $availablePaymentMethods = [];
+        $autoPaymentMethod = null;
+        if (old('account_id')) {
+            $selectedAccount = $accounts->firstWhere('id', (int) old('account_id'));
+            if ($selectedAccount) {
+                $availablePaymentMethods = $selectedAccount->getEffectivePaymentMethods();
+                if (count($availablePaymentMethods) === 1) {
+                    $autoPaymentMethod = $availablePaymentMethods[0];
+                }
+            }
+        }
+
+        return view('transactions.index', compact(
+            'transactions',
+            'categories',
+            'accounts',
+            'byPaymentMethod',
+            'byAccount',
+            'availablePaymentMethods',
+            'autoPaymentMethod'
+        ));
     }
 
     public function store(Request $request)
     {
         $request->validate([
             'category_id' => 'required|exists:categories,id',
-            'account_id' => 'nullable|exists:accounts,id',
+            'account_id' => 'required|exists:accounts,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'nullable|string|max:100',
+            'payment_method' => ['required', 'string', 'max:100', Rule::in(PaymentMethods::all())],
             'type' => 'required|in:income,expense',
             'date' => 'required|date',
         ]);
@@ -55,11 +77,21 @@ class TransactionController extends Controller
             abort(403);
         }
 
-        if ($request->account_id) {
-            $account = Account::find($request->account_id);
-            if ($account->couple_id !== Auth::user()->couple_id) {
-                abort(403);
-            }
+        $account = Account::find($request->account_id);
+        if (! $account || $account->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        if ($account->getEffectivePaymentMethods() === []) {
+            return back()->withErrors([
+                'account_id' => 'Esta conta não tem formas de pagamento habilitadas. Edite-a em Gerenciar contas.',
+            ])->withInput();
+        }
+
+        if (! $account->allowsPaymentMethod($request->payment_method)) {
+            return back()->withErrors([
+                'payment_method' => 'Esta forma de pagamento não está habilitada para a conta selecionada.',
+            ])->withInput();
         }
 
         if ($category->type !== $request->type) {

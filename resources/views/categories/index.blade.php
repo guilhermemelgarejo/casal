@@ -84,7 +84,7 @@
                                                 >
                                                     Editar
                                                 </button>
-                                                <form action="{{ route('categories.destroy', $cat) }}" method="POST" class="d-inline" onsubmit="return confirm('Excluir?')">
+                                                <form action="{{ route('categories.destroy', $cat) }}" method="POST" class="d-inline" data-confirm-title="{{ __('Excluir categoria') }}" data-confirm="{{ __('Deseja excluir esta categoria?') }}" data-confirm-accept="{{ __('Sim, excluir') }}" data-confirm-cancel="{{ __('Cancelar') }}">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-link btn-sm text-danger p-0">Excluir</button>

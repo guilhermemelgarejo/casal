@@ -3,27 +3,59 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Support\PaymentMethods;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AccountController extends Controller
 {
     public function index()
     {
         $accounts = Auth::user()->couple->accounts;
-        return view('accounts.index', compact('accounts'));
+        $paymentMethodOptions = PaymentMethods::all();
+
+        return view('accounts.index', compact('accounts', 'paymentMethodOptions'));
     }
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'color' => 'required|string|size:7',
+            'payment_methods' => ['required', 'array', 'min:1'],
+            'payment_methods.*' => ['string', Rule::in(PaymentMethods::all())],
         ]);
 
-        Auth::user()->couple->accounts()->create($request->all());
+        Auth::user()->couple->accounts()->create([
+            'name' => $validated['name'],
+            'color' => $validated['color'],
+            'allowed_payment_methods' => array_values(array_unique($validated['payment_methods'])),
+        ]);
 
         return back()->with('success', 'Conta cadastrada com sucesso!');
+    }
+
+    public function update(Request $request, Account $account)
+    {
+        if ($account->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'color' => 'required|string|size:7',
+            'payment_methods' => ['required', 'array', 'min:1'],
+            'payment_methods.*' => ['string', Rule::in(PaymentMethods::all())],
+        ]);
+
+        $account->update([
+            'name' => $validated['name'],
+            'color' => $validated['color'],
+            'allowed_payment_methods' => array_values(array_unique($validated['payment_methods'])),
+        ]);
+
+        return back()->with('success', 'Conta atualizada com sucesso!');
     }
 
     public function destroy(Account $account)
