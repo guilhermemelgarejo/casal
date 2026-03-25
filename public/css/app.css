@@ -1,0 +1,14 @@
+/* Estilos extra da aplicação (carregados depois do Bootstrap) */
+
+body {
+    min-height: 100vh;
+}
+
+.table > :not(caption) > * > * {
+    vertical-align: middle;
+}
+
+/* Pequeno ajuste de tipografia com Figtree (já ligada nos layouts) */
+body {
+    font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+}

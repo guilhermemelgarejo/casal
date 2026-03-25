@@ -9,7 +9,7 @@ class Couple extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'invite_code', 'monthly_income'];
+    protected $fillable = ['name', 'invite_code', 'monthly_income', 'spending_alert_threshold'];
 
     public function users()
     {

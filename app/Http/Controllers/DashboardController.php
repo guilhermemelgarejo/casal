@@ -33,6 +33,12 @@ class DashboardController extends Controller
         $totalExpense = $transactions->where('type', 'expense')->sum('amount');
         $balance = $totalIncome - $totalExpense;
 
+        // Alerta de Gastos
+        $thresholdPercentage = $couple->spending_alert_threshold ?? 80.00;
+        $income = $couple->monthly_income ?? 0;
+        $thresholdAmount = ($income * $thresholdPercentage) / 100;
+        $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
+
         // Agrupamento Cruzado: Conta x Forma de Pagamento
         $crossSummary = $transactions->where('type', 'expense')
             ->whereNotNull('account_id')
@@ -49,6 +55,7 @@ class DashboardController extends Controller
             });
 
         return view('dashboard', compact(
+            'couple',
             'transactions',
             'totalIncome', 
             'totalExpense', 
@@ -56,7 +63,10 @@ class DashboardController extends Controller
             'crossSummary',
             'period',
             'month', 
-            'year'
+            'year',
+            'showAlert',
+            'thresholdPercentage',
+            'thresholdAmount'
         ));
     }
 }

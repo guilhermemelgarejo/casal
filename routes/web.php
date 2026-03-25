@@ -42,6 +42,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/couple', [CoupleController::class, 'index'])->name('couple.index');
     Route::post('/couple/create', [CoupleController::class, 'create'])->name('couple.create');
     Route::post('/couple/join', [CoupleController::class, 'join'])->name('couple.join');
+    Route::post('/couple/invite', [CoupleController::class, 'sendInvite'])->name('couple.invite');
+    Route::put('/couple/update', [CoupleController::class, 'update'])->name('couple.update');
+    Route::post('/couple/leave', [CoupleController::class, 'leave'])->name('couple.leave');
 });
 
 require __DIR__ . '/auth.php';

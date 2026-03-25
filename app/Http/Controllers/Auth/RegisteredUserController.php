@@ -13,6 +13,8 @@ use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
+use App\Models\Couple;
+
 class RegisteredUserController extends Controller
 {
     /**
@@ -34,6 +36,7 @@ class RegisteredUserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'invite_code' => ['nullable', 'string', 'exists:couples,invite_code'],
         ]);
 
         $user = User::create([
@@ -41,6 +44,14 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
+
+        if ($request->filled('invite_code')) {
+            $couple = Couple::where('invite_code', $request->invite_code)->first();
+            if ($couple && $couple->users()->count() < 2) {
+                $user->couple_id = $couple->id;
+                $user->save();
+            }
+        }
 
         event(new Registered($user));
 
