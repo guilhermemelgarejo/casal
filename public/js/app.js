@@ -185,7 +185,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountSelect = document.getElementById('account_id');
     const paymentSelect = document.getElementById('payment_method');
     const paymentHint = document.getElementById('payment-method-hint');
+    const installmentsWrapper = document.getElementById('installments-wrapper');
+    const installmentsSelect = document.getElementById('installments');
     if (txForm && accountSelect && paymentSelect) {
+        const syncInstallmentsVisibility = () => {
+            if (!installmentsWrapper || !installmentsSelect) {
+                return;
+            }
+
+            const isCredit = paymentSelect.value === 'Cartão de Crédito';
+
+            if (isCredit) {
+                installmentsWrapper.classList.remove('d-none');
+                installmentsSelect.disabled = false;
+                installmentsSelect.required = true;
+                if (!installmentsSelect.value) {
+                    installmentsSelect.value = '1';
+                }
+            } else {
+                installmentsWrapper.classList.add('d-none');
+                installmentsSelect.disabled = true;
+                installmentsSelect.required = false;
+            }
+        };
+
         const methodsForSelectedAccount = () => {
             const opt = accountSelect.selectedOptions[0];
             if (!opt || !accountSelect.value) {
@@ -220,6 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (paymentHint) {
                     paymentHint.textContent = 'Escolha a conta para carregar as formas de pagamento permitidas.';
                 }
+                syncInstallmentsVisibility();
                 return;
             }
 
@@ -235,6 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (paymentHint) {
                     paymentHint.textContent = 'Edite a conta em Gerenciar contas e marque ao menos uma forma de pagamento.';
                 }
+                syncInstallmentsVisibility();
                 return;
             }
 
@@ -251,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (paymentHint) {
                     paymentHint.textContent = 'Esta conta só usa esta forma; ela foi selecionada automaticamente.';
                 }
+                syncInstallmentsVisibility();
                 return;
             }
 
@@ -272,9 +298,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (paymentHint) {
                 paymentHint.textContent = 'Só listamos as formas habilitadas para a conta selecionada.';
             }
+            syncInstallmentsVisibility();
         };
 
         accountSelect.addEventListener('change', syncPaymentMethodSelect);
+        paymentSelect.addEventListener('change', syncInstallmentsVisibility);
         syncPaymentMethodSelect();
     }
 });

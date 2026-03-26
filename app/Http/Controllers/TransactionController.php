@@ -6,35 +6,56 @@ use App\Models\Transaction;
 use App\Models\Category;
 use App\Models\Account;
 use App\Support\PaymentMethods;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class TransactionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $now = Carbon::now();
+        $validated = $request->validate([
+            'month' => 'nullable|integer|min:1|max:12',
+            'year' => 'nullable|integer|min:2000|max:2100',
+        ]);
+
+        $selectedMonth = (int) ($validated['month'] ?? $now->month);
+        $selectedYear = (int) ($validated['year'] ?? $now->year);
+
         $couple = Auth::user()->couple;
-        $transactions = $couple->transactions()->with(['category', 'user', 'accountModel'])->latest()->paginate(20);
+
+        $transactions = $couple->transactions()
+            ->with(['category', 'user', 'accountModel'])
+            ->whereMonth('date', $selectedMonth)
+            ->whereYear('date', $selectedYear)
+            ->latest()
+            ->paginate(20);
+        $transactions->appends(['month' => $selectedMonth, 'year' => $selectedYear]);
+
         $categories = $couple->categories;
         $accounts = $couple->accounts;
 
-        // Resumos por Pagamento e Conta (Apenas despesas do mês atual)
-        $monthTransactions = $couple->transactions()
-            ->whereMonth('date', date('m'))
-            ->whereYear('date', date('Y'))
-            ->where('type', 'expense')
+        // Resumos do mês selecionado (considera o mês inteiro, não apenas a página do paginate)
+        $monthTransactionsAll = $couple->transactions()
+            ->whereMonth('date', $selectedMonth)
+            ->whereYear('date', $selectedYear)
             ->get();
 
-        $byPaymentMethod = $monthTransactions->groupBy('payment_method')
+        $expenseMonthTransactions = $monthTransactionsAll->where('type', 'expense');
+
+        $byPaymentMethod = $expenseMonthTransactions->groupBy('payment_method')
             ->map(fn($items) => $items->sum('amount'))
             ->forget('');
 
         // Agrupamento por conta cadastrada (usando o nome da conta no model)
-        $byAccount = $monthTransactions->whereNotNull('account_id')->groupBy('account_id')
+        $byAccount = $expenseMonthTransactions->whereNotNull('account_id')->groupBy('account_id')
             ->mapWithKeys(function ($items, $accountId) {
                 $account = Account::find($accountId);
-                return [$account->name => $items->sum('amount')];
+                $accountName = $account?->name ?? 'Conta não encontrada';
+                return [$accountName => $items->sum('amount')];
             });
 
         $availablePaymentMethods = [];
@@ -49,14 +70,22 @@ class TransactionController extends Controller
             }
         }
 
+        $selectedMonthYearLabel = Carbon::createFromDate($selectedYear, $selectedMonth, 1)->format('m/Y');
+        $years = range($now->year - 5, $now->year + 5);
+
         return view('transactions.index', compact(
             'transactions',
+            'monthTransactionsAll',
             'categories',
             'accounts',
             'byPaymentMethod',
             'byAccount',
             'availablePaymentMethods',
-            'autoPaymentMethod'
+            'autoPaymentMethod',
+            'selectedMonth',
+            'selectedYear',
+            'selectedMonthYearLabel',
+            'years'
         ));
     }
 
@@ -68,6 +97,7 @@ class TransactionController extends Controller
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => ['required', 'string', 'max:100', Rule::in(PaymentMethods::all())],
+            'installments' => 'nullable|integer|min:1|max:12',
             'type' => 'required|in:income,expense',
             'date' => 'required|date',
         ]);
@@ -98,17 +128,69 @@ class TransactionController extends Controller
             return back()->withErrors(['category_id' => 'A categoria selecionada não corresponde ao tipo de lançamento (Receita/Despesa).'])->withInput();
         }
 
-        Transaction::create([
-            'couple_id' => Auth::user()->couple_id,
-            'user_id' => Auth::id(),
-            'category_id' => $request->category_id,
-            'account_id' => $request->account_id,
-            'description' => $request->description,
-            'amount' => $request->amount,
-            'payment_method' => $request->payment_method,
-            'type' => $request->type,
-            'date' => $request->date,
-        ]);
+        $isCredit = $request->payment_method === 'Cartão de Crédito';
+        $installments = $isCredit ? (int) $request->input('installments', 1) : 1;
+        if ($isCredit && $installments < 1) {
+            return back()->withErrors(['installments' => 'Informe a quantidade de parcelas.'])->withInput();
+        }
+
+        // Converte valor para centavos para dividir sem erros de ponto flutuante.
+        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $amountCents = (int) round(((float) $amountNormalized) * 100);
+        $baseCents = intdiv($amountCents, $installments);
+        $remainderCents = $amountCents - ($baseCents * $installments);
+
+        $startDate = Carbon::parse($request->date);
+        $baseDescription = (string) $request->description;
+        $installmentParentId = null;
+
+        DB::transaction(function () use (
+            $installments,
+            $baseCents,
+            $remainderCents,
+            $startDate,
+            $baseDescription,
+            &$installmentParentId,
+            $request
+        ) {
+            for ($i = 0; $i < $installments; $i++) {
+                $parcelIndex = $i + 1;
+                $cents = $baseCents + ($i === $installments - 1 ? $remainderCents : 0);
+                // Envia como string com 2 casas para evitar erros de ponto flutuante no decimal do banco.
+                $parcelAmount = number_format($cents / 100, 2, '.', '');
+
+                $data = [
+                    'couple_id' => Auth::user()->couple_id,
+                    'user_id' => Auth::id(),
+                    'category_id' => $request->category_id,
+                    'account_id' => $request->account_id,
+                    'description' => $installments > 1
+                        ? $baseDescription . ' (Parcela ' . $parcelIndex . '/' . $installments . ')'
+                        : $baseDescription,
+                    'amount' => $parcelAmount,
+                    'payment_method' => $request->payment_method,
+                    'type' => $request->type,
+                    'date' => $startDate->copy()->addMonths($i)->toDateString(),
+                ];
+
+                // Vínculo (autorelacionamento) entre as parcelas:
+                // - a primeira parcela fica como "pai"
+                // - as demais apontam para ela
+                if ($installments > 1) {
+                    if ($i === 0) {
+                        $data['installment_parent_id'] = null;
+                    } else {
+                        $data['installment_parent_id'] = $installmentParentId;
+                    }
+                }
+
+                $created = Transaction::create($data);
+
+                if ($installments > 1 && $i === 0) {
+                    $installmentParentId = $created->id;
+                }
+            }
+        });
 
         return back()->with('success', 'Lançamento realizado!');
     }

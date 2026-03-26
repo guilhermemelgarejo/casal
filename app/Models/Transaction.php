@@ -9,7 +9,7 @@ class Transaction extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['couple_id', 'user_id', 'category_id', 'account_id', 'description', 'amount', 'payment_method', 'account', 'type', 'date'];
+    protected $fillable = ['couple_id', 'user_id', 'category_id', 'account_id', 'description', 'amount', 'payment_method', 'account', 'type', 'date', 'installment_parent_id'];
 
     protected $casts = [
         'date' => 'date',
@@ -33,5 +33,21 @@ class Transaction extends Model
     public function accountModel()
     {
         return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    /**
+     * Primeira parcela do mesmo parcelamento (autorelacionamento).
+     */
+    public function installmentParent()
+    {
+        return $this->belongsTo(self::class, 'installment_parent_id');
+    }
+
+    /**
+     * Demais parcelas do mesmo parcelamento.
+     */
+    public function installmentChildren()
+    {
+        return $this->hasMany(self::class, 'installment_parent_id');
     }
 }

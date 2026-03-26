@@ -20,8 +20,51 @@
                     <div class="col-lg-8">
                         <div class="card border shadow-sm h-100">
                             <div class="card-header bg-white py-3 border-bottom">
-                                <h3 class="h5 mb-0">Lançamentos</h3>
-                                <p class="small text-secondary mb-0 mt-1">Histórico e movimentações do período</p>
+                                <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                                    <div>
+                                        <h3 class="h5 mb-0">Lançamentos</h3>
+                                        <p class="small text-secondary mb-0 mt-1">Histórico e movimentações do período</p>
+                                    </div>
+
+                                    <form method="GET" action="{{ route('transactions.index') }}" class="d-flex align-items-center gap-2">
+                                        <div class="input-group input-group-sm" style="min-width: 140px;">
+                                            <span class="input-group-text text-secondary">Mês</span>
+                                            <select
+                                                id="filter-month"
+                                                name="month"
+                                                class="form-select"
+                                                aria-label="Mês"
+                                            >
+                                                @for($m = 1; $m <= 12; $m++)
+                                                    <option value="{{ $m }}" {{ (int) $selectedMonth === $m ? 'selected' : '' }}>
+                                                        {{ str_pad((string) $m, 2, '0', STR_PAD_LEFT) }}
+                                                    </option>
+                                                @endfor
+                                            </select>
+                                        </div>
+
+                                        <div class="input-group input-group-sm" style="min-width: 160px;">
+                                            <span class="input-group-text text-secondary">Ano</span>
+                                            <select
+                                                id="filter-year"
+                                                name="year"
+                                                class="form-select"
+                                                aria-label="Ano"
+                                            >
+                                                @foreach($years as $y)
+                                                    <option value="{{ $y }}" {{ (int) $selectedYear === (int) $y ? 'selected' : '' }}>
+                                                        {{ $y }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Ações do filtro">
+                                            <button type="submit" class="btn btn-primary">Filtrar</button>
+                                            <a href="{{ route('transactions.index') }}" class="btn btn-outline-secondary">Atual</a>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
@@ -91,20 +134,20 @@
                             <div class="card border shadow-sm">
                                 <div class="card-header bg-white py-3 border-bottom">
                                     <h3 class="h5 mb-0">Resumo</h3>
-                                    <p class="small text-secondary mb-0 mt-1">Totais e indicadores de {{ date('m/Y') }}</p>
+                                    <p class="small text-secondary mb-0 mt-1">Totais e indicadores de {{ $selectedMonthYearLabel }}</p>
                                 </div>
                                 <div class="card-body p-3">
                                     <div class="rounded bg-body-secondary bg-opacity-50 p-2">
                                         <div class="d-flex justify-content-between small mb-1">
                                             <span class="text-secondary">Receitas</span>
-                                            <span class="text-success fw-semibold">R$ {{ number_format($transactions->where('type', 'income')->sum('amount'), 2, ',', '.') }}</span>
+                                            <span class="text-success fw-semibold">R$ {{ number_format($monthTransactionsAll->where('type', 'income')->sum('amount'), 2, ',', '.') }}</span>
                                         </div>
                                         <div class="d-flex justify-content-between small mb-2">
                                             <span class="text-secondary">Despesas</span>
-                                            <span class="text-danger fw-semibold">R$ {{ number_format($transactions->where('type', 'expense')->sum('amount'), 2, ',', '.') }}</span>
+                                            <span class="text-danger fw-semibold">R$ {{ number_format($monthTransactionsAll->where('type', 'expense')->sum('amount'), 2, ',', '.') }}</span>
                                         </div>
                                         <hr class="my-2">
-                                        @php $balance = $transactions->where('type', 'income')->sum('amount') - $transactions->where('type', 'expense')->sum('amount'); @endphp
+                                        @php $balance = $monthTransactionsAll->where('type', 'income')->sum('amount') - $monthTransactionsAll->where('type', 'expense')->sum('amount'); @endphp
                                         <div class="d-flex justify-content-between align-items-baseline">
                                             <span class="small fw-semibold">Saldo</span>
                                             <span class="fw-bold {{ $balance >= 0 ? 'text-success' : 'text-danger' }}">
@@ -237,6 +280,27 @@
                                                 </select>
                                                 <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
                                                 <p class="form-text mb-0" id="payment-method-hint">Escolha a conta; só aparecem as formas habilitadas para ela.</p>
+                                            </div>
+
+                                            @php
+                                                $pmSelectedForRender = old('payment_method', $autoPaymentMethod);
+                                                $isCreditRender = $pmSelectedForRender === 'Cartão de Crédito';
+                                                $installmentsOld = (int) old('installments', 1);
+                                            @endphp
+                                            <div id="installments-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
+                                                <x-input-label for="installments" value="Parcelas (crédito)" />
+                                                <select
+                                                    id="installments"
+                                                    name="installments"
+                                                    class="form-select mt-1"
+                                                    {{ $isCreditRender ? 'required' : '' }}
+                                                >
+                                                    @for($i = 1; $i <= 12; $i++)
+                                                        <option value="{{ $i }}" {{ $installmentsOld === $i ? 'selected' : '' }}>{{ $i }}</option>
+                                                    @endfor
+                                                </select>
+                                                <x-input-error :messages="$errors->get('installments')" class="mt-2" />
+                                                <p class="form-text mb-0">Geramos 1 lançamento por mês de referência.</p>
                                             </div>
 
                                             <div>
