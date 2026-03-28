@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'has-couple' => \App\Http\Middleware\EnsureHasCouple::class,
         ]);
+
+        $middleware->redirectUsersTo(fn () => route('dashboard', absolute: false));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
