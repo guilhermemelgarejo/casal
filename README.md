@@ -1,4 +1,4 @@
-# Finanças do Casal 💑
+# DuoZen
 
 Um aplicativo web moderno e responsivo para controle financeiro compartilhado entre casais, desenvolvido com Laravel 11.
 
