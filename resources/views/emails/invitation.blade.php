@@ -18,7 +18,7 @@ Para aceitar o convite, use o código abaixo no sistema:
 Criar minha conta e entrar no casal
 </x-mail::button>
 
-Se você já possui uma conta, basta fazer o login e inserir o código na seção de Gerenciar Casal.
+Se você já possui uma conta, basta entrar e inserir o código na seção Gerenciar casal.
 
 Atenciosamente,<br>
 {{ config('app.name') }}

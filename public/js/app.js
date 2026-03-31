@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const typeIn = catForm.querySelector('#type');
                 if (typeIn) typeIn.value = cat.type;
                 const colorIn = catForm.querySelector('#color');
-                if (colorIn) colorIn.value = cat.color;
+                if (colorIn) colorIn.value = cat.color || '#000000';
                 if (titleEl) titleEl.textContent = titleEl.dataset.titleEdit || 'Editar Categoria';
                 if (cancelBtn) cancelBtn.classList.remove('d-none');
                 window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <h2 class="h5 mb-0">
-                {{ __('Planejamento Mensal') }}
+                Planejamento mensal
             </h2>
 
             <div class="d-flex align-items-center gap-2 bg-white px-3 py-2 rounded border shadow-sm">
@@ -17,7 +17,7 @@
                     <form action="{{ route('budgets.income') }}" method="POST" class="d-flex align-items-center gap-2 flex-wrap">
                         @csrf
                         <input type="number" name="monthly_income" class="form-control form-control-sm" style="width: 7rem;" step="0.01" value="{{ Auth::user()->couple->monthly_income }}" required />
-                        <button type="submit" class="btn btn-success btn-sm">OK</button>
+                        <button type="submit" class="btn btn-success btn-sm">Salvar</button>
                         <button type="button" class="btn btn-outline-danger btn-sm" id="btn-income-cancel">✕</button>
                     </form>
                 </div>

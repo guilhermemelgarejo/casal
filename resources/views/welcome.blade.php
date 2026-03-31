@@ -3,8 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="Planeje o dinheiro do casal em um só lugar: receitas, despesas, orçamentos e metas, com convites e alertas.">
-        <title>{{ config('app.name', 'Laravel') }} — Finanças a dois</title>
+        <meta name="description" content="Planeje o dinheiro do casal: receitas, despesas, orçamentos e alertas. Período de teste com cartão e plano mensal via Stripe.">
+        <title>{{ config('app.name', 'DuoZen') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
         @include('layouts.partials.assets')
@@ -38,8 +38,14 @@
         <div class="min-vh-100 d-flex flex-column">
             @if (Route::has('login'))
                 <nav class="navbar navbar-expand-lg bg-white border-bottom shadow-sm">
-                    <div class="container py-1">
-                        <span class="navbar-brand mb-0 fw-semibold">{{ config('app.name', 'Laravel') }}</span>
+                    <div class="container py-0">
+                        <a class="navbar-brand mb-0 d-inline-flex align-items-center" href="{{ url('/') }}">
+                            <img
+                                src="{{ asset('images/duozen-logo.png') }}"
+                                alt="{{ config('app.name', 'DuoZen') }}"
+                                style="height: 3.5rem; width: auto; max-height: 100%;"
+                            />
+                        </a>
                         <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">
                             @auth
                                 <a class="btn btn-primary btn-sm" href="{{ url('/dashboard') }}">Ir ao painel</a>
@@ -74,7 +80,7 @@
                                                 <a href="{{ route('login') }}" class="btn btn-outline-secondary btn-lg px-4">Já tenho conta</a>
                                             @endif
                                         </div>
-                                        <p class="small text-secondary mb-0">Leva poucos minutos. Depois é só criar ou entrar no casal e começar a lançar.</p>
+                                        <p class="small text-secondary mb-0">Leva poucos minutos. Depois criem ou entrem no casal, ativem o plano (teste grátis com cartão) e comecem a lançar.</p>
                                     @elseif (Route::has('login'))
                                         <a href="{{ route('login') }}" class="btn btn-primary btn-lg px-4 shadow-sm">Entrar</a>
                                     @endif
@@ -85,7 +91,7 @@
                             <div class="col-lg-5">
                                 <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
                                     <div class="card-body p-4 p-md-5 bg-white">
-                                        <h2 class="h5 fw-bold mb-4">Por que casais usam o {{ config('app.name', 'app') }}?</h2>
+                                        <h2 class="h5 fw-bold mb-4">Por que casais usam o {{ config('app.name', 'DuoZen') }}?</h2>
                                         <ul class="list-unstyled mb-0">
                                             <li class="d-flex gap-3 mb-3">
                                                 <span class="feature-icon flex-shrink-0">✓</span>
@@ -163,13 +169,15 @@
                     </div>
                 </section>
 
+                @include('partials.subscription-public-info', ['compact' => false])
+
                 <section class="py-5">
                     <div class="container">
                         <div class="row justify-content-center">
                             <div class="col-lg-10 col-xl-8">
                                 <blockquote class="text-center border-0 mb-0 px-md-5">
                                     <p class="fs-5 text-dark fst-italic mb-3">“Quando o dinheiro fica visível para os dois, a conversa muda de culpa para planejamento.”</p>
-                                    <footer class="text-secondary small">É para isso que o {{ config('app.name', 'app') }} existe.</footer>
+                                    <footer class="text-secondary small">É para isso que o {{ config('app.name', 'DuoZen') }} existe.</footer>
                                 </blockquote>
                             </div>
                         </div>
@@ -181,7 +189,7 @@
                         <section class="landing-cta-band text-white py-5">
                             <div class="container text-center py-md-2">
                                 <h2 class="h3 fw-bold mb-2">Prontos para alinhar as finanças?</h2>
-                                <p class="cta-subtle mb-4 col-md-8 mx-auto">Crie sua conta, montem o casal e comecem a registrar em minutos — com a mesma clareza que vocês merecem.</p>
+                                <p class="cta-subtle mb-4 col-md-8 mx-auto">Crie sua conta, montem o casal, ativem o plano com período de teste e comecem a registrar em minutos — com a mesma clareza que vocês merecem.</p>
                                 <a href="{{ route('register') }}" class="btn btn-light btn-lg px-5 fw-semibold shadow">Criar conta grátis</a>
                                 @if (Route::has('login'))
                                     <p class="small cta-subtle mt-3 mb-0">
@@ -195,7 +203,7 @@
 
                 <footer class="py-4 bg-white border-top mt-auto">
                     <div class="container text-center text-secondary small">
-                        &copy; {{ date('Y') }} {{ config('app.name', 'Laravel') }}
+                        &copy; {{ date('Y') }} {{ config('app.name', 'DuoZen') }}
                     </div>
                 </footer>
             </main>

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="h5 mb-0">
-            {{ __('Lançamentos') }}
+            Lançamentos
         </h2>
     </x-slot>
 
@@ -104,7 +104,7 @@
                                                         {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ number_format($transaction->amount, 2, ',', '.') }}
                                                     </td>
                                                     <td class="text-center">
-                                                        <form action="{{ route('transactions.destroy', $transaction) }}" method="POST" class="d-inline" data-confirm-title="{{ __('Excluir lançamento') }}" data-confirm="{{ __('Deseja excluir este lançamento?') }}" data-confirm-accept="{{ __('Sim, excluir') }}" data-confirm-cancel="{{ __('Cancelar') }}">
+                                                        <form action="{{ route('transactions.destroy', $transaction) }}" method="POST" class="d-inline" data-confirm-title="Excluir lançamento" data-confirm="Deseja excluir este lançamento?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                                                             @csrf
                                                             @method('DELETE')
                                                             <button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir">
@@ -246,7 +246,7 @@
                                             <div>
                                                 <x-input-label for="account_id" value="Conta / cartão" />
                                                 <select id="account_id" name="account_id" class="form-select mt-1" required>
-                                                    <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>{{ __('Selecione a conta...') }}</option>
+                                                    <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>Selecione a conta…</option>
                                                     @foreach($accounts as $account)
                                                         <option
                                                             value="{{ $account->id }}"
@@ -272,7 +272,7 @@
                                                     @if(count($availablePaymentMethods) > 0) required @endif
                                                 >
                                                     @if(count($availablePaymentMethods) !== 1)
-                                                        <option value="">{{ __('Selecione...') }}</option>
+                                                        <option value="">Selecione…</option>
                                                     @endif
                                                     @foreach($availablePaymentMethods as $pm)
                                                         <option value="{{ $pm }}" {{ (string) old('payment_method', $autoPaymentMethod) === (string) $pm ? 'selected' : '' }}>{{ $pm }}</option>

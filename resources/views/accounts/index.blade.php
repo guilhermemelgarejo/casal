@@ -4,7 +4,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="h5 mb-0">
-            {{ __('Gerenciar Contas e Cartões') }}
+            Gerenciar contas e cartões
         </h2>
     </x-slot>
 
@@ -112,7 +112,7 @@
                                                 >
                                                     Editar
                                                 </button>
-                                                <form action="{{ route('accounts.destroy', $account) }}" method="POST" data-confirm-title="{{ __('Excluir conta') }}" data-confirm="{{ __('Excluir esta conta? Lançamentos vinculados ficarão sem conta.') }}" data-confirm-accept="{{ __('Sim, excluir') }}" data-confirm-cancel="{{ __('Cancelar') }}">
+                                                <form action="{{ route('accounts.destroy', $account) }}" method="POST" data-confirm-title="Excluir conta" data-confirm="Excluir esta conta? Lançamentos vinculados ficarão sem conta." data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir conta">

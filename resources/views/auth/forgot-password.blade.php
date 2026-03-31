@@ -1,6 +1,6 @@
 <x-guest-layout>
     <p class="small text-secondary mb-4">
-        {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
+        Esqueceu a senha? Sem problema. Informe seu e-mail e enviaremos um link para redefinir a senha e escolher uma nova.
     </p>
 
     <x-auth-session-status class="mb-4" :status="session('status')" />
@@ -9,14 +9,14 @@
         @csrf
 
         <div class="mb-3">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" value="E-mail" />
             <x-text-input id="email" class="mt-1" type="email" name="email" :value="old('email')" required autofocus />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
         <div class="d-flex justify-content-end mt-4">
             <x-primary-button>
-                {{ __('Email Password Reset Link') }}
+                Enviar link de redefinição
             </x-primary-button>
         </div>
     </form>

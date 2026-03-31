@@ -1,14 +1,14 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <h2 class="h5 mb-0">{{ __('Dashboard') }}</h2>
+            <h2 class="h5 mb-0">Painel</h2>
 
             <form action="{{ route('dashboard') }}" method="GET" class="d-flex align-items-center gap-2 flex-wrap">
                 <input type="month" name="period" value="{{ $period }}" class="form-control form-control-sm" style="width: auto;">
 
                 <x-primary-button type="submit" class="btn-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="me-1" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    {{ __('Filtrar') }}
+                    Filtrar
                 </x-primary-button>
 
                 @if(request()->has('period'))
@@ -103,7 +103,7 @@
             <div class="card shadow-sm border mb-4">
                 <div class="card-header bg-body-secondary d-flex justify-content-between align-items-center py-3">
                     <div>
-                        <h3 class="h6 mb-0">Onde e como você gastou</h3>
+                        <h3 class="h6 mb-0">Onde e como vocês gastaram</h3>
                         <p class="small text-secondary mb-0">Detalhamento por conta e pagamento</p>
                     </div>
                 </div>

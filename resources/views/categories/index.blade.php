@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="h5 mb-0">
-            {{ __('Categorias') }}
+            Categorias
         </h2>
     </x-slot>
 
@@ -80,11 +80,12 @@
                                                 <button
                                                     type="button"
                                                     class="btn btn-link btn-sm p-0 me-2"
-                                                    data-edit-category="{{ e(json_encode($cat)) }}"
+                                                    @php($editCat = $cat->only(['id', 'name', 'type', 'color']))
+                                                    data-edit-category='@json($editCat)'
                                                 >
                                                     Editar
                                                 </button>
-                                                <form action="{{ route('categories.destroy', $cat) }}" method="POST" class="d-inline" data-confirm-title="{{ __('Excluir categoria') }}" data-confirm="{{ __('Deseja excluir esta categoria?') }}" data-confirm-accept="{{ __('Sim, excluir') }}" data-confirm-cancel="{{ __('Cancelar') }}">
+                                                <form action="{{ route('categories.destroy', $cat) }}" method="POST" class="d-inline" data-confirm-title="Excluir categoria" data-confirm="Deseja excluir esta categoria?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-link btn-sm text-danger p-0">Excluir</button>

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="h5 mb-0">
-            {{ __('Gerenciar Casal') }}
+            Gerenciar casal
         </h2>
     </x-slot>
 
@@ -58,12 +58,12 @@
                             </div>
                             <div class="d-flex flex-wrap gap-2">
                                 <a href="{{ route('dashboard') }}" class="btn btn-primary btn-sm">
-                                    Ir para Dashboard
+                                    Ir para o painel
                                 </a>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
                                     Configurações
                                 </button>
-                                <form action="{{ route('couple.leave') }}" method="POST" data-confirm-title="{{ __('Sair do casal') }}" data-confirm="{{ __('Tem certeza de que deseja sair do casal?') }}" data-confirm-accept="{{ __('Sim, sair') }}" data-confirm-cancel="{{ __('Cancelar') }}" data-confirm-icon="question">
+                                <form action="{{ route('couple.leave') }}" method="POST" data-confirm-title="Sair do casal" data-confirm="Tem certeza de que deseja sair do casal?" data-confirm-accept="Sim, sair" data-confirm-cancel="Cancelar" data-confirm-icon="question">
                                     @csrf
                                     <button type="submit" class="btn btn-danger btn-sm">
                                         Sair do Casal
@@ -98,7 +98,7 @@
                                     <div class="mb-0">
                                         <x-input-label for="spending_alert_threshold" value="Alerta de Gastos (%)" />
                                         <x-text-input id="spending_alert_threshold" name="spending_alert_threshold" type="number" step="0.01" class="mt-1" value="{{ $couple->spending_alert_threshold }}" required />
-                                        <p class="form-text">Você será avisado na dashboard quando os gastos atingirem esta porcentagem da renda mensal.</p>
+                                        <p class="form-text">Vocês serão avisados no painel quando os gastos atingirem esta porcentagem da renda mensal.</p>
                                         <x-input-error :messages="$errors->get('spending_alert_threshold')" class="mt-2" />
                                     </div>
                                 </div>
