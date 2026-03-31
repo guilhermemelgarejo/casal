@@ -6,12 +6,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\Couple;
+use Laravel\Cashier\Billable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use Billable, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -28,6 +28,60 @@ class User extends Authenticatable
     public function couple()
     {
         return $this->belongsTo(Couple::class);
+    }
+
+    public function isCasalAdmin(): bool
+    {
+        $adminCoupleId = config('duozen.subscription_admin_couple_id');
+
+        if ($adminCoupleId !== null && (int) $this->couple_id === (int) $adminCoupleId) {
+            return true;
+        }
+
+        return $this->emailMatchesList(config('duozen.admin_emails', []));
+    }
+
+    public function isBillingExempt(): bool
+    {
+        if ($this->isCasalAdmin()) {
+            return true;
+        }
+
+        return $this->emailMatchesList(config('duozen.billing_exempt_emails', []));
+    }
+
+    /**
+     * Casal com acesso: algum membro tem subscrição Stripe válida (inclui período de teste com trial).
+     */
+    public function coupleHasBillingAccess(): bool
+    {
+        if (! $this->couple_id) {
+            return false;
+        }
+
+        $this->loadMissing('couple.users');
+
+        return $this->couple->users->contains(fn (User $member) => $member->subscribed('default'));
+    }
+
+    /**
+     * @param  list<string>  $emails
+     */
+    protected function emailMatchesList(array $emails): bool
+    {
+        if ($emails === []) {
+            return false;
+        }
+
+        $needle = strtolower($this->email);
+
+        foreach ($emails as $allowed) {
+            if (strtolower((string) $allowed) === $needle) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

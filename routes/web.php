@@ -1,19 +1,21 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\CoupleController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Admin\SubscriptionAdminController;
+use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CoupleController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::middleware(['auth', 'has-couple'])->group(function () {
+Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
@@ -35,6 +37,17 @@ Route::middleware(['auth', 'has-couple'])->group(function () {
     Route::post('/budgets/income', [BudgetController::class, 'updateIncome'])->name('budgets.income');
 });
 
+Route::middleware(['auth', 'has-couple'])->group(function () {
+    Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::post('/billing/checkout', [BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::get('/billing/success', [BillingController::class, 'success'])->name('billing.success');
+    Route::get('/billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
+});
+
+Route::middleware(['auth', 'duozen-admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/assinaturas', [SubscriptionAdminController::class, 'index'])->name('subscriptions.index');
+});
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -48,4 +61,4 @@ Route::middleware('auth')->group(function () {
     Route::post('/couple/leave', [CoupleController::class, 'leave'])->name('couple.leave');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

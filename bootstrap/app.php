@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureCasalAdmin;
+use App\Http\Middleware\EnsureCoupleBillingActive;
+use App\Http\Middleware\EnsureHasCouple;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,7 +15,14 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'has-couple' => \App\Http\Middleware\EnsureHasCouple::class,
+            'has-couple' => EnsureHasCouple::class,
+            'couple-billing' => EnsureCoupleBillingActive::class,
+            'duozen-admin' => EnsureCasalAdmin::class,
+            'casal-admin' => EnsureCasalAdmin::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'stripe/*',
         ]);
 
         $middleware->redirectUsersTo(fn () => route('dashboard', absolute: false));
