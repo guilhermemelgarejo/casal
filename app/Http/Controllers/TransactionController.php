@@ -29,8 +29,8 @@ class TransactionController extends Controller
 
         $transactions = $couple->transactions()
             ->with(['category', 'user', 'accountModel'])
-            ->whereMonth('date', $selectedMonth)
-            ->whereYear('date', $selectedYear)
+            ->where('reference_month', $selectedMonth)
+            ->where('reference_year', $selectedYear)
             ->latest()
             ->paginate(20);
         $transactions->appends(['month' => $selectedMonth, 'year' => $selectedYear]);
@@ -40,8 +40,8 @@ class TransactionController extends Controller
 
         // Resumos do mês selecionado (considera o mês inteiro, não apenas a página do paginate)
         $monthTransactionsAll = $couple->transactions()
-            ->whereMonth('date', $selectedMonth)
-            ->whereYear('date', $selectedYear)
+            ->where('reference_month', $selectedMonth)
+            ->where('reference_year', $selectedYear)
             ->get();
 
         $expenseMonthTransactions = $monthTransactionsAll->where('type', 'expense');
@@ -100,6 +100,8 @@ class TransactionController extends Controller
             'installments' => 'nullable|integer|min:1|max:12',
             'type' => 'required|in:income,expense',
             'date' => 'required|date',
+            'reference_month' => 'nullable|integer|min:1|max:12',
+            'reference_year' => 'nullable|integer|min:2000|max:2100',
         ]);
 
         $category = Category::find($request->category_id);
@@ -144,11 +146,16 @@ class TransactionController extends Controller
         $baseDescription = (string) $request->description;
         $installmentParentId = null;
 
+        $referenceMonth = (int) ($request->input('reference_month') ?: $startDate->month);
+        $referenceYear = (int) ($request->input('reference_year') ?: $startDate->year);
+        $referenceBase = Carbon::createFromDate($referenceYear, $referenceMonth, 1);
+
         DB::transaction(function () use (
             $installments,
             $baseCents,
             $remainderCents,
             $startDate,
+            $referenceBase,
             $baseDescription,
             &$installmentParentId,
             $request
@@ -159,6 +166,7 @@ class TransactionController extends Controller
                 // Envia como string com 2 casas para evitar erros de ponto flutuante no decimal do banco.
                 $parcelAmount = number_format($cents / 100, 2, '.', '');
 
+                $ref = $referenceBase->copy()->addMonths($i);
                 $data = [
                     'couple_id' => Auth::user()->couple_id,
                     'user_id' => Auth::id(),
@@ -171,6 +179,8 @@ class TransactionController extends Controller
                     'payment_method' => $request->payment_method,
                     'type' => $request->type,
                     'date' => $startDate->copy()->addMonths($i)->toDateString(),
+                    'reference_month' => (int) $ref->month,
+                    'reference_year' => (int) $ref->year,
                 ];
 
                 // Vínculo (autorelacionamento) entre as parcelas:

@@ -1,5 +1,6 @@
 @php
     use App\Support\PaymentMethods;
+    use App\Models\Account;
 @endphp
 <x-app-layout>
     <x-slot name="header">
@@ -34,6 +35,19 @@
                                         <x-input-label for="name" value="Nome" />
                                         <x-text-input id="name" name="name" type="text" class="mt-1" required placeholder="Ex: Nubank, Itaú, carteira..." value="{{ old('_form') === 'account-store' ? old('name') : '' }}" />
                                         <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                                    </div>
+
+                                    <div>
+                                        <x-input-label for="type" value="Tipo" />
+                                        <select id="type" name="kind" class="form-select mt-1" required>
+                                            @php
+                                                $kindOld = old('_form') === 'account-store' ? old('kind', Account::KIND_REGULAR) : Account::KIND_REGULAR;
+                                            @endphp
+                                            <option value="{{ Account::KIND_REGULAR }}" {{ $kindOld === Account::KIND_REGULAR ? 'selected' : '' }}>Conta (não-cartão)</option>
+                                            <option value="{{ Account::KIND_CREDIT_CARD }}" {{ $kindOld === Account::KIND_CREDIT_CARD ? 'selected' : '' }}>Cartão de crédito (tipada)</option>
+                                        </select>
+                                        <x-input-error :messages="$errors->get('kind')" class="mt-2" />
+                                        <p class="form-text mb-0">Se for cartão de crédito, esta conta aceitará somente “Cartão de Crédito”.</p>
                                     </div>
 
                                     <div>
@@ -83,6 +97,10 @@
                                     if (old('_form') === 'account-update-'.$account->id) {
                                         $selectedForEdit = (array) old('payment_methods', []);
                                     }
+                                    $typeLabel = match ($account->kind) {
+                                        Account::KIND_CREDIT_CARD => 'Cartão de crédito',
+                                        default => 'Conta (não-cartão)',
+                                    };
                                 @endphp
                                 <div class="card border shadow-sm">
                                     <div class="card-body">
@@ -93,6 +111,7 @@
                                                 </div>
                                                 <div class="min-w-0">
                                                     <h4 class="h6 mb-1">{{ $account->name }}</h4>
+                                                    <div class="small text-secondary mb-1">{{ $typeLabel }}</div>
                                                     <div class="d-flex flex-wrap gap-1 mb-1">
                                                         @foreach ($account->getEffectivePaymentMethods() as $pm)
                                                             <span class="badge rounded-pill bg-body-secondary text-body border">{{ $pm }}</span>
@@ -133,6 +152,19 @@
                                                         <x-input-label for="edit-name-{{ $account->id }}" value="Nome" />
                                                         <x-text-input id="edit-name-{{ $account->id }}" name="name" type="text" class="mt-1" required value="{{ old('_form') === 'account-update-'.$account->id ? old('name') : $account->name }}" />
                                                         <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                                                    </div>
+
+                                                    <div>
+                                                        <x-input-label for="edit-type-{{ $account->id }}" value="Tipo" />
+                                                        @php
+                                                            $kindEditOld = old('_form') === 'account-update-'.$account->id ? old('kind', $account->kind) : $account->kind;
+                                                        @endphp
+                                                        <select id="edit-type-{{ $account->id }}" name="kind" class="form-select mt-1" required>
+                                                            <option value="{{ Account::KIND_REGULAR }}" {{ $kindEditOld === Account::KIND_REGULAR ? 'selected' : '' }}>Conta (não-cartão)</option>
+                                                            <option value="{{ Account::KIND_CREDIT_CARD }}" {{ $kindEditOld === Account::KIND_CREDIT_CARD ? 'selected' : '' }}>Cartão de crédito (tipada)</option>
+                                                        </select>
+                                                        <x-input-error :messages="$errors->get('kind')" class="mt-2" />
+                                                        <p class="form-text mb-0">Se trocar para cartão de crédito, a conta passará a aceitar somente “Cartão de Crédito”.</p>
                                                     </div>
 
                                                     <div>

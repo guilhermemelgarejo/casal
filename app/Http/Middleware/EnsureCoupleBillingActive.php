@@ -27,6 +27,6 @@ class EnsureCoupleBillingActive
         }
 
         return redirect()->route('billing.index')
-            ->with('error', 'Ative a assinatura (período de teste com cartão) para continuar a usar o painel.');
+            ->with('info', 'Para continuar, ative a assinatura do casal. Você pode começar pelo período de teste — é só cadastrar um cartão no Stripe Checkout.');
     }
 }

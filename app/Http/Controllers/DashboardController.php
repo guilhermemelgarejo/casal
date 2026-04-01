@@ -21,10 +21,10 @@ class DashboardController extends Controller
         $year = intval($parts[0] ?? date('Y'));
         $month = intval($parts[1] ?? date('m'));
         
-        // Base das transações filtradas por data
+        // Base das transações filtradas por mês/ano de referência (fatura/competência)
         $query = $couple->transactions()
-            ->whereMonth('date', $month)
-            ->whereYear('date', $year);
+            ->where('reference_month', $month)
+            ->where('reference_year', $year);
 
         $transactions = $query->with(['category', 'accountModel'])->latest('date')->get();
 

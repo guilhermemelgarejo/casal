@@ -124,8 +124,8 @@
                                 $budget = $budgets->where('category_id', $category->id)->first();
                                 $spent = Auth::user()->couple->transactions()
                                     ->where('category_id', $category->id)
-                                    ->whereMonth('date', date('m'))
-                                    ->whereYear('date', date('Y'))
+                                    ->where('reference_month', (int) date('m'))
+                                    ->where('reference_year', (int) date('Y'))
                                     ->sum('amount');
                                 $usagePercent = $budget && $budget->amount > 0 ? ($spent / $budget->amount) * 100 : 0;
                                 $budgetVsIncome = $budget && $income > 0 ? ($budget->amount / $income) * 100 : 0;

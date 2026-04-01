@@ -1,8 +1,6 @@
 <x-guest-layout>
     <h1 class="h5 fw-semibold text-center text-dark mb-3">Criar conta</h1>
 
-    @include('partials.subscription-public-info', ['compact' => true])
-
     <form method="POST" action="{{ route('register') }}">
         @csrf
 
@@ -32,6 +30,10 @@
             <x-input-label for="password_confirmation" value="Confirmar senha" />
             <x-text-input id="password_confirmation" class="mt-1" type="password" name="password_confirmation" required autocomplete="new-password" />
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+        </div>
+
+        <div class="mt-3">
+            @include('partials.subscription-public-info', ['compact' => true])
         </div>
 
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">

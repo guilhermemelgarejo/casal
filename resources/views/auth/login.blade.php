@@ -22,11 +22,19 @@
         </div>
 
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
-            @if (Route::has('password.request'))
-                <a class="small text-decoration-none" href="{{ route('password.request') }}">
-                    Esqueceu a senha?
-                </a>
-            @endif
+            <div class="d-flex gap-3 flex-wrap">
+                @if (Route::has('register'))
+                    <a class="small text-decoration-none" href="{{ route('register') }}">
+                        Registrar
+                    </a>
+                @endif
+
+                @if (Route::has('password.request'))
+                    <a class="small text-decoration-none" href="{{ route('password.request') }}">
+                        Esqueceu a senha?
+                    </a>
+                @endif
+            </div>
 
             <x-primary-button>Entrar</x-primary-button>
         </div>

@@ -187,6 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentHint = document.getElementById('payment-method-hint');
     const installmentsWrapper = document.getElementById('installments-wrapper');
     const installmentsSelect = document.getElementById('installments');
+    const referenceWrapper = document.getElementById('reference-wrapper');
+    const referenceMonth = document.getElementById('reference_month');
+    const referenceYear = document.getElementById('reference_year');
     if (txForm && accountSelect && paymentSelect) {
         const syncInstallmentsVisibility = () => {
             if (!installmentsWrapper || !installmentsSelect) {
@@ -206,6 +209,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 installmentsWrapper.classList.add('d-none');
                 installmentsSelect.disabled = true;
                 installmentsSelect.required = false;
+            }
+
+            if (referenceWrapper) {
+                if (isCredit) {
+                    referenceWrapper.classList.remove('d-none');
+                    if (referenceMonth) referenceMonth.disabled = false;
+                    if (referenceYear) referenceYear.disabled = false;
+                } else {
+                    referenceWrapper.classList.add('d-none');
+                    if (referenceMonth) referenceMonth.disabled = true;
+                    if (referenceYear) referenceYear.disabled = true;
+                }
             }
         };
 

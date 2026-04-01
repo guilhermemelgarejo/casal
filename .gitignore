@@ -3,6 +3,8 @@
 /bootstrap/cache/*
 !/bootstrap/cache/.gitignore
 .env
+.env.testing
+.env.testing.local
 .env.backup
 .env.production
 .phpactor.json

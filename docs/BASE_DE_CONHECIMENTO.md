@@ -80,7 +80,7 @@ Comportamento:
 | `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`) |
 | `Couple` | `name`, `invite_code` (único), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts |
 | `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon` |
-| `Account` | `couple_id`, `name`, `color`, `allowed_payment_methods` (array JSON); `null` em allowed = todas (legado) — ver `getEffectivePaymentMethods()`, `allowsPaymentMethod()` |
+| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `allowed_payment_methods` (array JSON); `null` em allowed = todas (legado). **Regra:** se `kind=credit_card`, a conta é **tipada como cartão de crédito** e deve aceitar **somente** `Cartão de Crédito`; contas com `kind=regular` **nunca** devem permitir `Cartão de Crédito` — ver `getEffectivePaymentMethods()`, `allowsPaymentMethod()` |
 | `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method`, `type`, `date`, `installment_parent_id`; relação `accountModel`; parcelas ligadas à primeira via `installment_parent_id` |
 | `Budget` | `couple_id`, `category_id`, `amount`, `month`, `year` |
 
@@ -110,15 +110,15 @@ Contas restringem subconjuntos via `allowed_payment_methods`.
 
 ### `DashboardController`
 
-- Query param `period=YYYY-MM` (default mês atual).
+- Query param `period=YYYY-MM` (default mês atual), filtrando lançamentos pelo **mês de referência** (`reference_month`/`reference_year`).
 - Totais receita/despesa/saldo; alerta se `monthly_income > 0` e despesas ≥ limiar %.
 - Resumo despesas: conta × forma de pagamento.
 
 ### `TransactionController`
 
-- Lista paginada (20), filtro mês/ano; agregações do mês.
+- Lista paginada (20), filtro mês/ano **pelo mês de referência** (`reference_month`/`reference_year`); agregações do mês.
 - **store:** valida categoria e conta do casal; tipo da categoria = tipo do lançamento; payment method permitido pela conta.
-- **Cartão de crédito:** parcelas 1–12; divisão em **centavos**; descrição ` (Parcela x/y)`; datas mensais; `installment_parent_id`.
+- **Cartão de crédito:** parcelas 1–12; divisão em **centavos**; descrição ` (Parcela x/y)`; datas mensais; **mês de referência pode ser informado (ex.: compra em 20/04 cair na fatura 05/2026)**; `installment_parent_id`.
 - **destroy:** verifica `couple_id`.
 
 ### `CategoryController` / `AccountController`
@@ -167,6 +167,7 @@ Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/
 ## 10. Testes
 
 - `phpunit.xml`: `APP_URL=http://casal.localhost`, SQLite memória, `DUOZEN_BILLING_DISABLED=true` (evita bloquear dashboard nos testes sem Stripe).
+- **Recomendado:** criar um ficheiro `.env.testing` (não versionado) apontando para SQLite `:memory:` para garantir que comandos em `APP_ENV=testing` não atinjam o MySQL do desenvolvimento.
 - `tests/TestCase.php`: desativa o middleware `ValidateCsrfToken` nos testes de funcionalidade (evita 419 em `POST`/`PUT`/`DELETE` sem token).
 - Pastas: `tests/Feature` (Auth, Profile, CoupleAccess, CategoryCrud, …), `tests/Unit` (ex.: `PaymentMethodsTest`).
 - Utilizadores de `User::factory()` usam senha em texto plano `'password'` no factory; o cast `hashed` do modelo `User` gera o hash ao gravar (alinha com registo/atualização de senha na app).

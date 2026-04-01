@@ -82,7 +82,18 @@
                                         <tbody>
                                             @forelse ($transactions as $transaction)
                                                 <tr>
-                                                    <td class="text-secondary small text-nowrap">{{ $transaction->date->format('d/m/Y') }}</td>
+                                                    <td class="text-secondary small text-nowrap">
+                                                        <div>{{ $transaction->date->format('d/m/Y') }}</div>
+                                                        @php
+                                                            $refMonth = (int) ($transaction->reference_month ?? $transaction->date->month);
+                                                            $refYear = (int) ($transaction->reference_year ?? $transaction->date->year);
+                                                            $refLabel = str_pad((string) $refMonth, 2, '0', STR_PAD_LEFT) . '/' . $refYear;
+                                                            $dateMonthYear = $transaction->date->format('m/Y');
+                                                        @endphp
+                                                        @if($refLabel !== $dateMonthYear)
+                                                            <div class="text-muted">Ref: {{ $refLabel }}</div>
+                                                        @endif
+                                                    </td>
                                                     <td>
                                                         <div class="fw-medium">{{ $transaction->description }}</div>
                                                         <div class="small text-muted">{{ $transaction->user->name }}</div>
@@ -244,16 +255,17 @@
                                             </div>
 
                                             <div>
-                                                <x-input-label for="account_id" value="Conta / cartão" />
+                                                <x-input-label for="account_id" value="Conta (ou cartão)" />
                                                 <select id="account_id" name="account_id" class="form-select mt-1" required>
                                                     <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>Selecione a conta…</option>
                                                     @foreach($accounts as $account)
                                                         <option
                                                             value="{{ $account->id }}"
                                                             data-payment-methods='@json($account->getEffectivePaymentMethods())'
+                                                            data-kind="{{ $account->kind }}"
                                                             {{ (string) old('account_id') === (string) $account->id ? 'selected' : '' }}
                                                         >
-                                                            {{ $account->name }}
+                                                            {{ $account->name }}{{ $account->isCreditCard() ? ' (Cartão de crédito)' : '' }}
                                                         </option>
                                                     @endforeach
                                                 </select>
@@ -279,13 +291,17 @@
                                                     @endforeach
                                                 </select>
                                                 <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
-                                                <p class="form-text mb-0" id="payment-method-hint">Escolha a conta; só aparecem as formas habilitadas para ela.</p>
+                                                <p class="form-text mb-0" id="payment-method-hint">Escolha a conta; só aparecem as formas habilitadas para ela (cartão de crédito só aceita crédito).</p>
                                             </div>
 
                                             @php
                                                 $pmSelectedForRender = old('payment_method', $autoPaymentMethod);
                                                 $isCreditRender = $pmSelectedForRender === 'Cartão de Crédito';
                                                 $installmentsOld = (int) old('installments', 1);
+
+                                                $dateForRef = old('date', date('Y-m-d'));
+                                                $parsedRefMonth = (int) old('reference_month', (int) date('m', strtotime($dateForRef)));
+                                                $parsedRefYear = (int) old('reference_year', (int) date('Y', strtotime($dateForRef)));
                                             @endphp
                                             <div id="installments-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
                                                 <x-input-label for="installments" value="Parcelas (crédito)" />
@@ -301,6 +317,33 @@
                                                 </select>
                                                 <x-input-error :messages="$errors->get('installments')" class="mt-2" />
                                                 <p class="form-text mb-0">Geramos 1 lançamento por mês de referência.</p>
+                                            </div>
+
+                                            <div id="reference-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
+                                                <x-input-label value="Mês de referência (fatura)" />
+                                                <div class="row g-2 mt-1">
+                                                    <div class="col-6">
+                                                        <select id="reference_month" name="reference_month" class="form-select">
+                                                            @for($m = 1; $m <= 12; $m++)
+                                                                <option value="{{ $m }}" {{ (int) $parsedRefMonth === $m ? 'selected' : '' }}>
+                                                                    {{ str_pad((string) $m, 2, '0', STR_PAD_LEFT) }}
+                                                                </option>
+                                                            @endfor
+                                                        </select>
+                                                        <x-input-error :messages="$errors->get('reference_month')" class="mt-2" />
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <select id="reference_year" name="reference_year" class="form-select">
+                                                            @foreach($years as $y)
+                                                                <option value="{{ $y }}" {{ (int) $parsedRefYear === (int) $y ? 'selected' : '' }}>
+                                                                    {{ $y }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                        <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
+                                                    </div>
+                                                </div>
+                                                <p class="form-text mb-0">Ex.: compra em 20/04 pode cair na fatura de 05/2026.</p>
                                             </div>
 
                                             <div>

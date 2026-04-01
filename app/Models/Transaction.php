@@ -9,10 +9,26 @@ class Transaction extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['couple_id', 'user_id', 'category_id', 'account_id', 'description', 'amount', 'payment_method', 'account', 'type', 'date', 'installment_parent_id'];
+    protected $fillable = [
+        'couple_id',
+        'user_id',
+        'category_id',
+        'account_id',
+        'description',
+        'amount',
+        'payment_method',
+        'account',
+        'type',
+        'date',
+        'reference_month',
+        'reference_year',
+        'installment_parent_id',
+    ];
 
     protected $casts = [
         'date' => 'date',
+        'reference_month' => 'integer',
+        'reference_year' => 'integer',
     ];
 
     public function couple()
