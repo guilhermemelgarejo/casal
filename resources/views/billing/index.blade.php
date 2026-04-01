@@ -36,7 +36,11 @@
                             </a>
                         @else
                             <p class="mb-0">
-                                A assinatura está ativa por outro membro do casal. Não é necessário registar cartão novamente.
+                                A assinatura já está ativa por outro membro do casal
+                                @if (! empty($billingOwner?->name))
+                                    (<strong>{{ $billingOwner->name }}</strong>)
+                                @endif
+                                . Não é necessário registar cartão novamente.
                             </p>
                         @endif
                     @else

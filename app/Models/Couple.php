@@ -4,12 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Couple extends Model
 {
     use HasFactory;
 
     protected $fillable = ['name', 'invite_code', 'monthly_income', 'spending_alert_threshold'];
+
+    public function billingOwner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'billing_owner_user_id');
+    }
 
     public function users()
     {

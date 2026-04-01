@@ -138,7 +138,7 @@ Contas restringem subconjuntos via `allowed_payment_methods`.
 
 - **index:** estado do plano; se faturamento desativado ou Stripe incompleto, mensagem informativa; senão CTA para Checkout com trial (`DUOZEN_TRIAL_DAYS`, default 14) ou link para Customer Portal se já subscrito. (Compat: `CASAL_TRIAL_DAYS`.)
 - **checkout:** `newSubscription('default', STRIPE_PRICE_ID)->trialDays(...)->checkout()` (cartão no Stripe).
-- **success:** redirect ao dashboard com flash.
+- **success:** lê `session_id` do Checkout, obtém a subscrição no Stripe e grava/atualiza `subscriptions` / `subscription_items` via `App\Support\Billing::syncSubscriptionFromStripeSubscription` (garante acesso logo após pagar mesmo que o webhook ainda não tenha corrido — típico em local sem Stripe CLI); também define o **dono da assinatura do casal** (`couples.billing_owner_user_id`) no primeiro membro que ativar; depois redirect ao dashboard com flash.
 - **portal:** redirect ao Stripe Billing Portal (quem tem subscrição `default`).
 
 ### `SubscriptionAdminController` (`Admin`)
@@ -188,7 +188,7 @@ Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base**; volte a correr
 2. E-mail verificado não obrigatório para uso normal.
 3. Casal pode ficar sem utilizadores no registo (não há delete automático ao sair o último).
 4. Navbar usa `route('dashboard')`; utilizadores sem casal são empurrados para `couple.index` pelo middleware.
-5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1. (Compat: `CASAL_*`.)
+5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). O Cashier mantém o estado atualizado via webhooks; a rota **billing success** também sincroniza a subscrição a partir da sessão de Checkout (útil quando o webhook não atinge o ambiente, p.ex. `localhost` sem Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1. (Compat: `CASAL_*`.)
 
 ---
 
