@@ -48,7 +48,7 @@ database/factories/
 database/seeders/DatabaseSeeder.php
 resources/views/        # layouts, dashboard, couple, categories, transactions, welcome, auth/*, partials/subscription-public-info (texto trial/plano na landing e registo)
 tests/Feature/, tests/Unit/
-public/vendor/bootstrap, public/css, public/js
+public/vendor/bootstrap, public/css, public/js, `public/favicon.png` (marca; fallback `public/favicon.svg`), `public/images/` (ex.: logo completo em convidado)
 ```
 
 ---

@@ -1,3 +1,13 @@
+@php
+    $faviconSvg = public_path('favicon.svg');
+    $faviconPng = public_path('favicon.png');
+@endphp
+@if (file_exists($faviconPng))
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}?v={{ filemtime($faviconPng) }}" sizes="32x32">
+@elseif (file_exists($faviconSvg))
+    <link rel="icon" href="{{ asset('favicon.svg') }}?v={{ filemtime($faviconSvg) }}" type="image/svg+xml">
+@endif
+
 {{-- Bootstrap 5.3.3 local (public/vendor/bootstrap) — sem CDN --}}
 @php
     $bsCss = public_path('vendor/bootstrap/css/bootstrap.min.css');
