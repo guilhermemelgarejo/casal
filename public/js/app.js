@@ -171,33 +171,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         editor.querySelector('.js-pm-check-all')?.addEventListener('click', () => {
             grid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-                cb.checked = true;
+                if (!cb.disabled) {
+                    cb.checked = true;
+                }
             });
         });
         editor.querySelector('.js-pm-check-none')?.addEventListener('click', () => {
             grid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-                cb.checked = false;
+                if (!cb.disabled) {
+                    cb.checked = false;
+                }
             });
         });
     });
 
+    document.querySelectorAll('[data-account-kind-select]').forEach((sel) => {
+        const targetSelector = sel.getAttribute('data-pm-target');
+        const target = targetSelector ? document.querySelector(targetSelector) : null;
+        if (!target) {
+            return;
+        }
+        const sync = () => {
+            const isCard = sel.value === 'credit_card';
+            target.classList.toggle('d-none', isCard);
+            target.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+                cb.disabled = isCard;
+                if (isCard) {
+                    cb.checked = false;
+                }
+            });
+        };
+        sel.addEventListener('change', sync);
+        sync();
+    });
+
+    document.querySelectorAll('[data-account-pm-block][data-fixed-kind]').forEach((target) => {
+        const isCard = target.getAttribute('data-fixed-kind') === 'credit_card';
+        target.classList.toggle('d-none', isCard);
+        target.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+            cb.disabled = isCard;
+            if (isCard) {
+                cb.checked = false;
+            }
+        });
+    });
+
     const txForm = document.getElementById('form-new-transaction');
-    const accountSelect = document.getElementById('account_id');
-    const paymentSelect = document.getElementById('payment_method');
-    const paymentHint = document.getElementById('payment-method-hint');
     const installmentsWrapper = document.getElementById('installments-wrapper');
     const installmentsSelect = document.getElementById('installments');
     const referenceWrapper = document.getElementById('reference-wrapper');
     const referenceMonth = document.getElementById('reference_month');
     const referenceYear = document.getElementById('reference_year');
-    if (txForm && accountSelect && paymentSelect) {
-        const syncInstallmentsVisibility = () => {
+
+    if (txForm) {
+        const mode = txForm.dataset.txFormMode || 'regular_only';
+        let payload = { regular: [], cards: [] };
+        try {
+            payload = JSON.parse(txForm.dataset.txAccounts || '{}');
+        } catch {
+            /* ignore */
+        }
+
+        const fundingInput = document.getElementById('tx-funding');
+        const pmInput = document.getElementById('tx-payment-method');
+        const paymentFlow = document.getElementById('payment_flow');
+        const destWrap = document.getElementById('tx-destination-wrap');
+        const destLabel = document.getElementById('tx-destination-label');
+        const accountSel = document.getElementById('tx-account-id');
+        const noAccountHint = document.getElementById('tx-no-account-hint');
+        const oldAccountId = txForm.dataset.txOldAccountId || '';
+
+        const syncInstallments = (isCredit) => {
             if (!installmentsWrapper || !installmentsSelect) {
                 return;
             }
-
-            const isCredit = paymentSelect.value === 'Cartão de Crédito';
-
             if (isCredit) {
                 installmentsWrapper.classList.remove('d-none');
                 installmentsSelect.disabled = false;
@@ -210,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 installmentsSelect.disabled = true;
                 installmentsSelect.required = false;
             }
-
             if (referenceWrapper) {
                 if (isCredit) {
                     referenceWrapper.classList.remove('d-none');
@@ -224,100 +270,102 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        const methodsForSelectedAccount = () => {
-            const opt = accountSelect.selectedOptions[0];
-            if (!opt || !accountSelect.value) {
-                return [];
-            }
-            const raw = opt.getAttribute('data-payment-methods');
-            if (!raw) {
-                return [];
-            }
-            try {
-                const parsed = JSON.parse(raw);
-                return Array.isArray(parsed) ? parsed : [];
-            } catch {
-                return [];
-            }
-        };
-
-        const syncPaymentMethodSelect = () => {
-            const methods = methodsForSelectedAccount();
-            const prev = paymentSelect.value;
-            paymentSelect.replaceChildren();
-
-            if (!accountSelect.value) {
-                const ph = document.createElement('option');
-                ph.value = '';
-                ph.textContent = 'Selecione uma conta primeiro';
-                ph.disabled = true;
-                ph.selected = true;
-                paymentSelect.appendChild(ph);
-                paymentSelect.disabled = true;
-                paymentSelect.required = false;
-                if (paymentHint) {
-                    paymentHint.textContent = 'Escolha a conta para carregar as formas de pagamento permitidas.';
-                }
-                syncInstallmentsVisibility();
-                return;
-            }
-
-            if (methods.length === 0) {
-                const ph = document.createElement('option');
-                ph.value = '';
-                ph.textContent = 'Nenhuma forma habilitada nesta conta';
-                ph.disabled = true;
-                ph.selected = true;
-                paymentSelect.appendChild(ph);
-                paymentSelect.disabled = true;
-                paymentSelect.required = false;
-                if (paymentHint) {
-                    paymentHint.textContent = 'Edite a conta em Gerenciar contas e marque ao menos uma forma de pagamento.';
-                }
-                syncInstallmentsVisibility();
-                return;
-            }
-
-            paymentSelect.disabled = false;
-            paymentSelect.required = true;
-
-            if (methods.length === 1) {
-                const only = methods[0];
+        const fillSelect = (sel, items, selectedId) => {
+            sel.innerHTML = '';
+            const ph = document.createElement('option');
+            ph.value = '';
+            ph.textContent = items.length ? 'Selecione…' : 'Nenhuma opção';
+            ph.disabled = true;
+            ph.selected = true;
+            sel.appendChild(ph);
+            items.forEach((item) => {
                 const o = document.createElement('option');
-                o.value = only;
-                o.textContent = only;
-                o.selected = true;
-                paymentSelect.appendChild(o);
-                if (paymentHint) {
-                    paymentHint.textContent = 'Esta conta só usa esta forma; ela foi selecionada automaticamente.';
-                }
-                syncInstallmentsVisibility();
-                return;
-            }
-
-            const placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.textContent = 'Selecione a forma';
-            paymentSelect.appendChild(placeholder);
-            methods.forEach((m) => {
-                const o = document.createElement('option');
-                o.value = m;
-                o.textContent = m;
-                paymentSelect.appendChild(o);
+                o.value = String(item.id);
+                o.textContent = item.name;
+                sel.appendChild(o);
             });
-            if (prev && methods.includes(prev)) {
-                paymentSelect.value = prev;
-            } else {
-                paymentSelect.value = '';
+            if (selectedId && items.some((i) => String(i.id) === String(selectedId))) {
+                sel.value = String(selectedId);
             }
-            if (paymentHint) {
-                paymentHint.textContent = 'Só listamos as formas habilitadas para a conta selecionada.';
-            }
-            syncInstallmentsVisibility();
         };
 
-        accountSelect.addEventListener('change', syncPaymentMethodSelect);
-        paymentSelect.addEventListener('change', syncInstallmentsVisibility);
-        syncPaymentMethodSelect();
+        const isCreditUi = () =>
+            mode === 'cards_only' || (paymentFlow && paymentFlow.value === '__credit__');
+
+        const syncCreditReferencePlusOneMonth = () => {
+            if (!isCreditUi() || !referenceMonth || !referenceYear) {
+                return;
+            }
+            const m = txForm.dataset.txDefaultRefMonth;
+            const y = txForm.dataset.txDefaultRefYear;
+            if (m === undefined || y === undefined || m === '' || y === '') {
+                return;
+            }
+            referenceMonth.value = String(parseInt(m, 10));
+            referenceYear.value = String(parseInt(y, 10));
+        };
+
+        const applyPaymentFlow = (flow) => {
+            if (!accountSel || !destWrap || !fundingInput) {
+                return;
+            }
+            if (!flow) {
+                destWrap.classList.add('d-none');
+                accountSel.innerHTML = '';
+                accountSel.removeAttribute('name');
+                accountSel.required = false;
+                if (noAccountHint) noAccountHint.classList.add('d-none');
+                syncInstallments(false);
+                return;
+            }
+
+            destWrap.classList.remove('d-none');
+
+            if (flow === '__credit__') {
+                fundingInput.value = 'credit_card';
+                if (pmInput) {
+                    pmInput.value = '';
+                    pmInput.setAttribute('disabled', 'disabled');
+                    pmInput.removeAttribute('name');
+                }
+                if (destLabel) destLabel.textContent = 'Cartão de crédito';
+                fillSelect(accountSel, payload.cards || [], oldAccountId);
+                accountSel.setAttribute('name', 'account_id');
+                accountSel.required = (payload.cards || []).length > 0;
+                if (noAccountHint) noAccountHint.classList.add('d-none');
+                syncInstallments(true);
+            } else {
+                fundingInput.value = 'account';
+                if (pmInput) {
+                    pmInput.removeAttribute('disabled');
+                    pmInput.setAttribute('name', 'payment_method');
+                    pmInput.value = flow;
+                }
+                if (destLabel) destLabel.textContent = 'Conta';
+                const filtered = (payload.regular || []).filter(
+                    (a) => Array.isArray(a.methods) && a.methods.includes(flow),
+                );
+                const asOptions = filtered.map((a) => ({ id: a.id, name: a.name }));
+                fillSelect(accountSel, asOptions, oldAccountId);
+                accountSel.setAttribute('name', 'account_id');
+                accountSel.required = asOptions.length > 0;
+                if (noAccountHint) {
+                    noAccountHint.classList.toggle('d-none', asOptions.length > 0);
+                }
+                syncInstallments(false);
+            }
+        };
+
+        if (mode === 'cards_only') {
+            syncInstallments(true);
+        } else if (paymentFlow && accountSel) {
+            paymentFlow.addEventListener('change', () => {
+                applyPaymentFlow(paymentFlow.value);
+                if (paymentFlow.value === '__credit__') {
+                    syncCreditReferencePlusOneMonth();
+                }
+            });
+            applyPaymentFlow(paymentFlow.value);
+        }
     }
 });

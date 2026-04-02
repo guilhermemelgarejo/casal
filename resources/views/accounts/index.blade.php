@@ -39,15 +39,15 @@
 
                                     <div>
                                         <x-input-label for="type" value="Tipo" />
-                                        <select id="type" name="kind" class="form-select mt-1" required>
+                                        <select id="type" name="kind" class="form-select mt-1" required data-account-kind-select data-pm-target="#pm-block-store">
                                             @php
                                                 $kindOld = old('_form') === 'account-store' ? old('kind', Account::KIND_REGULAR) : Account::KIND_REGULAR;
                                             @endphp
-                                            <option value="{{ Account::KIND_REGULAR }}" {{ $kindOld === Account::KIND_REGULAR ? 'selected' : '' }}>Conta (não-cartão)</option>
-                                            <option value="{{ Account::KIND_CREDIT_CARD }}" {{ $kindOld === Account::KIND_CREDIT_CARD ? 'selected' : '' }}>Cartão de crédito (tipada)</option>
+                                            <option value="{{ Account::KIND_REGULAR }}" {{ $kindOld === Account::KIND_REGULAR ? 'selected' : '' }}>Conta</option>
+                                            <option value="{{ Account::KIND_CREDIT_CARD }}" {{ $kindOld === Account::KIND_CREDIT_CARD ? 'selected' : '' }}>Cartão de crédito</option>
                                         </select>
                                         <x-input-error :messages="$errors->get('kind')" class="mt-2" />
-                                        <p class="form-text mb-0">Se for cartão de crédito, esta conta aceitará somente “Cartão de Crédito”.</p>
+                                        <p class="form-text mb-0">Cartões são só para faturas/parcelas; contas bancárias usam Pix, débito, dinheiro, etc.</p>
                                     </div>
 
                                     <div>
@@ -56,12 +56,12 @@
                                         <x-input-error :messages="$errors->get('color')" class="mt-2" />
                                     </div>
 
-                                    <div class="rounded border bg-body-tertiary p-3">
+                                    <div id="pm-block-store" class="rounded border bg-body-tertiary p-3" data-account-pm-block>
                                         <div class="js-payment-methods-editor">
                                             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
                                                 <div>
                                                     <span class="fw-semibold d-block">Formas de pagamento</span>
-                                                    <span class="small text-secondary">Marque como esta conta costuma ser usada (Pix no banco X, crédito no cartão Y, etc.).</span>
+                                                    <span class="small text-secondary">Só para contas: como você costuma pagar por essa conta.</span>
                                                 </div>
                                                 <div class="d-flex gap-1 flex-shrink-0">
                                                     <button type="button" class="btn btn-sm btn-outline-secondary js-pm-check-all">Marcar todas</button>
@@ -70,7 +70,7 @@
                                             </div>
                                             @include('accounts.partials.payment-method-checkboxes', [
                                                 'paymentMethodOptions' => $paymentMethodOptions,
-                                                'selected' => old('_form') === 'account-store' ? (array) (old('payment_methods') ?? []) : PaymentMethods::all(),
+                                                'selected' => old('_form') === 'account-store' ? (array) (old('payment_methods') ?? []) : PaymentMethods::forRegularAccounts(),
                                                 'prefix' => 'new',
                                             ])
                                         </div>
@@ -91,15 +91,17 @@
                             @forelse($accounts as $account)
                                 @php
                                     $editOpen = $errors->any() && old('_form') === 'account-update-'.$account->id;
-                                    $selectedForEdit = $account->allowed_payment_methods !== null
-                                        ? $account->allowed_payment_methods
-                                        : PaymentMethods::all();
+                                    $selectedForEdit = $account->isCreditCard()
+                                        ? []
+                                        : ($account->allowed_payment_methods !== null
+                                            ? $account->allowed_payment_methods
+                                            : PaymentMethods::forRegularAccounts());
                                     if (old('_form') === 'account-update-'.$account->id) {
                                         $selectedForEdit = (array) old('payment_methods', []);
                                     }
                                     $typeLabel = match ($account->kind) {
                                         Account::KIND_CREDIT_CARD => 'Cartão de crédito',
-                                        default => 'Conta (não-cartão)',
+                                        default => 'Conta',
                                     };
                                 @endphp
                                 <div class="card border shadow-sm">
@@ -113,9 +115,13 @@
                                                     <h4 class="h6 mb-1">{{ $account->name }}</h4>
                                                     <div class="small text-secondary mb-1">{{ $typeLabel }}</div>
                                                     <div class="d-flex flex-wrap gap-1 mb-1">
-                                                        @foreach ($account->getEffectivePaymentMethods() as $pm)
-                                                            <span class="badge rounded-pill bg-body-secondary text-body border">{{ $pm }}</span>
-                                                        @endforeach
+                                                        @if($account->isCreditCard())
+                                                            <span class="badge rounded-pill bg-body-secondary text-body border">Cartão de crédito</span>
+                                                        @else
+                                                            @foreach ($account->getEffectivePaymentMethods() as $pm)
+                                                                <span class="badge rounded-pill bg-body-secondary text-body border">{{ $pm }}</span>
+                                                            @endforeach
+                                                        @endif
                                                     </div>
                                                     <p class="small text-secondary mb-0">Cadastrada em {{ $account->created_at->format('d/m/Y') }}</p>
                                                 </div>
@@ -155,16 +161,8 @@
                                                     </div>
 
                                                     <div>
-                                                        <x-input-label for="edit-type-{{ $account->id }}" value="Tipo" />
-                                                        @php
-                                                            $kindEditOld = old('_form') === 'account-update-'.$account->id ? old('kind', $account->kind) : $account->kind;
-                                                        @endphp
-                                                        <select id="edit-type-{{ $account->id }}" name="kind" class="form-select mt-1" required>
-                                                            <option value="{{ Account::KIND_REGULAR }}" {{ $kindEditOld === Account::KIND_REGULAR ? 'selected' : '' }}>Conta (não-cartão)</option>
-                                                            <option value="{{ Account::KIND_CREDIT_CARD }}" {{ $kindEditOld === Account::KIND_CREDIT_CARD ? 'selected' : '' }}>Cartão de crédito (tipada)</option>
-                                                        </select>
-                                                        <x-input-error :messages="$errors->get('kind')" class="mt-2" />
-                                                        <p class="form-text mb-0">Se trocar para cartão de crédito, a conta passará a aceitar somente “Cartão de Crédito”.</p>
+                                                        <span class="d-block small fw-medium text-secondary">Tipo</span>
+                                                        <p class="mb-0 mt-1">{{ $typeLabel }} <span class="text-secondary">(não pode ser alterado)</span></p>
                                                     </div>
 
                                                     <div>
@@ -173,12 +171,12 @@
                                                         <x-input-error :messages="$errors->get('color')" class="mt-2" />
                                                     </div>
 
-                                                    <div class="rounded border bg-body-tertiary p-3">
+                                                    <div id="pm-block-edit-{{ $account->id }}" class="rounded border bg-body-tertiary p-3" data-account-pm-block data-fixed-kind="{{ $account->kind }}">
                                                         <div class="js-payment-methods-editor">
                                                             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
                                                                 <div>
                                                                     <span class="fw-semibold d-block">Formas de pagamento</span>
-                                                                    <span class="small text-secondary">Ao lançar, só aparecerão as opções marcadas para esta conta.</span>
+                                                                    <span class="small text-secondary">Só para contas.</span>
                                                                 </div>
                                                                 <div class="d-flex gap-1 flex-shrink-0">
                                                                     <button type="button" class="btn btn-sm btn-outline-secondary js-pm-check-all">Marcar todas</button>

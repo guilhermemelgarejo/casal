@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Transaction;
-use App\Models\Category;
 use App\Models\Account;
+use App\Models\Category;
+use App\Models\Transaction;
 use App\Support\PaymentMethods;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class TransactionController extends Controller
 {
@@ -38,37 +38,70 @@ class TransactionController extends Controller
         $categories = $couple->categories;
         $accounts = $couple->accounts;
 
-        // Resumos do mês selecionado (considera o mês inteiro, não apenas a página do paginate)
+        $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->values();
+        $cardAccounts = $accounts->where('kind', Account::KIND_CREDIT_CARD)->values();
+
         $monthTransactionsAll = $couple->transactions()
+            ->with(['accountModel'])
             ->where('reference_month', $selectedMonth)
             ->where('reference_year', $selectedYear)
             ->get();
 
         $expenseMonthTransactions = $monthTransactionsAll->where('type', 'expense');
 
-        $byPaymentMethod = $expenseMonthTransactions->groupBy('payment_method')
-            ->map(fn($items) => $items->sum('amount'))
+        $byPaymentMethod = $expenseMonthTransactions->groupBy(function (Transaction $tx) {
+            if ($tx->accountModel?->isCreditCard()) {
+                return 'Cartão: '.$tx->accountModel->name;
+            }
+
+            return $tx->payment_method ?: '—';
+        })
+            ->map(fn ($items) => $items->sum('amount'))
             ->forget('');
 
-        // Agrupamento por conta cadastrada (usando o nome da conta no model)
         $byAccount = $expenseMonthTransactions->whereNotNull('account_id')->groupBy('account_id')
             ->mapWithKeys(function ($items, $accountId) {
                 $account = Account::find($accountId);
                 $accountName = $account?->name ?? 'Conta não encontrada';
+
                 return [$accountName => $items->sum('amount')];
             });
 
-        $availablePaymentMethods = [];
-        $autoPaymentMethod = null;
-        if (old('account_id')) {
-            $selectedAccount = $accounts->firstWhere('id', (int) old('account_id'));
-            if ($selectedAccount) {
-                $availablePaymentMethods = $selectedAccount->getEffectivePaymentMethods();
-                if (count($availablePaymentMethods) === 1) {
-                    $autoPaymentMethod = $availablePaymentMethods[0];
-                }
+        $fundingOld = old('funding');
+        if (! in_array($fundingOld, ['account', 'credit_card'], true)) {
+            if ($regularAccounts->isEmpty() && $cardAccounts->isNotEmpty()) {
+                $fundingOld = 'credit_card';
+            } else {
+                $fundingOld = 'account';
             }
         }
+
+        $paymentFlowOld = '';
+        if (old('funding') === 'credit_card') {
+            $paymentFlowOld = '__credit__';
+        } elseif (old('payment_method')) {
+            $paymentFlowOld = (string) old('payment_method');
+        }
+
+        $txFormMode = $regularAccounts->isNotEmpty() && $cardAccounts->isNotEmpty()
+            ? 'both'
+            : ($cardAccounts->isNotEmpty() ? 'cards_only' : 'regular_only');
+
+        $txAccountsPayload = [
+            'regular' => $regularAccounts->map(fn (Account $a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'methods' => $a->getEffectivePaymentMethods(),
+            ])->values()->all(),
+            'cards' => $cardAccounts->map(fn (Account $a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+            ])->values()->all(),
+        ];
+
+        $referenceDefaultNext = Carbon::now()->startOfMonth()->addMonth();
+        $refDefaultMonth = (int) $referenceDefaultNext->month;
+        $refDefaultYear = (int) $referenceDefaultNext->year;
 
         $selectedMonthYearLabel = Carbon::createFromDate($selectedYear, $selectedMonth, 1)->format('m/Y');
         $years = range($now->year - 5, $now->year + 5);
@@ -78,10 +111,16 @@ class TransactionController extends Controller
             'monthTransactionsAll',
             'categories',
             'accounts',
+            'regularAccounts',
+            'cardAccounts',
             'byPaymentMethod',
             'byAccount',
-            'availablePaymentMethods',
-            'autoPaymentMethod',
+            'fundingOld',
+            'paymentFlowOld',
+            'txFormMode',
+            'txAccountsPayload',
+            'refDefaultMonth',
+            'refDefaultYear',
             'selectedMonth',
             'selectedYear',
             'selectedMonthYearLabel',
@@ -92,11 +131,12 @@ class TransactionController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'funding' => ['required', 'string', Rule::in(['account', 'credit_card'])],
             'category_id' => 'required|exists:categories,id',
             'account_id' => 'required|exists:accounts,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => ['required', 'string', 'max:100', Rule::in(PaymentMethods::all())],
+            'payment_method' => ['nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
             'installments' => 'nullable|integer|min:1|max:12',
             'type' => 'required|in:income,expense',
             'date' => 'required|date',
@@ -114,29 +154,54 @@ class TransactionController extends Controller
             abort(403);
         }
 
-        if ($account->getEffectivePaymentMethods() === []) {
-            return back()->withErrors([
-                'account_id' => 'Esta conta não tem formas de pagamento habilitadas. Edite-a em Gerenciar contas.',
-            ])->withInput();
-        }
+        $funding = $request->input('funding');
 
-        if (! $account->allowsPaymentMethod($request->payment_method)) {
-            return back()->withErrors([
-                'payment_method' => 'Esta forma de pagamento não está habilitada para a conta selecionada.',
-            ])->withInput();
+        if ($funding === 'credit_card') {
+            if (! $account->isCreditCard()) {
+                return back()->withErrors([
+                    'account_id' => 'Selecione um cartão de crédito cadastrado.',
+                ])->withInput();
+            }
+            if ($request->filled('payment_method')) {
+                return back()->withErrors([
+                    'payment_method' => 'Em cartão de crédito não informe forma de pagamento separada; o cartão já identifica o meio.',
+                ])->withInput();
+            }
+            $paymentMethod = null;
+        } else {
+            if ($account->isCreditCard()) {
+                return back()->withErrors([
+                    'account_id' => 'Para Pix, débito, dinheiro etc., escolha uma conta (não um cartão de crédito).',
+                ])->withInput();
+            }
+            if ($account->getEffectivePaymentMethods() === []) {
+                return back()->withErrors([
+                    'account_id' => 'Esta conta não tem formas de pagamento habilitadas. Edite-a em Gerenciar contas.',
+                ])->withInput();
+            }
+            if (! $request->filled('payment_method')) {
+                return back()->withErrors([
+                    'payment_method' => 'Selecione a forma de pagamento.',
+                ])->withInput();
+            }
+            if (! $account->allowsPaymentMethod($request->payment_method)) {
+                return back()->withErrors([
+                    'payment_method' => 'Esta forma de pagamento não está habilitada para a conta selecionada.',
+                ])->withInput();
+            }
+            $paymentMethod = $request->payment_method;
         }
 
         if ($category->type !== $request->type) {
             return back()->withErrors(['category_id' => 'A categoria selecionada não corresponde ao tipo de lançamento (Receita/Despesa).'])->withInput();
         }
 
-        $isCredit = $request->payment_method === 'Cartão de Crédito';
+        $isCredit = $funding === 'credit_card';
         $installments = $isCredit ? (int) $request->input('installments', 1) : 1;
         if ($isCredit && $installments < 1) {
             return back()->withErrors(['installments' => 'Informe a quantidade de parcelas.'])->withInput();
         }
 
-        // Converte valor para centavos para dividir sem erros de ponto flutuante.
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
         $amountCents = (int) round(((float) $amountNormalized) * 100);
         $baseCents = intdiv($amountCents, $installments);
@@ -146,8 +211,19 @@ class TransactionController extends Controller
         $baseDescription = (string) $request->description;
         $installmentParentId = null;
 
-        $referenceMonth = (int) ($request->input('reference_month') ?: $startDate->month);
-        $referenceYear = (int) ($request->input('reference_year') ?: $startDate->year);
+        if ($isCredit) {
+            if ($request->filled('reference_month') && $request->filled('reference_year')) {
+                $referenceMonth = (int) $request->input('reference_month');
+                $referenceYear = (int) $request->input('reference_year');
+            } else {
+                $refDefault = Carbon::now()->startOfMonth()->addMonth();
+                $referenceMonth = (int) $refDefault->month;
+                $referenceYear = (int) $refDefault->year;
+            }
+        } else {
+            $referenceMonth = (int) ($request->input('reference_month') ?: $startDate->month);
+            $referenceYear = (int) ($request->input('reference_year') ?: $startDate->year);
+        }
         $referenceBase = Carbon::createFromDate($referenceYear, $referenceMonth, 1);
 
         DB::transaction(function () use (
@@ -158,12 +234,12 @@ class TransactionController extends Controller
             $referenceBase,
             $baseDescription,
             &$installmentParentId,
-            $request
+            $request,
+            $paymentMethod
         ) {
             for ($i = 0; $i < $installments; $i++) {
                 $parcelIndex = $i + 1;
                 $cents = $baseCents + ($i === $installments - 1 ? $remainderCents : 0);
-                // Envia como string com 2 casas para evitar erros de ponto flutuante no decimal do banco.
                 $parcelAmount = number_format($cents / 100, 2, '.', '');
 
                 $ref = $referenceBase->copy()->addMonths($i);
@@ -173,19 +249,16 @@ class TransactionController extends Controller
                     'category_id' => $request->category_id,
                     'account_id' => $request->account_id,
                     'description' => $installments > 1
-                        ? $baseDescription . ' (Parcela ' . $parcelIndex . '/' . $installments . ')'
+                        ? $baseDescription.' (Parcela '.$parcelIndex.'/'.$installments.')'
                         : $baseDescription,
                     'amount' => $parcelAmount,
-                    'payment_method' => $request->payment_method,
+                    'payment_method' => $paymentMethod,
                     'type' => $request->type,
                     'date' => $startDate->copy()->addMonths($i)->toDateString(),
                     'reference_month' => (int) $ref->month,
                     'reference_year' => (int) $ref->year,
                 ];
 
-                // Vínculo (autorelacionamento) entre as parcelas:
-                // - a primeira parcela fica como "pai"
-                // - as demais apontam para ela
                 if ($installments > 1) {
                     if ($i === 0) {
                         $data['installment_parent_id'] = null;
@@ -212,6 +285,7 @@ class TransactionController extends Controller
         }
 
         $transaction->delete();
+
         return back()->with('success', 'Lançamento excluído!');
     }
 }

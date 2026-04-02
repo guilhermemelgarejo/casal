@@ -36,31 +36,33 @@ class Account extends Model
     }
 
     /**
-     * Formas permitidas para lançamentos. null = todas (legado / padrão).
+     * Formas permitidas para lançamentos em conta (não-cartão). null = todas as formas de conta.
+     * Cartões de crédito não têm "forma de pagamento" extra: o próprio cartão identifica o meio.
      *
      * @return list<string>
      */
     public function getEffectivePaymentMethods(): array
     {
-        $all = PaymentMethods::all();
+        if ($this->isCreditCard()) {
+            return [];
+        }
+
+        $pool = PaymentMethods::forRegularAccounts();
         $allowed = $this->allowed_payment_methods;
 
-        // Conta tipada como cartão de crédito: deve aceitar somente crédito,
-        // independentemente do que esteja salvo em allowed_payment_methods.
-        if ($this->isCreditCard()) {
-            return ['Cartão de Crédito'];
-        }
-
         if ($allowed === null) {
-            return array_values(array_filter($all, fn ($m) => $m !== 'Cartão de Crédito'));
+            return $pool;
         }
 
-        $effective = array_values(array_intersect($all, $allowed));
-        return array_values(array_filter($effective, fn ($m) => $m !== 'Cartão de Crédito'));
+        return array_values(array_intersect($pool, $allowed));
     }
 
     public function allowsPaymentMethod(?string $method): bool
     {
+        if ($this->isCreditCard()) {
+            return $method === null || $method === '';
+        }
+
         if ($method === null || $method === '') {
             return true;
         }

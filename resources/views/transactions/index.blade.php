@@ -104,9 +104,13 @@
                                                         </span>
                                                     </td>
                                                     <td class="small">
-                                                        @if($transaction->payment_method || $transaction->accountModel)
-                                                            <div class="fw-medium">{{ $transaction->payment_method ?: '-' }}</div>
-                                                            <div class="text-muted">{{ $transaction->accountModel ? $transaction->accountModel->name : '-' }}</div>
+                                                        @php $accRow = $transaction->accountModel; @endphp
+                                                        @if($accRow?->isCreditCard())
+                                                            <div class="fw-medium">Cartão de crédito</div>
+                                                            <div class="text-muted">{{ $accRow->name }}</div>
+                                                        @elseif($transaction->payment_method || $accRow)
+                                                            <div class="fw-medium">{{ $transaction->payment_method ?: '—' }}</div>
+                                                            <div class="text-muted">{{ $accRow?->name ?? '—' }}</div>
                                                         @else
                                                             <span class="text-muted">-</span>
                                                         @endif
@@ -204,7 +208,7 @@
                             <div class="card border shadow-sm">
                                 <div class="card-header bg-white py-3 border-bottom">
                                     <h3 class="h5 mb-0">Novo lançamento</h3>
-                                    <p class="small text-secondary mb-0 mt-1">A conta é obrigatória; a forma de pagamento segue o que você habilitou nela</p>
+                                    <p class="small text-secondary mb-0 mt-1">Comece pela forma de pagamento; em seguida escolha o cartão ou a conta compatível.</p>
                                 </div>
                                 <div class="card-body p-3">
                                     @if($accounts->isEmpty())
@@ -214,9 +218,77 @@
                                             para poder lançar movimentações.
                                         </div>
                                     @else
-                                    <form id="form-new-transaction" action="{{ route('transactions.store') }}" method="POST">
+                                    @php
+                                        $canPayWithAccount = $regularAccounts->isNotEmpty();
+                                        $canPayWithCard = $cardAccounts->isNotEmpty();
+                                    @endphp
+                                    <form
+                                        id="form-new-transaction"
+                                        action="{{ route('transactions.store') }}"
+                                        method="POST"
+                                        data-tx-form-mode="{{ $txFormMode }}"
+                                        data-tx-accounts='@json($txAccountsPayload)'
+                                        data-tx-old-account-id="{{ old('account_id', '') }}"
+                                        data-tx-default-ref-month="{{ $refDefaultMonth }}"
+                                        data-tx-default-ref-year="{{ $refDefaultYear }}"
+                                    >
                                         @csrf
+
+                                        <input type="hidden" name="funding" id="tx-funding" value="@if($txFormMode === 'cards_only')credit_card@elseif($txFormMode === 'regular_only')account@else{{ old('funding', '') }}@endif">
+
+                                        @if($txFormMode !== 'cards_only')
+                                            <input type="hidden" name="payment_method" id="tx-payment-method" value="{{ old('payment_method', '') }}" @if($txFormMode === 'both' && old('funding') === 'credit_card') disabled @endif>
+                                        @endif
+
                                         <div class="vstack gap-3">
+                                            @if($txFormMode === 'cards_only')
+                                                <div>
+                                                    <x-input-label for="tx-account-id" value="Cartão de crédito" />
+                                                    <select name="account_id" id="tx-account-id" class="form-select mt-1" required>
+                                                        <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>Selecione o cartão…</option>
+                                                        @foreach($cardAccounts as $account)
+                                                            <option value="{{ $account->id }}" {{ (string) old('account_id') === (string) $account->id ? 'selected' : '' }}>{{ $account->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                                </div>
+                                            @else
+                                                <div>
+                                                    <x-input-label for="payment_flow" value="Forma de pagamento" />
+                                                    <select id="payment_flow" class="form-select mt-1" required>
+                                                        <option value="" {{ $paymentFlowOld === '' ? 'selected' : '' }}>Selecione…</option>
+                                                        @if($txFormMode === 'both')
+                                                            <option value="__credit__" {{ $paymentFlowOld === '__credit__' ? 'selected' : '' }}>Cartão de crédito</option>
+                                                        @endif
+                                                        @foreach(\App\Support\PaymentMethods::forRegularAccounts() as $pm)
+                                                            <option value="{{ $pm }}" {{ $paymentFlowOld === $pm ? 'selected' : '' }}>{{ $pm }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <p class="form-text mb-0" id="payment-flow-hint">Depois aparecem só cartões ou contas compatíveis com essa forma.</p>
+                                                    <x-input-error :messages="$errors->get('funding')" class="mt-2" />
+                                                    <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
+                                                </div>
+
+                                                <div id="tx-destination-wrap" class="{{ $paymentFlowOld !== '' ? '' : 'd-none' }}">
+                                                    <label class="form-label" for="tx-account-id" id="tx-destination-label">
+                                                        @if($paymentFlowOld === '__credit__')
+                                                            Cartão de crédito
+                                                        @elseif($paymentFlowOld !== '')
+                                                            Conta
+                                                        @else
+                                                            Conta ou cartão
+                                                        @endif
+                                                    </label>
+                                                    <select id="tx-account-id" class="form-select mt-1"></select>
+                                                    <p class="form-text mb-0 d-none text-warning" id="tx-no-account-hint">Nenhuma conta permite esta forma. Ajuste em Gerenciar contas.</p>
+                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                                </div>
+                                            @endif
+
+                                            <p class="form-text mb-0">
+                                                <a href="{{ route('accounts.index') }}">Gerenciar contas e cartões</a>
+                                            </p>
+
                                             <div>
                                                 <x-input-label for="transaction-type" value="Tipo de Lançamento" />
                                                 <select id="transaction-type" name="type" class="form-select mt-1">
@@ -254,54 +326,23 @@
                                                 <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                                             </div>
 
-                                            <div>
-                                                <x-input-label for="account_id" value="Conta (ou cartão)" />
-                                                <select id="account_id" name="account_id" class="form-select mt-1" required>
-                                                    <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>Selecione a conta…</option>
-                                                    @foreach($accounts as $account)
-                                                        <option
-                                                            value="{{ $account->id }}"
-                                                            data-payment-methods='@json($account->getEffectivePaymentMethods())'
-                                                            data-kind="{{ $account->kind }}"
-                                                            {{ (string) old('account_id') === (string) $account->id ? 'selected' : '' }}
-                                                        >
-                                                            {{ $account->name }}{{ $account->isCreditCard() ? ' (Cartão de crédito)' : '' }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
-                                                <p class="form-text mb-0">
-                                                    <a href="{{ route('accounts.index') }}">Gerenciar contas e formas por conta</a>
-                                                </p>
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="payment_method" value="Forma de pagamento" />
-                                                <select
-                                                    id="payment_method"
-                                                    name="payment_method"
-                                                    class="form-select mt-1"
-                                                    @if(count($availablePaymentMethods) > 0) required @endif
-                                                >
-                                                    @if(count($availablePaymentMethods) !== 1)
-                                                        <option value="">Selecione…</option>
-                                                    @endif
-                                                    @foreach($availablePaymentMethods as $pm)
-                                                        <option value="{{ $pm }}" {{ (string) old('payment_method', $autoPaymentMethod) === (string) $pm ? 'selected' : '' }}>{{ $pm }}</option>
-                                                    @endforeach
-                                                </select>
-                                                <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
-                                                <p class="form-text mb-0" id="payment-method-hint">Escolha a conta; só aparecem as formas habilitadas para ela (cartão de crédito só aceita crédito).</p>
-                                            </div>
-
                                             @php
-                                                $pmSelectedForRender = old('payment_method', $autoPaymentMethod);
-                                                $isCreditRender = $pmSelectedForRender === 'Cartão de Crédito';
+                                                $isCreditRender = $txFormMode === 'cards_only' || $fundingOld === 'credit_card' || $paymentFlowOld === '__credit__';
                                                 $installmentsOld = (int) old('installments', 1);
 
                                                 $dateForRef = old('date', date('Y-m-d'));
-                                                $parsedRefMonth = (int) old('reference_month', (int) date('m', strtotime($dateForRef)));
-                                                $parsedRefYear = (int) old('reference_year', (int) date('Y', strtotime($dateForRef)));
+                                                $hasOldRef = old('reference_month') !== null && old('reference_month') !== ''
+                                                    && old('reference_year') !== null && old('reference_year') !== '';
+                                                if ($hasOldRef) {
+                                                    $parsedRefMonth = (int) old('reference_month');
+                                                    $parsedRefYear = (int) old('reference_year');
+                                                } elseif ($isCreditRender) {
+                                                    $parsedRefMonth = $refDefaultMonth;
+                                                    $parsedRefYear = $refDefaultYear;
+                                                } else {
+                                                    $parsedRefMonth = (int) date('m', strtotime($dateForRef));
+                                                    $parsedRefYear = (int) date('Y', strtotime($dateForRef));
+                                                }
                                             @endphp
                                             <div id="installments-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
                                                 <x-input-label for="installments" value="Parcelas (crédito)" />
@@ -343,7 +384,7 @@
                                                         <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
                                                     </div>
                                                 </div>
-                                                <p class="form-text mb-0">Ex.: compra em 20/04 pode cair na fatura de 05/2026.</p>
+                                                <p class="form-text mb-0">Por padrão usamos o mês seguinte à data de hoje no fuso da aplicação ({{ config('app.timezone') }}). Ajuste se precisar.</p>
                                             </div>
 
                                             <div>

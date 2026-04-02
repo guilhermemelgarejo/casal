@@ -48,9 +48,15 @@ class DashboardController extends Controller
                 return [
                     'account_name' => $account->name,
                     'account_color' => $account->color,
-                    'methods' => $accountTransactions->groupBy('payment_method')
-                        ->map(fn($methodTransactions) => $methodTransactions->sum('amount'))
-                        ->forget('')
+                    'methods' => $accountTransactions->groupBy(function ($tx) {
+                        if ($tx->accountModel?->isCreditCard()) {
+                            return 'Cartão de crédito';
+                        }
+
+                        return $tx->payment_method ?: '—';
+                    })
+                        ->map(fn ($methodTransactions) => $methodTransactions->sum('amount'))
+                        ->forget(''),
                 ];
             });
 

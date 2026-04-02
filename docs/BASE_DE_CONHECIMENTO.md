@@ -22,7 +22,8 @@ Documento de referência do repositório **casal** (produto **DuoZen**). Use com
 | Opcional | **SweetAlert2** em `public/vendor/sweetalert2` (se o ficheiro existir) — ver `resources/views/layouts/partials/assets.blade.php` |
 | Build | **Sem pipeline npm** para o app; `package.json` só documenta o arranjo de assets |
 | Banco (dev típico) | MySQL/MariaDB (ex.: XAMPP) via `.env` |
-| Testes | **SQLite** `:memory:` — `phpunit.xml` |
+| Fuso horário | `APP_TIMEZONE` no `.env` (por omissão `America/Sao_Paulo` em `config/app.php`); `Carbon::now()` e datas na app usam este fuso. O JS do lançamento em crédito usa `data-tx-default-ref-*` calculado no servidor na mesma página. |
+| Testes | **SQLite** `:memory:` — `phpunit.xml` (define `APP_TIMEZONE=America/Sao_Paulo` para alinhar com a app) |
 | Mail em testes | `MAIL_MAILER=array` |
 | Assinaturas / Stripe | **Laravel Cashier** (`laravel/cashier`): Checkout com trial, subscrição mensal, Customer Portal; webhooks em `/stripe/webhook` (prefixo configurável em `config/cashier.php` / `CASHIER_PATH`) |
 
@@ -80,21 +81,21 @@ Comportamento:
 | `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`) |
 | `Couple` | `name`, `invite_code` (único), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts |
 | `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon` |
-| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `allowed_payment_methods` (array JSON); `null` em allowed = todas (legado). **Regra:** se `kind=credit_card`, a conta é **tipada como cartão de crédito** e deve aceitar **somente** `Cartão de Crédito`; contas com `kind=regular` **nunca** devem permitir `Cartão de Crédito` — ver `getEffectivePaymentMethods()`, `allowsPaymentMethod()` |
-| `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method`, `type`, `date`, `installment_parent_id`; relação `accountModel`; parcelas ligadas à primeira via `installment_parent_id` |
+| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `allowed_payment_methods` (JSON, só `regular`): subconjunto de `PaymentMethods::forRegularAccounts()`; `null` = todas as formas de conta. **`credit_card`:** registro do cartão (fatura/parcelas); não usa lista de “forma de pagamento” na conta. |
+| `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method` (nullable: preenchido só em conta `regular`, ex. Pix), `type`, `date`, `installment_parent_id`; relação `accountModel`; parcelas no cartão via `installment_parent_id` |
 | `Budget` | `couple_id`, `category_id`, `amount`, `month`, `year` |
 
 Coluna legada em `transactions`: `account` (string), de migração antiga; fluxo atual usa **`account_id`** e modelo `Account`.
 
 ---
 
-## 6. Formas de pagamento canónicas
+## 6. Formas de pagamento (conta) e cartões
 
-Definidas em `app/Support/PaymentMethods.php`:
+Em `app/Support/PaymentMethods.php`, **`forRegularAccounts()`** (e alias `all()`): Dinheiro, Cartão de Débito, Pix, Boleto. **Não** existe “Cartão de Crédito” como forma de pagamento: crédito é o registro `Account` com `kind=credit_card`, escolhido no lançamento com `funding=credit_card`.
 
-- Dinheiro, Cartão de Crédito, Cartão de Débito, Pix, Boleto, Outros.
+Constante `PaymentMethods::LEGACY_CREDIT_CARD` e migração `2026_04_01_120000_*` tratam dados antigos que gravavam esse rótulo em `transactions.payment_method`.
 
-Contas restringem subconjuntos via `allowed_payment_methods`.
+Contas `regular` restringem subconjuntos via `allowed_payment_methods`.
 
 ---
 
@@ -117,13 +118,14 @@ Contas restringem subconjuntos via `allowed_payment_methods`.
 ### `TransactionController`
 
 - Lista paginada (20), filtro mês/ano **pelo mês de referência** (`reference_month`/`reference_year`); agregações do mês.
-- **store:** valida categoria e conta do casal; tipo da categoria = tipo do lançamento; payment method permitido pela conta.
-- **Cartão de crédito:** parcelas 1–12; divisão em **centavos**; descrição ` (Parcela x/y)`; datas mensais; **mês de referência pode ser informado (ex.: compra em 20/04 cair na fatura 05/2026)**; `installment_parent_id`.
+- **store:** `funding` = `account` \| `credit_card`; categoria e conta do casal; tipo da categoria = tipo do lançamento. Na UI, o utilizador escolhe primeiro a **forma de pagamento** (incl. “Cartão de crédito”); em seguida o **cartão** ou as **contas** que aceitam aquela forma (`resources/views/transactions/index.blade.php` + `public/js/app.js`).
+- **`funding=account`:** `account_id` deve ser `kind=regular`; `payment_method` obrigatório e permitido pela conta.
+- **`funding=credit_card`:** `account_id` deve ser `kind=credit_card`; `payment_method` deve ficar vazio; parcelas 1–12; divisão em **centavos**; descrição ` (Parcela x/y)`; **mês de referência (fatura)** opcional — se não vier `reference_month`/`reference_year`, assume **o mês civil seguinte** a `Carbon::now()` no fuso `config('app.timezone')` (`APP_TIMEZONE`); `installment_parent_id`.
 - **destroy:** verifica `couple_id`.
 
 ### `CategoryController` / `AccountController`
 
-- CRUD com `abort(403)` se recurso de outro casal.
+- CRUD com `abort(403)` se recurso de outro casal. Cartão (`credit_card`) não exige checkboxes de formas de pagamento na UI. **`kind` da conta é fixo após criação** (não editável na UI; `update` não altera `kind` mesmo com parâmetros na requisição).
 
 ### `BudgetController`
 

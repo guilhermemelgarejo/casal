@@ -14,5 +14,6 @@ class PaymentMethodsTest extends TestCase
         $this->assertNotEmpty($methods);
         $this->assertContains('Pix', $methods);
         $this->assertContains('Dinheiro', $methods);
+        $this->assertNotContains('Cartão de Crédito', $methods);
     }
 }
