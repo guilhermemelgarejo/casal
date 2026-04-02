@@ -1,5 +1,4 @@
 @php
-    use App\Support\PaymentMethods;
     use App\Models\Account;
 @endphp
 <x-app-layout>
@@ -24,7 +23,7 @@
                         <div class="card border shadow-sm h-100">
                             <div class="card-header bg-white py-3 border-bottom">
                                 <h3 class="h5 mb-0">Nova conta ou cartão</h3>
-                                <p class="small text-secondary mb-0 mt-1">Nome, cor e como você usa no dia a dia</p>
+                                <p class="small text-secondary mb-0 mt-1">Nome, cor e tipo</p>
                             </div>
                             <div class="card-body p-3">
                                 <form action="{{ route('accounts.store') }}" method="POST" class="vstack gap-4">
@@ -39,7 +38,7 @@
 
                                     <div>
                                         <x-input-label for="type" value="Tipo" />
-                                        <select id="type" name="kind" class="form-select mt-1" required data-account-kind-select data-pm-target="#pm-block-store">
+                                        <select id="type" name="kind" class="form-select mt-1" required>
                                             @php
                                                 $kindOld = old('_form') === 'account-store' ? old('kind', Account::KIND_REGULAR) : Account::KIND_REGULAR;
                                             @endphp
@@ -47,34 +46,13 @@
                                             <option value="{{ Account::KIND_CREDIT_CARD }}" {{ $kindOld === Account::KIND_CREDIT_CARD ? 'selected' : '' }}>Cartão de crédito</option>
                                         </select>
                                         <x-input-error :messages="$errors->get('kind')" class="mt-2" />
-                                        <p class="form-text mb-0">Cartões são só para faturas/parcelas; contas bancárias usam Pix, débito, dinheiro, etc.</p>
+                                        <p class="form-text mb-0">Conta: lançamentos com Dinheiro, Cartão de Débito, Pix ou Boleto. Cartão: faturas e parcelas (crédito).</p>
                                     </div>
 
                                     <div>
                                         <x-input-label for="color" value="Cor de identificação" />
                                         <input type="color" id="color" name="color" value="{{ old('_form') === 'account-store' ? old('color', '#4f46e5') : '#4f46e5' }}" class="form-control form-control-color w-100 mt-1">
                                         <x-input-error :messages="$errors->get('color')" class="mt-2" />
-                                    </div>
-
-                                    <div id="pm-block-store" class="rounded border bg-body-tertiary p-3" data-account-pm-block>
-                                        <div class="js-payment-methods-editor">
-                                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
-                                                <div>
-                                                    <span class="fw-semibold d-block">Formas de pagamento</span>
-                                                    <span class="small text-secondary">Só para contas: como você costuma pagar por essa conta.</span>
-                                                </div>
-                                                <div class="d-flex gap-1 flex-shrink-0">
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-pm-check-all">Marcar todas</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-pm-check-none">Limpar</button>
-                                                </div>
-                                            </div>
-                                            @include('accounts.partials.payment-method-checkboxes', [
-                                                'paymentMethodOptions' => $paymentMethodOptions,
-                                                'selected' => old('_form') === 'account-store' ? (array) (old('payment_methods') ?? []) : PaymentMethods::forRegularAccounts(),
-                                                'prefix' => 'new',
-                                            ])
-                                        </div>
-                                        <x-input-error :messages="$errors->get('payment_methods')" class="mt-2" />
                                     </div>
 
                                     <x-primary-button class="w-100 justify-content-center">
@@ -91,14 +69,6 @@
                             @forelse($accounts as $account)
                                 @php
                                     $editOpen = $errors->any() && old('_form') === 'account-update-'.$account->id;
-                                    $selectedForEdit = $account->isCreditCard()
-                                        ? []
-                                        : ($account->allowed_payment_methods !== null
-                                            ? $account->allowed_payment_methods
-                                            : PaymentMethods::forRegularAccounts());
-                                    if (old('_form') === 'account-update-'.$account->id) {
-                                        $selectedForEdit = (array) old('payment_methods', []);
-                                    }
                                     $typeLabel = match ($account->kind) {
                                         Account::KIND_CREDIT_CARD => 'Cartão de crédito',
                                         default => 'Conta',
@@ -169,27 +139,6 @@
                                                         <x-input-label for="edit-color-{{ $account->id }}" value="Cor" />
                                                         <input type="color" id="edit-color-{{ $account->id }}" name="color" value="{{ old('_form') === 'account-update-'.$account->id ? old('color', $account->color) : $account->color }}" class="form-control form-control-color w-100 mt-1">
                                                         <x-input-error :messages="$errors->get('color')" class="mt-2" />
-                                                    </div>
-
-                                                    <div id="pm-block-edit-{{ $account->id }}" class="rounded border bg-body-tertiary p-3" data-account-pm-block data-fixed-kind="{{ $account->kind }}">
-                                                        <div class="js-payment-methods-editor">
-                                                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
-                                                                <div>
-                                                                    <span class="fw-semibold d-block">Formas de pagamento</span>
-                                                                    <span class="small text-secondary">Só para contas.</span>
-                                                                </div>
-                                                                <div class="d-flex gap-1 flex-shrink-0">
-                                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-pm-check-all">Marcar todas</button>
-                                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-pm-check-none">Limpar</button>
-                                                                </div>
-                                                            </div>
-                                                            @include('accounts.partials.payment-method-checkboxes', [
-                                                                'paymentMethodOptions' => $paymentMethodOptions,
-                                                                'selected' => $selectedForEdit,
-                                                                'prefix' => 'edit-'.$account->id,
-                                                            ])
-                                                        </div>
-                                                        <x-input-error :messages="$errors->get('payment_methods')" class="mt-2" />
                                                     </div>
 
                                                     <div class="d-flex flex-wrap gap-2">

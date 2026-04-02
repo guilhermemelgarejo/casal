@@ -15,7 +15,15 @@ class BudgetController extends Controller
         $categories = $couple->categories()->where('type', 'expense')->get();
         $budgets = $couple->budgets()->where('month', date('m'))->where('year', date('Y'))->get();
 
-        return view('budgets.index', compact('categories', 'budgets'));
+        $spentByCategory = $couple->transactions()
+            ->excludingCreditCardInvoicePayments()
+            ->where('reference_month', (int) date('m'))
+            ->where('reference_year', (int) date('Y'))
+            ->get(['category_id', 'amount'])
+            ->groupBy('category_id')
+            ->map(fn ($rows) => $rows->sum('amount'));
+
+        return view('budgets.index', compact('categories', 'budgets', 'spentByCategory'));
     }
 
     public function store(Request $request)

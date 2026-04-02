@@ -3,14 +3,15 @@
 namespace App\Models;
 
 use App\Support\PaymentMethods;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Account extends Model
 {
     use HasFactory;
 
     public const KIND_REGULAR = 'regular';
+
     public const KIND_CREDIT_CARD = 'credit_card';
 
     protected $fillable = ['couple_id', 'name', 'kind', 'color', 'allowed_payment_methods'];
@@ -78,5 +79,10 @@ class Account extends Model
     public function transactions()
     {
         return $this->hasMany(Transaction::class, 'account_id');
+    }
+
+    public function creditCardStatements()
+    {
+        return $this->hasMany(CreditCardStatement::class, 'account_id');
     }
 }

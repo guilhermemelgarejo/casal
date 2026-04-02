@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Couple;
 use App\Models\User;
-use App\Support\PaymentMethods;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,7 +30,6 @@ class AccountKindImmutableTest extends TestCase
             'name' => 'Conta renomeada',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#222222',
-            'payment_methods' => PaymentMethods::forRegularAccounts(),
         ]);
 
         $response->assertSessionHasNoErrors();
@@ -40,7 +38,7 @@ class AccountKindImmutableTest extends TestCase
         $this->assertSame(Account::KIND_REGULAR, $account->kind);
         $this->assertSame('Conta renomeada', $account->name);
         $this->assertSame('#222222', $account->color);
-        $this->assertSame(PaymentMethods::forRegularAccounts(), $account->allowed_payment_methods);
+        $this->assertNull($account->allowed_payment_methods);
     }
 
     public function test_cartao_nao_vira_conta_por_parametro_na_requisicao(): void
@@ -61,7 +59,6 @@ class AccountKindImmutableTest extends TestCase
             'name' => 'Visa Gold',
             'kind' => Account::KIND_REGULAR,
             'color' => '#444444',
-            'payment_methods' => ['Pix'],
         ]);
 
         $response->assertSessionHasNoErrors();

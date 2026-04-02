@@ -14,25 +14,31 @@
                         {{ session('success') }}
                     </div>
                 @endif
+                @if (session('error'))
+                    <div class="alert alert-danger mb-4">
+                        {{ session('error') }}
+                    </div>
+                @endif
 
                 <div class="row g-4">
                     {{-- Lista principal: maior peso visual --}}
                     <div class="col-lg-8">
                         <div class="card border shadow-sm h-100">
                             <div class="card-header bg-white py-3 border-bottom">
-                                <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                                <div class="vstack gap-0">
                                     <div>
                                         <h3 class="h5 mb-0">Lançamentos</h3>
                                         <p class="small text-secondary mb-0 mt-1">Histórico e movimentações do período</p>
                                     </div>
 
-                                    <form method="GET" action="{{ route('transactions.index') }}" class="d-flex align-items-center gap-2">
-                                        <div class="input-group input-group-sm" style="min-width: 140px;">
-                                            <span class="input-group-text text-secondary">Mês</span>
+                                    <div class="border-top pt-3 mt-3 min-w-0">
+                                    <form method="GET" action="{{ route('transactions.index') }}" class="d-flex align-items-stretch flex-nowrap gap-2 w-100 min-w-0">
+                                        <div class="input-group input-group-sm min-w-0" style="flex: 0 1 6.75rem;">
+                                            <span class="input-group-text text-secondary px-2">Mês</span>
                                             <select
                                                 id="filter-month"
                                                 name="month"
-                                                class="form-select"
+                                                class="form-select min-w-0 px-2"
                                                 aria-label="Mês"
                                             >
                                                 @for($m = 1; $m <= 12; $m++)
@@ -43,12 +49,12 @@
                                             </select>
                                         </div>
 
-                                        <div class="input-group input-group-sm" style="min-width: 160px;">
-                                            <span class="input-group-text text-secondary">Ano</span>
+                                        <div class="input-group input-group-sm min-w-0" style="flex: 0 1 7.25rem;">
+                                            <span class="input-group-text text-secondary px-2">Ano</span>
                                             <select
                                                 id="filter-year"
                                                 name="year"
-                                                class="form-select"
+                                                class="form-select min-w-0 px-2"
                                                 aria-label="Ano"
                                             >
                                                 @foreach($years as $y)
@@ -59,11 +65,33 @@
                                             </select>
                                         </div>
 
-                                        <div class="btn-group btn-group-sm" role="group" aria-label="Ações do filtro">
+                                        <div class="input-group input-group-sm min-w-0" style="flex: 1 1 5rem;">
+                                            <span class="input-group-text text-secondary px-2">Conta</span>
+                                            <select
+                                                id="filter-account"
+                                                name="account_id"
+                                                class="form-select min-w-0 px-2"
+                                                aria-label="Filtrar por conta"
+                                            >
+                                                <option value="" {{ $filterAccountId === null ? 'selected' : '' }}>Todas</option>
+                                                @foreach($accountsSortedForFilter as $acc)
+                                                    <option value="{{ $acc->id }}" {{ (int) $filterAccountId === (int) $acc->id ? 'selected' : '' }}>
+                                                        @if($acc->isCreditCard())
+                                                            {{ $acc->name }} (cartão)
+                                                        @else
+                                                            {{ $acc->name }}
+                                                        @endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+
+                                        <div class="btn-group btn-group-sm flex-shrink-0 align-self-center" role="group" aria-label="Ações do filtro">
                                             <button type="submit" class="btn btn-primary">Filtrar</button>
                                             <a href="{{ route('transactions.index') }}" class="btn btn-outline-secondary">Atual</a>
                                         </div>
                                     </form>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-body p-0">
@@ -81,6 +109,14 @@
                                         </thead>
                                         <tbody>
                                             @forelse ($transactions as $transaction)
+                                                @php
+                                                    $delMeta = $transactionDeleteMeta[$transaction->id] ?? [
+                                                        'paidInvoice' => false,
+                                                        'peerCount' => 1,
+                                                        'singleAllowed' => true,
+                                                    ];
+                                                    $blockedMsg = 'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
+                                                @endphp
                                                 <tr>
                                                     <td class="text-secondary small text-nowrap">
                                                         <div>{{ $transaction->date->format('d/m/Y') }}</div>
@@ -119,13 +155,31 @@
                                                         {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ number_format($transaction->amount, 2, ',', '.') }}
                                                     </td>
                                                     <td class="text-center">
-                                                        <form action="{{ route('transactions.destroy', $transaction) }}" method="POST" class="d-inline" data-confirm-title="Excluir lançamento" data-confirm="Deseja excluir este lançamento?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                                        @if ($delMeta['paidInvoice'])
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked"
+                                                                title="Exclusão bloqueada: fatura deste período já paga"
+                                                                aria-label="Exclusão bloqueada: lançamento em ciclo de fatura de cartão já pago"
+                                                                data-tx-blocked-msg="{{ $blockedMsg }}"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
                                                             </button>
-                                                        </form>
+                                                        @else
+                                                            <form
+                                                                action="{{ route('transactions.destroy', $transaction) }}"
+                                                                method="POST"
+                                                                class="d-inline js-tx-delete-form"
+                                                                data-tx-delete-meta="{!! htmlspecialchars(json_encode($delMeta, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') !!}"
+                                                            >
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope">
+                                                                <button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                                                </button>
+                                                            </form>
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @empty
@@ -149,7 +203,15 @@
                             <div class="card border shadow-sm">
                                 <div class="card-header bg-white py-3 border-bottom">
                                     <h3 class="h5 mb-0">Resumo</h3>
-                                    <p class="small text-secondary mb-0 mt-1">Totais e indicadores de {{ $selectedMonthYearLabel }}</p>
+                                    <p class="small text-secondary mb-0 mt-1">
+                                        Totais de {{ $selectedMonthYearLabel }}
+                                        @if($filterAccountId !== null)
+                                            @php $fAcc = $accounts->firstWhere('id', $filterAccountId); @endphp
+                                            @if($fAcc)
+                                                — só {{ $fAcc->name }}{{ $fAcc->isCreditCard() ? ' (cartão)' : '' }}
+                                            @endif
+                                        @endif
+                                    </p>
                                 </div>
                                 <div class="card-body p-3">
                                     <div class="rounded bg-body-secondary bg-opacity-50 p-2">

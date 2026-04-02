@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
-use App\Support\PaymentMethods;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -13,9 +12,8 @@ class AccountController extends Controller
     public function index()
     {
         $accounts = Auth::user()->couple->accounts;
-        $paymentMethodOptions = PaymentMethods::forRegularAccounts();
 
-        return view('accounts.index', compact('accounts', 'paymentMethodOptions'));
+        return view('accounts.index', compact('accounts'));
     }
 
     public function store(Request $request)
@@ -24,28 +22,13 @@ class AccountController extends Controller
             'name' => 'required|string|max:255',
             'kind' => ['required', 'string', Rule::in(Account::kinds())],
             'color' => 'required|string|size:7',
-            'payment_methods' => ['nullable', 'array'],
-            'payment_methods.*' => ['string', Rule::in(PaymentMethods::forRegularAccounts())],
         ]);
-
-        $kind = $validated['kind'];
-        if ($kind === Account::KIND_CREDIT_CARD) {
-            $allowed = null;
-        } else {
-            $methods = array_values(array_unique($validated['payment_methods'] ?? []));
-            if (count($methods) < 1) {
-                return back()->withErrors([
-                    'payment_methods' => 'Marque ao menos uma forma de pagamento para esta conta.',
-                ])->withInput();
-            }
-            $allowed = $methods;
-        }
 
         Auth::user()->couple->accounts()->create([
             'name' => $validated['name'],
-            'kind' => $kind,
+            'kind' => $validated['kind'],
             'color' => $validated['color'],
-            'allowed_payment_methods' => $allowed,
+            'allowed_payment_methods' => null,
         ]);
 
         return back()->with('success', 'Conta cadastrada com sucesso!');
@@ -60,27 +43,12 @@ class AccountController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'color' => 'required|string|size:7',
-            'payment_methods' => ['nullable', 'array'],
-            'payment_methods.*' => ['string', Rule::in(PaymentMethods::forRegularAccounts())],
         ]);
-
-        $kind = $account->kind;
-        if ($kind === Account::KIND_CREDIT_CARD) {
-            $allowed = null;
-        } else {
-            $methods = array_values(array_unique($validated['payment_methods'] ?? []));
-            if (count($methods) < 1) {
-                return back()->withErrors([
-                    'payment_methods' => 'Marque ao menos uma forma de pagamento para esta conta.',
-                ])->withInput();
-            }
-            $allowed = $methods;
-        }
 
         $account->update([
             'name' => $validated['name'],
             'color' => $validated['color'],
-            'allowed_payment_methods' => $allowed,
+            'allowed_payment_methods' => null,
         ]);
 
         return back()->with('success', 'Conta atualizada com sucesso!');

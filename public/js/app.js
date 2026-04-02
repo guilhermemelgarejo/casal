@@ -117,6 +117,164 @@ document.addEventListener('DOMContentLoaded', () => {
         bs.Modal.getOrCreateInstance(delModal).show();
     }
 
+    document.querySelectorAll('.js-tx-delete-blocked').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const text =
+                btn.getAttribute('data-tx-blocked-msg') ||
+                'Este lançamento não pode ser excluído.';
+            if (typeof Swal === 'undefined') {
+                window.alert(text);
+                return;
+            }
+            Swal.fire({
+                icon: 'error',
+                title: 'Exclusão não permitida',
+                text,
+                confirmButtonText: 'Entendi',
+                confirmButtonColor: '#0d6efd',
+                customClass: { confirmButton: 'btn btn-primary px-4' },
+                buttonsStyling: false,
+            });
+        });
+    });
+
+    document.querySelectorAll('form.js-tx-delete-form').forEach((form) => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const scopeInput = form.querySelector('.js-tx-installment-scope');
+            if (!scopeInput) {
+                form.submit();
+                return;
+            }
+            scopeInput.value = 'single';
+            let meta = {};
+            try {
+                meta = JSON.parse(form.getAttribute('data-tx-delete-meta') || '{}');
+            } catch {
+                meta = {};
+            }
+            const peerCount = Number(meta.peerCount) || 1;
+            const singleAllowed = meta.singleAllowed !== false;
+
+            const proceedSingle = () => {
+                scopeInput.value = 'single';
+                form.submit();
+            };
+            const proceedAll = () => {
+                scopeInput.value = 'all';
+                form.submit();
+            };
+
+            const simpleConfirm = (title, html, confirmText) => {
+                if (typeof Swal === 'undefined') {
+                    if (window.confirm(html.replace(/<[^>]+>/g, ''))) {
+                        proceedSingle();
+                    }
+                    return;
+                }
+                Swal.fire({
+                    title,
+                    html,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    focusCancel: true,
+                    confirmButtonText: confirmText,
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#0d6efd',
+                    cancelButtonColor: '#6c757d',
+                    customClass: {
+                        confirmButton: 'btn btn-danger px-4',
+                        cancelButton: 'btn btn-outline-secondary px-4',
+                    },
+                    buttonsStyling: false,
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        proceedSingle();
+                    }
+                });
+            };
+
+            if (peerCount <= 1) {
+                simpleConfirm(
+                    'Excluir lançamento?',
+                    '<p class="mb-0">Deseja excluir este lançamento? Esta ação não pode ser desfeita.</p>',
+                    'Sim, excluir',
+                );
+                return;
+            }
+
+            if (!singleAllowed) {
+                if (typeof Swal === 'undefined') {
+                    if (
+                        window.confirm(
+                            `Este parcelamento tem ${peerCount} parcelas. Só é possível excluir todas de uma vez. Confirmar?`,
+                        )
+                    ) {
+                        proceedAll();
+                    }
+                    return;
+                }
+                Swal.fire({
+                    title: 'Primeira parcela de um parcelamento',
+                    html: `<p class="mb-2">Este parcelamento tem <strong>${peerCount}</strong> parcelas. Não é possível excluir só esta enquanto existirem as demais.</p><p class="mb-0">Deseja excluir <strong>todas as ${peerCount} parcelas</strong>?</p>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    focusCancel: true,
+                    confirmButtonText: `Excluir todas as ${peerCount} parcelas`,
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    customClass: {
+                        confirmButton: 'btn btn-danger px-3',
+                        cancelButton: 'btn btn-outline-secondary px-4',
+                    },
+                    buttonsStyling: false,
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        proceedAll();
+                    }
+                });
+                return;
+            }
+
+            if (typeof Swal === 'undefined') {
+                if (window.confirm('Excluir só esta parcela?')) {
+                    proceedSingle();
+                } else if (window.confirm('Excluir todas as parcelas?')) {
+                    proceedAll();
+                }
+                return;
+            }
+            Swal.fire({
+                title: 'Parcelamento no cartão',
+                html: `<p class="mb-2">Este parcelamento tem <strong>${peerCount}</strong> parcelas no total.</p><p class="mb-0">O que deseja excluir?</p>`,
+                icon: 'warning',
+                showDenyButton: true,
+                showCancelButton: true,
+                focusCancel: true,
+                confirmButtonText: 'Só esta parcela',
+                denyButtonText: `Excluir todas as ${peerCount} parcelas`,
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#0d6efd',
+                denyButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                customClass: {
+                    confirmButton: 'btn btn-primary px-3',
+                    denyButton: 'btn btn-danger px-3',
+                    cancelButton: 'btn btn-outline-secondary px-4',
+                },
+                buttonsStyling: false,
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    proceedSingle();
+                }
+                if (result.isDenied) {
+                    proceedAll();
+                }
+            });
+        });
+    });
+
     /** Formulários com data-confirm: diálogo SweetAlert2 em vez de window.confirm */
     document.querySelectorAll('form[data-confirm]').forEach((form) => {
         form.addEventListener('submit', (e) => {
@@ -161,58 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     proceed();
                 }
             });
-        });
-    });
-
-    document.querySelectorAll('.js-payment-methods-editor').forEach((editor) => {
-        const grid = editor.querySelector('.js-payment-method-grid');
-        if (!grid) {
-            return;
-        }
-        editor.querySelector('.js-pm-check-all')?.addEventListener('click', () => {
-            grid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-                if (!cb.disabled) {
-                    cb.checked = true;
-                }
-            });
-        });
-        editor.querySelector('.js-pm-check-none')?.addEventListener('click', () => {
-            grid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-                if (!cb.disabled) {
-                    cb.checked = false;
-                }
-            });
-        });
-    });
-
-    document.querySelectorAll('[data-account-kind-select]').forEach((sel) => {
-        const targetSelector = sel.getAttribute('data-pm-target');
-        const target = targetSelector ? document.querySelector(targetSelector) : null;
-        if (!target) {
-            return;
-        }
-        const sync = () => {
-            const isCard = sel.value === 'credit_card';
-            target.classList.toggle('d-none', isCard);
-            target.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-                cb.disabled = isCard;
-                if (isCard) {
-                    cb.checked = false;
-                }
-            });
-        };
-        sel.addEventListener('change', sync);
-        sync();
-    });
-
-    document.querySelectorAll('[data-account-pm-block][data-fixed-kind]').forEach((target) => {
-        const isCard = target.getAttribute('data-fixed-kind') === 'credit_card';
-        target.classList.toggle('d-none', isCard);
-        target.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-            cb.disabled = isCard;
-            if (isCard) {
-                cb.checked = false;
-            }
         });
     });
 

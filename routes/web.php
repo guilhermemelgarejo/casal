@@ -6,6 +6,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CoupleController;
+use App\Http\Controllers\CreditCardStatementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
@@ -31,6 +32,24 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
     Route::put('/accounts/{account}', [AccountController::class, 'update'])->name('accounts.update');
     Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->name('accounts.destroy');
+
+    Route::get('/faturas-cartao', [CreditCardStatementController::class, 'index'])->name('credit-card-statements.index');
+    Route::put('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}', [CreditCardStatementController::class, 'update'])
+        ->whereNumber('referenceYear')
+        ->whereNumber('referenceMonth')
+        ->name('credit-card-statements.update');
+    Route::post('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}/pagamento', [CreditCardStatementController::class, 'attachPayment'])
+        ->whereNumber('referenceYear')
+        ->whereNumber('referenceMonth')
+        ->name('credit-card-statements.attach-payment');
+    Route::post('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}/pagamento/remover', [CreditCardStatementController::class, 'detachPayment'])
+        ->whereNumber('referenceYear')
+        ->whereNumber('referenceMonth')
+        ->name('credit-card-statements.detach-payment');
+    Route::delete('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}/metadados', [CreditCardStatementController::class, 'destroy'])
+        ->whereNumber('referenceYear')
+        ->whereNumber('referenceMonth')
+        ->name('credit-card-statements.destroy');
 
     Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
     Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');

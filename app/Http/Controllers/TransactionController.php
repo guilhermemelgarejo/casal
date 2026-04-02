@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Support\PaymentMethods;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -17,34 +18,64 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         $now = Carbon::now();
+        $couple = Auth::user()->couple;
+
         $validated = $request->validate([
             'month' => 'nullable|integer|min:1|max:12',
             'year' => 'nullable|integer|min:2000|max:2100',
+            'account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where('couple_id', $couple->id),
+            ],
         ]);
 
         $selectedMonth = (int) ($validated['month'] ?? $now->month);
         $selectedYear = (int) ($validated['year'] ?? $now->year);
-
-        $couple = Auth::user()->couple;
+        $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
 
         $transactions = $couple->transactions()
             ->with(['category', 'user', 'accountModel'])
             ->where('reference_month', $selectedMonth)
             ->where('reference_year', $selectedYear)
+            ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
             ->latest()
             ->paginate(20);
-        $transactions->appends(['month' => $selectedMonth, 'year' => $selectedYear]);
+
+        $installmentGroups = $this->installmentGroupsForTransactionPage($couple->id, $transactions->getCollection());
+        $transactionDeleteMeta = [];
+        foreach ($transactions as $txRow) {
+            $transactionDeleteMeta[$txRow->id] = $this->transactionDeleteMeta($txRow, $installmentGroups);
+        }
+
+        $appendQuery = [
+            'month' => $selectedMonth,
+            'year' => $selectedYear,
+        ];
+        if ($filterAccountId !== null) {
+            $appendQuery['account_id'] = $filterAccountId;
+        }
+        $transactions->appends($appendQuery);
 
         $categories = $couple->categories;
         $accounts = $couple->accounts;
+
+        $accountsSortedForFilter = $accounts->sortBy(function (Account $a) {
+            return [
+                $a->isCreditCard() ? 1 : 0,
+                mb_strtolower($a->name),
+            ];
+        })->values();
 
         $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->values();
         $cardAccounts = $accounts->where('kind', Account::KIND_CREDIT_CARD)->values();
 
         $monthTransactionsAll = $couple->transactions()
+            ->excludingCreditCardInvoicePayments()
             ->with(['accountModel'])
             ->where('reference_month', $selectedMonth)
             ->where('reference_year', $selectedYear)
+            ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
             ->get();
 
         $expenseMonthTransactions = $monthTransactionsAll->where('type', 'expense');
@@ -111,6 +142,7 @@ class TransactionController extends Controller
             'monthTransactionsAll',
             'categories',
             'accounts',
+            'accountsSortedForFilter',
             'regularAccounts',
             'cardAccounts',
             'byPaymentMethod',
@@ -124,8 +156,56 @@ class TransactionController extends Controller
             'selectedMonth',
             'selectedYear',
             'selectedMonthYearLabel',
-            'years'
+            'years',
+            'filterAccountId',
+            'transactionDeleteMeta'
         ));
+    }
+
+    /**
+     * @param  Collection<int, Transaction>  $pageTransactions
+     * @return Collection<int, Collection<int, Transaction>>
+     */
+    private function installmentGroupsForTransactionPage(int $coupleId, Collection $pageTransactions): Collection
+    {
+        if ($pageTransactions->isEmpty()) {
+            return collect();
+        }
+
+        $roots = $pageTransactions->map(fn (Transaction $t) => $t->installmentRootId())->unique()->values()->all();
+
+        $groupMembers = Transaction::query()
+            ->where('couple_id', $coupleId)
+            ->where(function ($q) use ($roots) {
+                $q->whereIn('id', $roots)
+                    ->orWhereIn('installment_parent_id', $roots);
+            })
+            ->get();
+
+        // Chaves em string evitam falha de lookup int vs string em Collection::get().
+        return $groupMembers->groupBy(fn (Transaction $t) => (string) $t->installmentRootId());
+    }
+
+    /**
+     * @param  Collection<string, Collection<int, Transaction>>  $installmentGroups
+     * @return array{paidInvoice: bool, peerCount: int, singleAllowed: bool}
+     */
+    private function transactionDeleteMeta(Transaction $t, Collection $installmentGroups): array
+    {
+        $rootId = $t->installmentRootId();
+        $group = $installmentGroups->get((string) $rootId)
+            ?? $installmentGroups->get($rootId);
+        if ($group === null || $group->isEmpty()) {
+            $group = collect([$t]);
+        }
+
+        $isParentWithSiblings = $t->installment_parent_id === null && $group->count() > 1;
+
+        return [
+            'paidInvoice' => $t->isInPaidCreditCardInvoiceCycle(),
+            'peerCount' => $group->count(),
+            'singleAllowed' => ! $isParentWithSiblings,
+        ];
     }
 
     public function store(Request $request)
@@ -278,10 +358,68 @@ class TransactionController extends Controller
         return back()->with('success', 'Lançamento realizado!');
     }
 
-    public function destroy(Transaction $transaction)
+    public function destroy(Request $request, Transaction $transaction)
     {
         if ($transaction->couple_id !== Auth::user()->couple_id) {
             abort(403);
+        }
+
+        if ($transaction->isInPaidCreditCardInvoiceCycle()) {
+            return back()->with(
+                'error',
+                'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.'
+            );
+        }
+
+        $request->validate([
+            'installment_scope' => ['nullable', 'string', Rule::in(['single', 'all'])],
+        ]);
+
+        $scope = $request->input('installment_scope', 'single');
+
+        $rootId = $transaction->installmentRootId();
+        $group = Transaction::query()
+            ->where('couple_id', $transaction->couple_id)
+            ->where(function ($q) use ($rootId) {
+                $q->where('id', $rootId)
+                    ->orWhere('installment_parent_id', $rootId);
+            })
+            ->get();
+
+        if ($scope === 'all') {
+            foreach ($group as $tx) {
+                if ($tx->isInPaidCreditCardInvoiceCycle()) {
+                    return back()->with(
+                        'error',
+                        'Não é possível excluir este conjunto: pelo menos uma parcela pertence a um ciclo de fatura já marcado como pago.'
+                    );
+                }
+            }
+
+            DB::transaction(function () use ($group, $rootId) {
+                $children = $group->filter(fn (Transaction $x) => $x->installment_parent_id !== null)
+                    ->sortByDesc('id');
+                foreach ($children as $child) {
+                    $child->delete();
+                }
+                $root = $group->firstWhere('id', $rootId);
+                if ($root) {
+                    $root->delete();
+                }
+            });
+
+            $msg = $group->count() > 1
+                ? 'Todas as parcelas deste lançamento foram excluídas.'
+                : 'Lançamento excluído!';
+
+            return back()->with('success', $msg);
+        }
+
+        if ((int) $transaction->id === $rootId && $group->count() > 1) {
+            return back()->with(
+                'error',
+                'Não é possível excluir só a primeira parcela enquanto existirem as demais. Exclua as outras parcelas primeiro ou utilize a opção de excluir todas.'
+            );
         }
 
         $transaction->delete();

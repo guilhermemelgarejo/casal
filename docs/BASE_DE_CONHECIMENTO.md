@@ -35,10 +35,10 @@ Documento de referência do repositório **casal** (produto **DuoZen**). Use com
 
 ```
 app/
-  Http/Controllers/     # Dashboard, Couple, Category, Transaction, Budget, Account, Billing, Admin/SubscriptionAdmin, Profile, Auth/*
+  Http/Controllers/     # Dashboard, Couple, Category, Transaction, Budget, Account, CreditCardStatement, Billing, Admin/SubscriptionAdmin, Profile, Auth/*
   Http/Middleware/      # EnsureHasCouple (has-couple), EnsureCoupleBillingActive (couple-billing), EnsureCasalAdmin (duozen-admin)
   Mail/InvitationMail.php
-  Models/               # User (Billable Cashier), Couple, Category, Transaction, Account, Budget
+  Models/               # User (Billable Cashier), Couple, Category, Transaction, Account, CreditCardStatement, Budget
   Support/PaymentMethods.php, Support/Billing.php
 bootstrap/app.php       # aliases de middleware; exceção CSRF `stripe/*`; redirect pós-login → dashboard
 config/duozen.php       # trial, admins, isentos, flags de faturamento (compat: config/casal.php)
@@ -81,8 +81,9 @@ Comportamento:
 | `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`) |
 | `Couple` | `name`, `invite_code` (único), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts |
 | `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon` |
-| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `allowed_payment_methods` (JSON, só `regular`): subconjunto de `PaymentMethods::forRegularAccounts()`; `null` = todas as formas de conta. **`credit_card`:** registro do cartão (fatura/parcelas); não usa lista de “forma de pagamento” na conta. |
-| `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method` (nullable: preenchido só em conta `regular`, ex. Pix), `type`, `date`, `installment_parent_id`; relação `accountModel`; parcelas no cartão via `installment_parent_id` |
+| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `allowed_payment_methods` (JSON, legado): na prática **sempre `null`** após migração `2026_04_02_120000_*` e CRUD atual — **conta `regular`** implica todas as formas em `PaymentMethods::forRegularAccounts()`; **cartão** implica só crédito no fluxo de lançamentos. O modelo ainda suporta subconjunto em `getEffectivePaymentMethods()` se existirem dados antigos não migrados. |
+| `CreditCardStatement` | **Metadados** do ciclo de fatura (opcional até o utilizador gravar algo): `couple_id`, `account_id` (cartão), `reference_month`/`reference_year`, `due_date` (nullable), `paid_at` (nullable), `payment_transaction_id` (nullable, FK `transactions`). A **fatura em si** não é criada manualmente: cada linha na UI corresponde a um par cartão + mês/ano em que existem **despesas** nesse cartão; o **total** é sempre a **soma** dessas despesas. **Único** por (`account_id`, `reference_month`, `reference_year`); cada `payment_transaction_id` só numa fatura. Migração `2026_04_02_100000_*` remove `total_amount` e torna `due_date` opcional. |
+| `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method` (nullable: preenchido só em conta `regular`, ex. Pix), `type`, `date`, `installment_parent_id`; relação `accountModel`; parcelas no cartão via `installment_parent_id`; relação opcional `creditCardStatementPaidFor` (se este lançamento paga uma fatura). **Evento `deleting`:** se algum `credit_card_statements` apontava para este `id` em `payment_transaction_id`, limpa esse FK e **`paid_at`** (reabre a fatura). **Scope** `excludingCreditCardInvoicePayments()`: exclui despesas vinculadas como `payment_transaction_id` de uma fatura — usado em **totais do painel**, **resumo/agrupamentos em Lançamentos** e **gasto por categoria em Orçamentos** (o movimento continua na listagem paginada de lançamentos). |
 | `Budget` | `couple_id`, `category_id`, `amount`, `month`, `year` |
 
 Coluna legada em `transactions`: `account` (string), de migração antiga; fluxo atual usa **`account_id`** e modelo `Account`.
@@ -95,7 +96,7 @@ Em `app/Support/PaymentMethods.php`, **`forRegularAccounts()`** (e alias `all()`
 
 Constante `PaymentMethods::LEGACY_CREDIT_CARD` e migração `2026_04_01_120000_*` tratam dados antigos que gravavam esse rótulo em `transactions.payment_method`.
 
-Contas `regular` restringem subconjuntos via `allowed_payment_methods`.
+O cadastro de contas **não** pergunta formas de pagamento: fica implícito conforme o `kind`.
 
 ---
 
@@ -111,25 +112,32 @@ Contas `regular` restringem subconjuntos via `allowed_payment_methods`.
 
 ### `DashboardController`
 
-- Query param `period=YYYY-MM` (default mês atual), filtrando lançamentos pelo **mês de referência** (`reference_month`/`reference_year`).
+- Query param `period=YYYY-MM` (default mês atual), filtrando lançamentos pelo **mês de referência** (`reference_month`/`reference_year`), aplicando `Transaction::excludingCreditCardInvoicePayments()` (pagamentos de fatura de cartão não entram nos números).
 - Totais receita/despesa/saldo; alerta se `monthly_income > 0` e despesas ≥ limiar %.
 - Resumo despesas: conta × forma de pagamento.
 
 ### `TransactionController`
 
-- Lista paginada (20), filtro mês/ano **pelo mês de referência** (`reference_month`/`reference_year`); agregações do mês.
+- Lista paginada (20); filtros `GET`: mês/ano pelo **mês de referência** (`reference_month`/`reference_year`) e opcional **`account_id`** (conta do casal). Com conta selecionada, **listagem** e **resumo lateral** (totais e tabelas por pagamento/conta) limitam-se a essa conta. O resumo usa `excludingCreditCardInvoicePayments()` no query builder, o mesmo período e o mesmo `account_id` quando enviado. A tabela principal lista qualquer lançamento desse período e conta (inclui, por exemplo, pagamento de fatura quando a conta filtrada for a da movimentação).
 - **store:** `funding` = `account` \| `credit_card`; categoria e conta do casal; tipo da categoria = tipo do lançamento. Na UI, o utilizador escolhe primeiro a **forma de pagamento** (incl. “Cartão de crédito”); em seguida o **cartão** ou as **contas** que aceitam aquela forma (`resources/views/transactions/index.blade.php` + `public/js/app.js`).
 - **`funding=account`:** `account_id` deve ser `kind=regular`; `payment_method` obrigatório e permitido pela conta.
 - **`funding=credit_card`:** `account_id` deve ser `kind=credit_card`; `payment_method` deve ficar vazio; parcelas 1–12; divisão em **centavos**; descrição ` (Parcela x/y)`; **mês de referência (fatura)** opcional — se não vier `reference_month`/`reference_year`, assume **o mês civil seguinte** a `Carbon::now()` no fuso `config('app.timezone')` (`APP_TIMEZONE`); `installment_parent_id`.
-- **destroy:** verifica `couple_id`.
+- **destroy:** verifica `couple_id`; **não** exclui lançamentos no **cartão** cujo par (`account_id`, `reference_month`, `reference_year`) coincide com um registo em `credit_card_statements` do casal com **`paid_at` preenchido** (`Transaction::isInPaidCreditCardInvoiceCycle()`). **Quitação** na conta corrente pode ser excluída; ao apagar esse `Transaction`, o modelo **reabre a fatura** (limpa `payment_transaction_id` e `paid_at` no `CreditCardStatement` — evento `deleting`). Parcelas: corpo `installment_scope` = `single` \| `all`; primeira parcela com irmãs não pode `single`. **UI:** ao clicar em excluir num parcelamento no cartão abre **SweetAlert2** (`public/js/app.js`) com “Só esta parcela” / “Excluir todas…” (requer `vendor/sweetalert2` em `layouts/partials/scripts.blade.php`). Metadados `data-tx-delete-meta` vêm de `installmentGroupsForTransactionPage` (agrupa por raiz do parcelamento, chaves string para lookup estável).
 
 ### `CategoryController` / `AccountController`
 
-- CRUD com `abort(403)` se recurso de outro casal. Cartão (`credit_card`) não exige checkboxes de formas de pagamento na UI. **`kind` da conta é fixo após criação** (não editável na UI; `update` não altera `kind` mesmo com parâmetros na requisição).
+- CRUD com `abort(403)` se recurso de outro casal. **`store` / `update`:** `allowed_payment_methods` gravado como **`null`** (conta = todas as formas canónicas; cartão = sem lista na conta). Sem UI de checkboxes em `resources/views/accounts/index.blade.php`. **`kind` da conta é fixo após criação** (não editável na UI; `update` não altera `kind` mesmo com parâmetros na requisição).
+
+### `CreditCardStatementController`
+
+- Rotas sob **`/faturas-cartao`** (`credit-card-statements.*`), middleware `auth` + `has-couple` + `couple-billing`. **index:** agrupa **despesas** por (`account_id` cartão, `reference_month`, `reference_year`); mostra total somado; faz merge com `credit_card_statements` quando existem metadados; lançamentos elegíveis para vincular como pagamento.
+- **update** `PUT .../faturas-cartao/{account}/{referenceYear}/{referenceMonth}`: `due_date` e `paid_at` opcionais; cria linha em `credit_card_statements` se ainda não existir (`firstOrCreate`); `paid_at` vazio limpa vínculo de pagamento. Exige pelo menos uma despesa no cartão naquele ciclo (senão 404).
+- **attach-payment** `POST .../pagamento`: idem ciclo na URL; valor do lançamento gerado = soma do ciclo se `amount` omitido. **detach-payment** / **destroy** `DELETE .../metadados`: remove só metadados gravados (vencimento/pagamento); o total continua a vir dos lançamentos no cartão.
 
 ### `BudgetController`
 
 - **Apenas mês e ano correntes** na listagem e no `store` (`date('m')`, `date('Y')`).
+- Gasto real por categoria (`spentByCategory`) usa `excludingCreditCardInvoicePayments()`.
 - `updateIncome` atualiza `monthly_income` do casal.
 
 ### `ProfileController`
@@ -160,7 +168,7 @@ Contas `regular` restringem subconjuntos via `allowed_payment_methods`.
 
 ## 9. Navegação (UI)
 
-`resources/views/layouts/navigation.blade.php`: Painel, Lançamentos, Categorias, Contas, Orçamentos, Casal; **Assinatura** (se `couple_id`); **Admin** (se `User::isCasalAdmin()`); dropdown Perfil, Assinatura, assinaturas admin, Sair.
+`resources/views/layouts/navigation.blade.php`: Painel, Lançamentos, Categorias, Contas, **Faturas cartão** (`credit-card-statements.index`), Orçamentos, Casal; **Assinatura** (se `couple_id`); **Admin** (se `User::isCasalAdmin()`); dropdown Perfil, Assinatura, assinaturas admin, Sair.
 
 Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/assets.blade.php`, `scripts`.
 
@@ -171,7 +179,7 @@ Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/
 - `phpunit.xml`: `APP_URL=http://casal.localhost`, SQLite memória, `DUOZEN_BILLING_DISABLED=true` (evita bloquear dashboard nos testes sem Stripe).
 - **Recomendado:** criar um ficheiro `.env.testing` (não versionado) apontando para SQLite `:memory:` para garantir que comandos em `APP_ENV=testing` não atinjam o MySQL do desenvolvimento.
 - `tests/TestCase.php`: desativa o middleware `ValidateCsrfToken` nos testes de funcionalidade (evita 419 em `POST`/`PUT`/`DELETE` sem token).
-- Pastas: `tests/Feature` (Auth, Profile, CoupleAccess, CategoryCrud, …), `tests/Unit` (ex.: `PaymentMethodsTest`).
+- Pastas: `tests/Feature` (Auth, Profile, CoupleAccess, CategoryCrud, `CreditCardStatementTest`, `CreditCardInvoicePaymentExcludedFromStatisticsTest`, …), `tests/Unit` (ex.: `PaymentMethodsTest`).
 - Utilizadores de `User::factory()` usam senha em texto plano `'password'` no factory; o cast `hashed` do modelo `User` gera o hash ao gravar (alinha com registo/atualização de senha na app).
 
 ---

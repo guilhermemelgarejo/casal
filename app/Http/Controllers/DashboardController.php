@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Transaction;
-use App\Models\Account;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -12,17 +10,18 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $couple = Auth::user()->couple;
-        
+
         // Filtro de Período (formato YYYY-MM)
         $period = $request->get('period', date('Y-m'));
-        
+
         // Extrai ano e mês do período
         $parts = explode('-', $period);
         $year = intval($parts[0] ?? date('Y'));
         $month = intval($parts[1] ?? date('m'));
-        
+
         // Base das transações filtradas por mês/ano de referência (fatura/competência)
         $query = $couple->transactions()
+            ->excludingCreditCardInvoicePayments()
             ->where('reference_month', $month)
             ->where('reference_year', $year);
 
@@ -45,6 +44,7 @@ class DashboardController extends Controller
             ->groupBy('account_id')
             ->map(function ($accountTransactions) {
                 $account = $accountTransactions->first()->accountModel;
+
                 return [
                     'account_name' => $account->name,
                     'account_color' => $account->color,
@@ -63,12 +63,12 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'couple',
             'transactions',
-            'totalIncome', 
-            'totalExpense', 
-            'balance', 
+            'totalIncome',
+            'totalExpense',
+            'balance',
             'crossSummary',
             'period',
-            'month', 
+            'month',
             'year',
             'showAlert',
             'thresholdPercentage',

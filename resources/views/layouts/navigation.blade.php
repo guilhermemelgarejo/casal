@@ -44,6 +44,11 @@
                     </x-nav-link>
                 </li>
                 <li class="nav-item">
+                    <x-nav-link class="px-2" :href="route('credit-card-statements.index')" :active="request()->routeIs('credit-card-statements.*')">
+                        Faturas cartão
+                    </x-nav-link>
+                </li>
+                <li class="nav-item">
                     <x-nav-link class="px-2" :href="route('budgets.index')" :active="request()->routeIs('budgets.*')">
                         Orçamentos
                     </x-nav-link>

@@ -89,3 +89,21 @@ body {
 body {
     font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
 }
+
+/* SweetAlert2 — botões empilhados com espaçamento (app.js + data-confirm) */
+.swal2-popup .swal2-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 1rem auto 0 !important;
+    padding: 0 0.5rem 0.25rem;
+    box-sizing: border-box;
+}
+
+.swal2-popup .swal2-actions .swal2-styled {
+    margin: 0 !important;
+    width: 100% !important;
+}
