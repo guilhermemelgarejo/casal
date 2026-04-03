@@ -79,6 +79,77 @@ class CreditCardStatementTest extends TestCase
             ->assertSee('04/2026', false);
     }
 
+    public function test_primeiro_lancamento_cartao_materializa_fatura_com_vencimento_previsto(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $card->update(['credit_card_invoice_due_day' => 10]);
+        $this->cardExpense($user, $card, $category, 4, 2026, '40.00');
+
+        $this->assertDatabaseHas('credit_card_statements', [
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 4,
+            'reference_year' => 2026,
+        ]);
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 4)
+            ->where('reference_year', 2026)
+            ->first();
+        $this->assertNotNull($meta);
+        $this->assertSame('2026-05-10', $meta->due_date->toDateString());
+        $this->assertEquals(40.0, (float) $meta->spent_total);
+
+        $this->actingAs($user)->get(route('credit-card-statements.index'))
+            ->assertOk()
+            ->assertSee('10/05/2026', false)
+            ->assertSee('data-edit-due="2026-05-10"', false)
+            ->assertDontSee('Sug. 10/05/2026', false);
+    }
+
+    public function test_segundo_lancamento_no_mesmo_ciclo_atualiza_spent_total_materializado(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $card->update(['credit_card_invoice_due_day' => 10]);
+        $this->cardExpense($user, $card, $category, 4, 2026, '40.00');
+        $this->cardExpense($user, $card, $category, 4, 2026, '35.50');
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 4)
+            ->where('reference_year', 2026)
+            ->first();
+
+        $this->assertNotNull($meta);
+        $this->assertEquals(75.5, (float) $meta->spent_total);
+    }
+
+    public function test_primeiro_attach_payment_grava_vencimento_padrao_do_cartao(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $card->update(['credit_card_invoice_due_day' => 10]);
+        $this->cardExpense($user, $card, $category, 4, 2026, '25.00');
+
+        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 4]), [
+            'mode' => 'create',
+            'account_id' => $checking->id,
+            'payment_method' => 'Pix',
+            'category_id' => $category->id,
+            'paid_date' => '2026-05-12',
+        ])->assertSessionHasNoErrors();
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 4)
+            ->where('reference_year', 2026)
+            ->first();
+
+        $this->assertNotNull($meta);
+        $this->assertSame('2026-05-10', $meta->due_date->toDateString());
+        $this->assertTrue($meta->isPaid());
+    }
+
     public function test_editar_vencimento_e_data_pagamento_cria_ou_atualiza_metadados(): void
     {
         extract($this->seedCoupleWithAccounts());
@@ -169,15 +240,14 @@ class CreditCardStatementTest extends TestCase
             'reference_year' => 2026,
         ]);
 
-        CreditCardStatement::create([
-            'couple_id' => $couple->id,
-            'account_id' => $card->id,
-            'reference_month' => 5,
-            'reference_year' => 2026,
-            'due_date' => null,
-            'paid_at' => '2026-06-01',
-            'payment_transaction_id' => $tx->id,
-        ]);
+        CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 5)
+            ->where('reference_year', 2026)
+            ->update([
+                'paid_at' => '2026-06-01',
+                'payment_transaction_id' => $tx->id,
+            ]);
 
         $this->actingAs($user)->post(route('credit-card-statements.detach-payment', [$card, 2026, 5]))
             ->assertSessionHasNoErrors();

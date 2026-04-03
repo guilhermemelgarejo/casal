@@ -16,8 +16,8 @@
                     @endif
 
                     <p class="text-secondary small mb-4">
-                        Cada fatura corresponde ao <strong>mês de referência</strong> em que há despesa no cartão (igual aos lançamentos). O valor da fatura é a <strong>soma dessas despesas</strong>.
-                        Você pode definir vencimento, marcar como paga e registrar o pagamento na conta corrente (novo lançamento ou vínculo).
+                        Cada fatura corresponde ao <strong>mês de referência</strong> em que há despesa no cartão (igual aos lançamentos). O <strong>total</strong> fica <strong>gravado na fatura</strong> e é <strong>atualizado a cada lançamento</strong> (incluindo exclusões) naquele ciclo.
+                        O <strong>dia de vencimento padrão</strong> de cada cartão fica em <a href="{{ route('accounts.index') }}">Contas</a> (edição do cartão). Com o <strong>primeiro lançamento</strong> de despesa naquele cartão e mês de referência, a fatura já é criada com o vencimento previsto (mês seguinte à referência). Pode ajustar o vencimento em Editar quando quiser.
                     </p>
 
                     @if ($cardAccounts->isEmpty())
@@ -49,14 +49,31 @@
                                             $meta = $cycle->meta;
                                             $isPaid = $meta?->isPaid() ?? false;
                                             $hasLink = $meta && $meta->payment_transaction_id;
+                                            $virtualDue = $cycle->account->defaultStatementDueDate($cycle->reference_month, $cycle->reference_year);
+                                            if ($meta?->due_date) {
+                                                $dueForDisplay = $meta->due_date;
+                                                $dueIsSuggestion = false;
+                                            } elseif ($meta === null && $virtualDue) {
+                                                $dueForDisplay = $virtualDue;
+                                                $dueIsSuggestion = true;
+                                            } else {
+                                                $dueForDisplay = null;
+                                                $dueIsSuggestion = false;
+                                            }
+                                            $editDueValue = $meta?->due_date?->format('Y-m-d')
+                                                ?? ($meta === null ? ($virtualDue?->format('Y-m-d') ?? '') : '');
                                         @endphp
                                         <tr>
                                             <td class="fw-medium">{{ $cycle->account->name }}</td>
                                             <td>{{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}</td>
                                             <td class="text-end fw-medium">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</td>
                                             <td>
-                                                @if ($meta?->due_date)
-                                                    {{ $meta->due_date->format('d/m/Y') }}
+                                                @if ($dueForDisplay)
+                                                    @if ($dueIsSuggestion)
+                                                        <span class="text-secondary" title="Conforme o cartão em Contas; confirme em Editar ou ao registrar pagamento">Sug. {{ $dueForDisplay->format('d/m/Y') }}</span>
+                                                    @else
+                                                        {{ $dueForDisplay->format('d/m/Y') }}
+                                                    @endif
                                                 @else
                                                     <span class="text-secondary">—</span>
                                                 @endif
@@ -82,7 +99,7 @@
                                                     data-bs-target="#editStatementModal"
                                                     data-edit-action="{{ route('credit-card-statements.update', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
                                                     data-edit-subtitle="{{ $cycle->account->name }} — {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}"
-                                                    data-edit-due="{{ $meta?->due_date?->format('Y-m-d') ?? '' }}"
+                                                    data-edit-due="{{ $editDueValue }}"
                                                     data-edit-paid="{{ $meta?->paid_at?->format('Y-m-d') ?? '' }}"
                                                 >Editar</button>
                                                 @if (! $hasLink)
@@ -193,6 +210,7 @@
                                             <div class="mb-3">
                                                 <x-input-label for="editStatementDue" value="Vencimento" />
                                                 <input type="date" name="due_date" id="editStatementDue" class="form-control mt-1" value="{{ old('due_date') }}">
+                                                <p class="form-text mb-0">Sugerido pelo dia configurado no cartão quando ainda não há vencimento gravado; pode alterar antes de salvar.</p>
                                                 <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
                                             </div>
                                             <div class="mb-0">

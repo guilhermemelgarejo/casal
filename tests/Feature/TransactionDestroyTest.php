@@ -49,15 +49,14 @@ class TransactionDestroyTest extends TestCase
             'reference_year' => 2026,
         ]);
 
-        CreditCardStatement::create([
-            'couple_id' => $couple->id,
-            'account_id' => $card->id,
-            'reference_month' => 4,
-            'reference_year' => 2026,
-            'due_date' => null,
-            'paid_at' => '2026-04-20',
-            'payment_transaction_id' => null,
-        ]);
+        CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 4)
+            ->where('reference_year', 2026)
+            ->update([
+                'paid_at' => '2026-04-20',
+                'payment_transaction_id' => null,
+            ]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $purchase), [
             'installment_scope' => 'single',
@@ -99,16 +98,6 @@ class TransactionDestroyTest extends TestCase
             'date' => '2026-04-05',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
-
-        CreditCardStatement::create([
-            'couple_id' => $couple->id,
-            'account_id' => $card->id,
-            'reference_month' => 4,
-            'reference_year' => 2026,
-            'due_date' => null,
-            'paid_at' => null,
-            'payment_transaction_id' => null,
         ]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $purchase), [

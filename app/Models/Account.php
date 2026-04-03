@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\PaymentMethods;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,13 +15,37 @@ class Account extends Model
 
     public const KIND_CREDIT_CARD = 'credit_card';
 
-    protected $fillable = ['couple_id', 'name', 'kind', 'color', 'allowed_payment_methods'];
+    protected $fillable = ['couple_id', 'name', 'kind', 'color', 'allowed_payment_methods', 'credit_card_invoice_due_day'];
 
     protected function casts(): array
     {
         return [
             'allowed_payment_methods' => 'array',
+            'credit_card_invoice_due_day' => 'integer',
         ];
+    }
+
+    /**
+     * Data de vencimento sugerida para o ciclo (mês de referência), usando o dia configurado neste cartão.
+     * Mês civil seguinte ao de referência (ex.: ref. 04/2026 → venc. em 05).
+     */
+    public function defaultStatementDueDate(int $referenceMonth, int $referenceYear): ?Carbon
+    {
+        if (! $this->isCreditCard() || $this->credit_card_invoice_due_day === null) {
+            return null;
+        }
+
+        $day = (int) $this->credit_card_invoice_due_day;
+        if ($day < 1 || $day > 31) {
+            return null;
+        }
+
+        $tz = config('app.timezone');
+        $base = Carbon::create($referenceYear, $referenceMonth, 1, 0, 0, 0, $tz);
+        $dueMonth = $base->copy()->addMonth();
+        $dom = min($day, $dueMonth->daysInMonth);
+
+        return $dueMonth->copy()->day($dom)->startOfDay();
     }
 
     public static function kinds(): array

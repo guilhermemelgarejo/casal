@@ -55,6 +55,13 @@
                                         <x-input-error :messages="$errors->get('color')" class="mt-2" />
                                     </div>
 
+                                    <div id="account-due-day-wrap" class="{{ $kindOld === Account::KIND_CREDIT_CARD ? '' : 'd-none' }}">
+                                        <x-input-label for="credit_card_invoice_due_day" value="Dia de vencimento da fatura" />
+                                        <x-text-input id="credit_card_invoice_due_day" name="credit_card_invoice_due_day" type="number" min="1" max="31" class="mt-1" placeholder="Ex.: 10 (padrão se vazio)" value="{{ old('_form') === 'account-store' ? old('credit_card_invoice_due_day') : '' }}" />
+                                        <p class="form-text mb-0">Só para cartão: usado para sugerir o vencimento em <a href="{{ route('credit-card-statements.index') }}">Faturas cartão</a> (mês seguinte à referência). Se vazio ao cadastrar, assume o dia 10.</p>
+                                        <x-input-error :messages="$errors->get('credit_card_invoice_due_day')" class="mt-2" />
+                                    </div>
+
                                     <x-primary-button class="w-100 justify-content-center">
                                         Cadastrar conta
                                     </x-primary-button>
@@ -141,6 +148,15 @@
                                                         <x-input-error :messages="$errors->get('color')" class="mt-2" />
                                                     </div>
 
+                                                    @if ($account->isCreditCard())
+                                                        <div>
+                                                            <x-input-label for="edit-due-day-{{ $account->id }}" value="Dia de vencimento da fatura" />
+                                                            <x-text-input id="edit-due-day-{{ $account->id }}" name="credit_card_invoice_due_day" type="number" min="1" max="31" class="mt-1" placeholder="Ex.: 10" value="{{ old('_form') === 'account-update-'.$account->id ? old('credit_card_invoice_due_day') : $account->credit_card_invoice_due_day }}" />
+                                                            <p class="form-text mb-0">Vazio = sem data sugerida automaticamente nas faturas deste cartão.</p>
+                                                            <x-input-error :messages="$errors->get('credit_card_invoice_due_day')" class="mt-2" />
+                                                        </div>
+                                                    @endif
+
                                                     <div class="d-flex flex-wrap gap-2">
                                                         <x-primary-button type="submit">Salvar alterações</x-primary-button>
                                                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#edit-account-{{ $account->id }}">Fechar</button>
@@ -162,4 +178,20 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            (function () {
+                const typeSel = document.getElementById('type');
+                const wrap = document.getElementById('account-due-day-wrap');
+                if (!typeSel || !wrap) return;
+                const cardKind = @json(Account::KIND_CREDIT_CARD);
+                function syncDueDayField() {
+                    wrap.classList.toggle('d-none', typeSel.value !== cardKind);
+                }
+                typeSel.addEventListener('change', syncDueDayField);
+                syncDueDayField();
+            })();
+        </script>
+    @endpush
 </x-app-layout>

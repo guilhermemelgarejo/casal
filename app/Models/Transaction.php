@@ -13,6 +13,67 @@ class Transaction extends Model
 
     protected static function booted(): void
     {
+        static::created(function (Transaction $transaction) {
+            if ($transaction->type !== 'expense') {
+                return;
+            }
+            $transaction->loadMissing('accountModel');
+            $account = $transaction->accountModel;
+            if (! $account || ! $account->isCreditCard()) {
+                return;
+            }
+            CreditCardStatement::materializeForCycle(
+                $account,
+                (int) $transaction->reference_month,
+                (int) $transaction->reference_year
+            );
+        });
+
+        static::updated(function (Transaction $transaction) {
+            $old = $transaction->getOriginal();
+
+            if (($old['type'] ?? '') === 'expense' && ! empty($old['account_id'])) {
+                $oldAccount = Account::find($old['account_id']);
+                if ($oldAccount?->isCreditCard()) {
+                    CreditCardStatement::refreshSpentTotalForCycle(
+                        (int) $transaction->couple_id,
+                        (int) $old['account_id'],
+                        (int) $old['reference_month'],
+                        (int) $old['reference_year']
+                    );
+                }
+            }
+
+            if ($transaction->type === 'expense' && $transaction->account_id) {
+                $transaction->loadMissing('accountModel');
+                if ($transaction->accountModel?->isCreditCard()) {
+                    CreditCardStatement::materializeForCycle(
+                        $transaction->accountModel,
+                        (int) $transaction->reference_month,
+                        (int) $transaction->reference_year
+                    );
+                }
+            }
+        });
+
+        static::deleted(function (Transaction $transaction) {
+            if ($transaction->type !== 'expense' || ! $transaction->account_id) {
+                return;
+            }
+
+            $account = Account::find($transaction->account_id);
+            if (! $account?->isCreditCard()) {
+                return;
+            }
+
+            CreditCardStatement::refreshSpentTotalForCycle(
+                (int) $transaction->couple_id,
+                (int) $transaction->account_id,
+                (int) $transaction->reference_month,
+                (int) $transaction->reference_year
+            );
+        });
+
         static::deleting(function (Transaction $transaction) {
             CreditCardStatement::query()
                 ->where('payment_transaction_id', $transaction->id)

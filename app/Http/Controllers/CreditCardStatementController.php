@@ -50,13 +50,15 @@ class CreditCardStatementController extends Controller
 
             $invoiceCycles = $periodRows->map(function ($row) use ($metaByKey, $accountsById) {
                 $key = $this->cycleKey($row->account_id, $row->reference_year, $row->reference_month);
+                $meta = $metaByKey->get($key);
+                $liveTotal = (float) $row->spent_total;
 
                 return (object) [
                     'account' => $accountsById[$row->account_id],
                     'reference_month' => (int) $row->reference_month,
                     'reference_year' => (int) $row->reference_year,
-                    'spent_total' => (float) $row->spent_total,
-                    'meta' => $metaByKey->get($key),
+                    'spent_total' => $meta !== null ? (float) $meta->spent_total : $liveTotal,
+                    'meta' => $meta,
                 ];
             });
         }
@@ -307,7 +309,7 @@ class CreditCardStatementController extends Controller
 
         $meta->delete();
 
-        return back()->with('success', 'Vencimento e dados de pagamento deste ciclo foram removidos. O total continua vindo dos lançamentos no cartão.');
+        return back()->with('success', 'Vencimento e dados de pagamento deste ciclo foram removidos. O total materializado da fatura foi removido; ao voltar a haver lançamentos no ciclo, o valor é recalculado.');
     }
 
     private function authorizeCreditCardAccount(Account $account): void
@@ -335,15 +337,17 @@ class CreditCardStatementController extends Controller
 
     private function cycleSpentTotal(Account $account, int $referenceMonth, int $referenceYear): string
     {
-        $sum = Transaction::query()
-            ->where('couple_id', $account->couple_id)
-            ->where('account_id', $account->id)
-            ->where('reference_month', $referenceMonth)
-            ->where('reference_year', $referenceYear)
-            ->where('type', 'expense')
-            ->sum('amount');
+        $meta = $this->findMeta($account, $referenceMonth, $referenceYear);
+        if ($meta !== null) {
+            return number_format((float) $meta->spent_total, 2, '.', '');
+        }
 
-        return number_format((float) $sum, 2, '.', '');
+        return CreditCardStatement::sumCardExpensesForCycle(
+            $account->couple_id,
+            $account->id,
+            $referenceMonth,
+            $referenceYear
+        );
     }
 
     private function findMeta(Account $account, int $referenceMonth, int $referenceYear): ?CreditCardStatement
@@ -358,18 +362,6 @@ class CreditCardStatementController extends Controller
 
     private function firstOrCreateMeta(Account $account, int $referenceMonth, int $referenceYear): CreditCardStatement
     {
-        return CreditCardStatement::firstOrCreate(
-            [
-                'couple_id' => $account->couple_id,
-                'account_id' => $account->id,
-                'reference_month' => $referenceMonth,
-                'reference_year' => $referenceYear,
-            ],
-            [
-                'due_date' => null,
-                'paid_at' => null,
-                'payment_transaction_id' => null,
-            ]
-        );
+        return CreditCardStatement::materializeForCycle($account, $referenceMonth, $referenceYear);
     }
 }

@@ -22,13 +22,21 @@ class AccountController extends Controller
             'name' => 'required|string|max:255',
             'kind' => ['required', 'string', Rule::in(Account::kinds())],
             'color' => 'required|string|size:7',
+            'credit_card_invoice_due_day' => ['nullable', 'integer', 'min:1', 'max:31'],
         ]);
+
+        $isCard = $validated['kind'] === Account::KIND_CREDIT_CARD;
 
         Auth::user()->couple->accounts()->create([
             'name' => $validated['name'],
             'kind' => $validated['kind'],
             'color' => $validated['color'],
             'allowed_payment_methods' => null,
+            'credit_card_invoice_due_day' => $isCard
+                ? ($request->filled('credit_card_invoice_due_day')
+                    ? (int) $validated['credit_card_invoice_due_day']
+                    : 10)
+                : null,
         ]);
 
         return back()->with('success', 'Conta cadastrada com sucesso!');
@@ -40,15 +48,25 @@ class AccountController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'color' => 'required|string|size:7',
-        ]);
+        ];
+        if ($account->isCreditCard()) {
+            $rules['credit_card_invoice_due_day'] = ['nullable', 'integer', 'min:1', 'max:31'];
+        }
+
+        $validated = $request->validate($rules);
 
         $account->update([
             'name' => $validated['name'],
             'color' => $validated['color'],
             'allowed_payment_methods' => null,
+            'credit_card_invoice_due_day' => $account->isCreditCard()
+                ? ($request->filled('credit_card_invoice_due_day')
+                    ? (int) $request->credit_card_invoice_due_day
+                    : null)
+                : null,
         ]);
 
         return back()->with('success', 'Conta atualizada com sucesso!');
