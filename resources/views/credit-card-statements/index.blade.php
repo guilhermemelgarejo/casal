@@ -17,7 +17,7 @@
 
                     <p class="text-secondary small mb-4">
                         Cada fatura corresponde ao <strong>mês de referência</strong> em que há despesa no cartão (igual aos lançamentos). O <strong>total</strong> fica <strong>gravado na fatura</strong> e é <strong>atualizado a cada lançamento</strong> (incluindo exclusões) naquele ciclo.
-                        O <strong>dia de vencimento padrão</strong> de cada cartão fica em <a href="{{ route('accounts.index') }}">Contas</a> (edição do cartão). Com o <strong>primeiro lançamento</strong> de despesa naquele cartão e mês de referência, a fatura já é criada com o vencimento previsto (mês seguinte à referência). Pode ajustar o vencimento em Editar quando quiser.
+                        O <strong>dia de vencimento padrão</strong> de cada cartão fica em <a href="{{ route('accounts.index') }}">Contas</a> (edição do cartão). Com o <strong>primeiro lançamento</strong> de despesa naquele cartão e mês de referência, a fatura já é criada com o vencimento previsto (mesmo mês da referência). Pode ajustar o vencimento em Editar quando quiser.
                     </p>
 
                     @if ($cardAccounts->isEmpty())

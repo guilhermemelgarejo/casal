@@ -40,7 +40,7 @@ class CreditCardStatement extends Model
 
     /**
      * Garante um registo de metadados para o ciclo (cartão + mês/ano de referência).
-     * Na criação, define due_date com base no dia configurado no cartão (mês seguinte à referência).
+     * Na criação, define due_date com base no dia configurado no cartão (mesmo mês da referência).
      * Atualiza sempre o total materializado ({@see $spent_total}) com a soma das despesas no cartão.
      */
     public static function materializeForCycle(Account $account, int $referenceMonth, int $referenceYear): self

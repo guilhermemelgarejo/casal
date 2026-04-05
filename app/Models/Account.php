@@ -27,7 +27,7 @@ class Account extends Model
 
     /**
      * Data de vencimento sugerida para o ciclo (mês de referência), usando o dia configurado neste cartão.
-     * Mês civil seguinte ao de referência (ex.: ref. 04/2026 → venc. em 05).
+     * Mesmo mês civil da referência (ex.: ref. 06/2026 e dia 10 → 10/06/2026).
      */
     public function defaultStatementDueDate(int $referenceMonth, int $referenceYear): ?Carbon
     {
@@ -42,10 +42,9 @@ class Account extends Model
 
         $tz = config('app.timezone');
         $base = Carbon::create($referenceYear, $referenceMonth, 1, 0, 0, 0, $tz);
-        $dueMonth = $base->copy()->addMonth();
-        $dom = min($day, $dueMonth->daysInMonth);
+        $dom = min($day, $base->daysInMonth);
 
-        return $dueMonth->copy()->day($dom)->startOfDay();
+        return $base->copy()->day($dom)->startOfDay();
     }
 
     public static function kinds(): array

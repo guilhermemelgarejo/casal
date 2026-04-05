@@ -98,14 +98,14 @@ class CreditCardStatementTest extends TestCase
             ->where('reference_year', 2026)
             ->first();
         $this->assertNotNull($meta);
-        $this->assertSame('2026-05-10', $meta->due_date->toDateString());
+        $this->assertSame('2026-04-10', $meta->due_date->toDateString());
         $this->assertEquals(40.0, (float) $meta->spent_total);
 
         $this->actingAs($user)->get(route('credit-card-statements.index'))
             ->assertOk()
-            ->assertSee('10/05/2026', false)
-            ->assertSee('data-edit-due="2026-05-10"', false)
-            ->assertDontSee('Sug. 10/05/2026', false);
+            ->assertSee('10/04/2026', false)
+            ->assertSee('data-edit-due="2026-04-10"', false)
+            ->assertDontSee('Sug. 10/04/2026', false);
     }
 
     public function test_segundo_lancamento_no_mesmo_ciclo_atualiza_spent_total_materializado(): void
@@ -146,7 +146,7 @@ class CreditCardStatementTest extends TestCase
             ->first();
 
         $this->assertNotNull($meta);
-        $this->assertSame('2026-05-10', $meta->due_date->toDateString());
+        $this->assertSame('2026-04-10', $meta->due_date->toDateString());
         $this->assertTrue($meta->isPaid());
     }
 

@@ -18,7 +18,7 @@ class AccountDefaultStatementDueDateTest extends TestCase
     }
 
     #[DataProvider('dueCasesProvider')]
-    public function test_calcula_mes_seguinte_e_respeita_ultimo_dia_do_mes(int $refM, int $refY, int $dueDay, string $expectedYmd): void
+    public function test_mesmo_mes_da_referencia_e_respeita_ultimo_dia_do_mes(int $refM, int $refY, int $dueDay, string $expectedYmd): void
     {
         $account = new Account([
             'kind' => Account::KIND_CREDIT_CARD,
@@ -33,10 +33,10 @@ class AccountDefaultStatementDueDateTest extends TestCase
     public static function dueCasesProvider(): array
     {
         return [
-            'abril ref → maio 10' => [4, 2026, 10, '2026-05-10'],
-            'dezembro ref → janeiro seguinte' => [12, 2025, 5, '2026-01-05'],
-            'dia 31 em fevereiro não leap' => [1, 2026, 31, '2026-02-28'],
-            'dia 31 em fevereiro leap' => [1, 2024, 31, '2024-02-29'],
+            'abril ref → abril dia 10' => [4, 2026, 10, '2026-04-10'],
+            'dezembro ref → dezembro' => [12, 2025, 5, '2025-12-05'],
+            'dia 31 em fevereiro não leap' => [2, 2026, 31, '2026-02-28'],
+            'dia 31 em fevereiro leap' => [2, 2024, 31, '2024-02-29'],
         ];
     }
 }
