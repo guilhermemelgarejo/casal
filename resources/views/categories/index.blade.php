@@ -14,6 +14,15 @@
                         {{ session('success') }}
                     </div>
                 @endif
+                @if ($errors->any())
+                    <div class="alert alert-danger mb-4">
+                        <ul class="mb-0 ps-3">
+                            @foreach ($errors->all() as $err)
+                                <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
 
                 <div class="row g-4">
                     <div class="col-md-6">
@@ -77,19 +86,23 @@
                                                 <div class="rounded border" style="width: 1.5rem; height: 1.5rem; background-color: {{ $cat->color }}"></div>
                                             </td>
                                             <td class="text-center text-nowrap">
-                                                <button
-                                                    type="button"
-                                                    class="btn btn-link btn-sm p-0 me-2"
-                                                    @php($editCat = $cat->only(['id', 'name', 'type', 'color']))
-                                                    data-edit-category='@json($editCat)'
-                                                >
-                                                    Editar
-                                                </button>
-                                                <form action="{{ route('categories.destroy', $cat) }}" method="POST" class="d-inline" data-confirm-title="Excluir categoria" data-confirm="Deseja excluir esta categoria?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-link btn-sm text-danger p-0">Excluir</button>
-                                                </form>
+                                                @if ($cat->isCreditCardInvoicePayment())
+                                                    <span class="small text-secondary" title="Categoria do sistema para quitação em Faturas de cartão">Fixa</span>
+                                                @else
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-link btn-sm p-0 me-2"
+                                                        @php($editCat = $cat->only(['id', 'name', 'type', 'color']))
+                                                        data-edit-category='@json($editCat)'
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                    <form action="{{ route('categories.destroy', $cat) }}" method="POST" class="d-inline" data-confirm-title="Excluir categoria" data-confirm="Deseja excluir esta categoria?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-link btn-sm text-danger p-0">Excluir</button>
+                                                    </form>
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach

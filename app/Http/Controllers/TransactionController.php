@@ -57,7 +57,10 @@ class TransactionController extends Controller
         }
         $transactions->appends($appendQuery);
 
-        $categories = $couple->categories;
+        $categories = $couple->categories()
+            ->excludingCreditCardInvoicePayment()
+            ->orderBy('name')
+            ->get();
         $accounts = $couple->accounts;
 
         $accountsSortedForFilter = $accounts->sortBy(function (Account $a) {
@@ -229,6 +232,12 @@ class TransactionController extends Controller
             abort(403);
         }
 
+        if ($category->isCreditCardInvoicePayment()) {
+            return back()->withErrors([
+                'category_id' => 'Esta categoria é reservada para pagamentos de fatura de cartão. Use Faturas de cartão para registar a quitação.',
+            ])->withInput();
+        }
+
         $account = Account::find($request->account_id);
         if (! $account || $account->couple_id !== Auth::user()->couple_id) {
             abort(403);
@@ -252,11 +261,6 @@ class TransactionController extends Controller
             if ($account->isCreditCard()) {
                 return back()->withErrors([
                     'account_id' => 'Para Pix, débito, dinheiro etc., escolha uma conta (não um cartão de crédito).',
-                ])->withInput();
-            }
-            if ($account->getEffectivePaymentMethods() === []) {
-                return back()->withErrors([
-                    'account_id' => 'Esta conta não tem formas de pagamento habilitadas. Edite-a em Gerenciar contas.',
                 ])->withInput();
             }
             if (! $request->filled('payment_method')) {

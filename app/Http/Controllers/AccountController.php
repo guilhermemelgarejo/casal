@@ -31,7 +31,6 @@ class AccountController extends Controller
             'name' => $validated['name'],
             'kind' => $validated['kind'],
             'color' => $validated['color'],
-            'allowed_payment_methods' => null,
             'credit_card_invoice_due_day' => $isCard
                 ? ($request->filled('credit_card_invoice_due_day')
                     ? (int) $validated['credit_card_invoice_due_day']
@@ -61,7 +60,6 @@ class AccountController extends Controller
         $account->update([
             'name' => $validated['name'],
             'color' => $validated['color'],
-            'allowed_payment_methods' => null,
             'credit_card_invoice_due_day' => $account->isCreditCard()
                 ? ($request->filled('credit_card_invoice_due_day')
                     ? (int) $request->credit_card_invoice_due_day

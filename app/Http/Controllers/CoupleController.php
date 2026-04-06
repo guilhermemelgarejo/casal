@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Couple;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -37,6 +38,12 @@ class CoupleController extends Controller
             ['name' => 'Moradia', 'type' => 'expense', 'color' => '#3b82f6'],
             ['name' => 'Transporte', 'type' => 'expense', 'color' => '#f59e0b'],
             ['name' => 'Lazer', 'type' => 'expense', 'color' => '#10b981'],
+            [
+                'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+                'type' => 'expense',
+                'color' => '#64748b',
+                'system_key' => Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT,
+            ],
             ['name' => 'Salário', 'type' => 'income', 'color' => '#8b5cf6'],
         ];
 

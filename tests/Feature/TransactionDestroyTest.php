@@ -25,7 +25,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([
@@ -76,7 +75,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([
@@ -118,7 +116,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $checking = Account::create([
@@ -126,7 +123,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Conta',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([
@@ -181,7 +177,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([
@@ -239,7 +234,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([
@@ -298,7 +292,6 @@ class TransactionDestroyTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([

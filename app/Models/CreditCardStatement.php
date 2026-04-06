@@ -41,6 +41,7 @@ class CreditCardStatement extends Model
     /**
      * Garante um registo de metadados para o ciclo (cartão + mês/ano de referência).
      * Na criação, define due_date com base no dia configurado no cartão (mesmo mês da referência).
+     * Se o registo já existia com vencimento vazio ou ainda com a sugestão antiga (mês seguinte), atualiza due_date.
      * Atualiza sempre o total materializado ({@see $spent_total}) com a soma das despesas no cartão.
      */
     public static function materializeForCycle(Account $account, int $referenceMonth, int $referenceYear): self
@@ -61,6 +62,20 @@ class CreditCardStatement extends Model
                 'spent_total' => '0.00',
             ]
         );
+
+        if ($suggested !== null) {
+            $legacy = $account->legacyDefaultStatementDueDate($referenceMonth, $referenceYear);
+            $currentStr = $meta->due_date?->toDateString();
+            $targetStr = $suggested->toDateString();
+            $legacyStr = $legacy?->toDateString();
+
+            $shouldUpdate = $currentStr === null
+                || ($legacyStr !== null && $currentStr === $legacyStr);
+
+            if ($shouldUpdate && $currentStr !== $targetStr) {
+                $meta->update(['due_date' => $targetStr]);
+            }
+        }
 
         self::refreshSpentTotalForCycle(
             $account->couple_id,

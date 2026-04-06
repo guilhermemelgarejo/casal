@@ -53,7 +53,7 @@
                                             if ($meta?->due_date) {
                                                 $dueForDisplay = $meta->due_date;
                                                 $dueIsSuggestion = false;
-                                            } elseif ($meta === null && $virtualDue) {
+                                            } elseif ($virtualDue) {
                                                 $dueForDisplay = $virtualDue;
                                                 $dueIsSuggestion = true;
                                             } else {
@@ -61,7 +61,7 @@
                                                 $dueIsSuggestion = false;
                                             }
                                             $editDueValue = $meta?->due_date?->format('Y-m-d')
-                                                ?? ($meta === null ? ($virtualDue?->format('Y-m-d') ?? '') : '');
+                                                ?? ($virtualDue?->format('Y-m-d') ?? '');
                                         @endphp
                                         <tr>
                                             <td class="fw-medium">{{ $cycle->account->name }}</td>

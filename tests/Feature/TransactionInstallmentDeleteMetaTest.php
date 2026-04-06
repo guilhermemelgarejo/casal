@@ -24,7 +24,6 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $category = Category::create([

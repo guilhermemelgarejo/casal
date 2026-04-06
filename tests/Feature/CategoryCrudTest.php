@@ -86,4 +86,54 @@ class CategoryCrudTest extends TestCase
             'type' => 'income',
         ]);
     }
+
+    public function test_nao_pode_editar_nem_excluir_categoria_sistema_pagamento_fatura(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $fixed = Category::create([
+            'couple_id' => $couple->id,
+            'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+            'type' => 'expense',
+            'color' => '#64748b',
+            'system_key' => Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT,
+        ]);
+
+        $this->actingAs($user)->put(route('categories.update', $fixed), [
+            'name' => 'Outro nome',
+            'type' => 'expense',
+        ])->assertSessionHasErrors('name');
+
+        $this->assertDatabaseHas('categories', [
+            'id' => $fixed->id,
+            'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+        ]);
+
+        $this->actingAs($user)->delete(route('categories.destroy', $fixed))
+            ->assertSessionHasErrors('category');
+
+        $this->assertDatabaseHas('categories', ['id' => $fixed->id]);
+    }
+
+    public function test_nao_pode_renomear_categoria_para_nome_reservado(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Livre',
+            'type' => 'expense',
+            'color' => '#111',
+        ]);
+
+        $this->actingAs($user)->put(route('categories.update', $category), [
+            'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+            'type' => 'expense',
+        ])->assertSessionHasErrors('name');
+
+        $this->assertDatabaseHas('categories', [
+            'id' => $category->id,
+            'name' => 'Livre',
+        ]);
+    }
 }

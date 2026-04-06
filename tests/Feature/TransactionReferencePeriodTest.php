@@ -32,7 +32,6 @@ class TransactionReferencePeriodTest extends TestCase
             'name' => 'Nubank',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000000',
-            'allowed_payment_methods' => null, // todas
         ]);
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
@@ -91,7 +90,6 @@ class TransactionReferencePeriodTest extends TestCase
             'name' => 'Banco X',
             'kind' => Account::KIND_REGULAR,
             'color' => '#000000',
-            'allowed_payment_methods' => ['Pix'],
         ]);
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
@@ -127,7 +125,6 @@ class TransactionReferencePeriodTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000000',
-            'allowed_payment_methods' => null,
         ]);
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
@@ -164,7 +161,6 @@ class TransactionReferencePeriodTest extends TestCase
                 'name' => 'Master',
                 'kind' => Account::KIND_CREDIT_CARD,
                 'color' => '#000000',
-                'allowed_payment_methods' => null,
             ]);
 
             $response = $this->actingAs($user)->post(route('transactions.store'), [
@@ -191,4 +187,3 @@ class TransactionReferencePeriodTest extends TestCase
         }
     }
 }
-

@@ -31,7 +31,6 @@ class TransactionIndexFilterTest extends TestCase
             'name' => 'Conta Alfa',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111111',
-            'allowed_payment_methods' => null,
         ]);
 
         $accB = Account::create([
@@ -39,7 +38,6 @@ class TransactionIndexFilterTest extends TestCase
             'name' => 'Conta Beta',
             'kind' => Account::KIND_REGULAR,
             'color' => '#222222',
-            'allowed_payment_methods' => null,
         ]);
 
         Transaction::create([
@@ -92,7 +90,6 @@ class TransactionIndexFilterTest extends TestCase
             'name' => 'Conta estrangeira',
             'kind' => Account::KIND_REGULAR,
             'color' => '#333333',
-            'allowed_payment_methods' => null,
         ]);
 
         $response = $this->actingAs($user)->get(route('transactions.index', [

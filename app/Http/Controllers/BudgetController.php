@@ -12,8 +12,16 @@ class BudgetController extends Controller
     public function index()
     {
         $couple = Auth::user()->couple;
-        $categories = $couple->categories()->where('type', 'expense')->get();
-        $budgets = $couple->budgets()->where('month', date('m'))->where('year', date('Y'))->get();
+        $categories = $couple->categories()
+            ->where('type', 'expense')
+            ->excludingCreditCardInvoicePayment()
+            ->orderBy('name')
+            ->get();
+        $budgets = $couple->budgets()
+            ->where('month', date('m'))
+            ->where('year', date('Y'))
+            ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment())
+            ->get();
 
         $spentByCategory = $couple->transactions()
             ->excludingCreditCardInvoicePayments()
@@ -36,6 +44,12 @@ class BudgetController extends Controller
         $category = Category::find($request->category_id);
         if ($category->couple_id !== Auth::user()->couple_id || $category->type !== 'expense') {
             abort(403);
+        }
+
+        if ($category->isCreditCardInvoicePayment()) {
+            return back()->withErrors([
+                'category_id' => 'Esta categoria é reservada para pagamentos de fatura de cartão. Use outra categoria no orçamento.',
+            ])->withInput();
         }
 
         Budget::updateOrCreate(

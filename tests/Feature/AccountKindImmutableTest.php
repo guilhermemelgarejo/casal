@@ -22,7 +22,6 @@ class AccountKindImmutableTest extends TestCase
             'name' => 'Conta corrente',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111111',
-            'allowed_payment_methods' => ['Pix'],
         ]);
 
         $response = $this->actingAs($user)->put(route('accounts.update', $account), [
@@ -38,7 +37,6 @@ class AccountKindImmutableTest extends TestCase
         $this->assertSame(Account::KIND_REGULAR, $account->kind);
         $this->assertSame('Conta renomeada', $account->name);
         $this->assertSame('#222222', $account->color);
-        $this->assertNull($account->allowed_payment_methods);
     }
 
     public function test_cartao_nao_vira_conta_por_parametro_na_requisicao(): void
@@ -51,7 +49,6 @@ class AccountKindImmutableTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#333333',
-            'allowed_payment_methods' => null,
         ]);
 
         $response = $this->actingAs($user)->put(route('accounts.update', $account), [
@@ -66,6 +63,5 @@ class AccountKindImmutableTest extends TestCase
         $account->refresh();
         $this->assertSame(Account::KIND_CREDIT_CARD, $account->kind);
         $this->assertSame('Visa Gold', $account->name);
-        $this->assertNull($account->allowed_payment_methods);
     }
 }

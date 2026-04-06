@@ -15,12 +15,11 @@ class Account extends Model
 
     public const KIND_CREDIT_CARD = 'credit_card';
 
-    protected $fillable = ['couple_id', 'name', 'kind', 'color', 'allowed_payment_methods', 'credit_card_invoice_due_day'];
+    protected $fillable = ['couple_id', 'name', 'kind', 'color', 'credit_card_invoice_due_day'];
 
     protected function casts(): array
     {
         return [
-            'allowed_payment_methods' => 'array',
             'credit_card_invoice_due_day' => 'integer',
         ];
     }
@@ -47,6 +46,29 @@ class Account extends Model
         return $base->copy()->day($dom)->startOfDay();
     }
 
+    /**
+     * Regra antiga de vencimento (mês civil seguinte à referência).
+     * Usada só para alinhar faturas já gravadas com a sugestão automática anterior.
+     */
+    public function legacyDefaultStatementDueDate(int $referenceMonth, int $referenceYear): ?Carbon
+    {
+        if (! $this->isCreditCard() || $this->credit_card_invoice_due_day === null) {
+            return null;
+        }
+
+        $day = (int) $this->credit_card_invoice_due_day;
+        if ($day < 1 || $day > 31) {
+            return null;
+        }
+
+        $tz = config('app.timezone');
+        $base = Carbon::create($referenceYear, $referenceMonth, 1, 0, 0, 0, $tz);
+        $dueMonth = $base->copy()->addMonth();
+        $dom = min($day, $dueMonth->daysInMonth);
+
+        return $dueMonth->copy()->day($dom)->startOfDay();
+    }
+
     public static function kinds(): array
     {
         return [
@@ -61,8 +83,8 @@ class Account extends Model
     }
 
     /**
-     * Formas permitidas para lançamentos em conta (não-cartão). null = todas as formas de conta.
-     * Cartões de crédito não têm "forma de pagamento" extra: o próprio cartão identifica o meio.
+     * Formas de pagamento para lançamentos em conta (não-cartão): lista canónica.
+     * Cartões de crédito não têm forma extra: o próprio cartão identifica o meio.
      *
      * @return list<string>
      */
@@ -72,14 +94,7 @@ class Account extends Model
             return [];
         }
 
-        $pool = PaymentMethods::forRegularAccounts();
-        $allowed = $this->allowed_payment_methods;
-
-        if ($allowed === null) {
-            return $pool;
-        }
-
-        return array_values(array_intersect($pool, $allowed));
+        return PaymentMethods::forRegularAccounts();
     }
 
     public function allowsPaymentMethod(?string $method): bool

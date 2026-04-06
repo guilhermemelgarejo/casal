@@ -25,7 +25,6 @@ class CreditCardStatementTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $checking = Account::create([
@@ -33,7 +32,6 @@ class CreditCardStatementTest extends TestCase
             'name' => 'Conta corrente',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111',
-            'allowed_payment_methods' => ['Pix'],
         ]);
 
         $category = Category::create([
@@ -77,6 +75,62 @@ class CreditCardStatementTest extends TestCase
             ->assertOk()
             ->assertSee('R$ 150,50', false)
             ->assertSee('04/2026', false);
+    }
+
+    public function test_materialize_atualiza_vencimento_legado_do_mes_seguinte(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $card->update(['credit_card_invoice_due_day' => 10]);
+
+        CreditCardStatement::create([
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 6,
+            'reference_year' => 2026,
+            'spent_total' => '0.00',
+            'due_date' => '2026-07-10',
+            'paid_at' => null,
+            'payment_transaction_id' => null,
+        ]);
+
+        $this->cardExpense($user, $card, $category, 6, 2026, '10.00');
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 6)
+            ->where('reference_year', 2026)
+            ->first();
+
+        $this->assertNotNull($meta);
+        $this->assertSame('2026-06-10', $meta->due_date->toDateString());
+    }
+
+    public function test_materialize_nao_sobrescreve_vencimento_personalizado(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $card->update(['credit_card_invoice_due_day' => 10]);
+
+        CreditCardStatement::create([
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 6,
+            'reference_year' => 2026,
+            'spent_total' => '0.00',
+            'due_date' => '2026-06-25',
+            'paid_at' => null,
+            'payment_transaction_id' => null,
+        ]);
+
+        $this->cardExpense($user, $card, $category, 6, 2026, '5.00');
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 6)
+            ->where('reference_year', 2026)
+            ->first();
+
+        $this->assertNotNull($meta);
+        $this->assertSame('2026-06-25', $meta->due_date->toDateString());
     }
 
     public function test_primeiro_lancamento_cartao_materializa_fatura_com_vencimento_previsto(): void

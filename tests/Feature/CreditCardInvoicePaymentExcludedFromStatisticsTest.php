@@ -27,7 +27,6 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $checking = Account::create([
@@ -35,7 +34,6 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'name' => 'CC',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111',
-            'allowed_payment_methods' => ['Pix'],
         ]);
 
         $catExpense = Category::create([
@@ -111,7 +109,6 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'name' => 'Visa',
             'kind' => Account::KIND_CREDIT_CARD,
             'color' => '#000',
-            'allowed_payment_methods' => null,
         ]);
 
         $checking = Account::create([
@@ -119,7 +116,6 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'name' => 'CC',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111',
-            'allowed_payment_methods' => ['Pix'],
         ]);
 
         $cat = Category::create([
