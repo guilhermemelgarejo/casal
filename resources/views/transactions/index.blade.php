@@ -91,6 +91,12 @@
                                             <a href="{{ route('transactions.index') }}" class="btn btn-outline-secondary">Atual</a>
                                         </div>
                                     </form>
+                                    @if ($filteredRegularAccountBalance !== null)
+                                        <p class="small text-secondary mb-0 mt-2">
+                                            Saldo atual desta conta (todos os lançamentos):
+                                            <span class="fw-semibold {{ $filteredRegularAccountBalance >= 0 ? 'text-body' : 'text-danger' }}">R$ {{ number_format($filteredRegularAccountBalance, 2, ',', '.') }}</span>
+                                        </p>
+                                    @endif
                                     </div>
                                 </div>
                             </div>

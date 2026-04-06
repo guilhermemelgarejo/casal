@@ -99,6 +99,16 @@
                                                             @endforeach
                                                         @endif
                                                     </div>
+                                                    @if (! $account->isCreditCard())
+                                                        @php
+                                                            $accBal = (float) $account->balance;
+                                                        @endphp
+                                                        <p class="small mb-1">
+                                                            <span class="text-secondary">Saldo atual</span>
+                                                            <span class="fw-semibold {{ $accBal >= 0 ? 'text-body' : 'text-danger' }} ms-1">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
+                                                        </p>
+                                                        <p class="form-text mb-2">Guardado na base de dados e atualizado só pelos lançamentos desta conta.</p>
+                                                    @endif
                                                     <p class="small text-secondary mb-0">Cadastrada em {{ $account->created_at->format('d/m/Y') }}</p>
                                                 </div>
                                             </div>

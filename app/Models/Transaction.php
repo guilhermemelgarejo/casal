@@ -20,23 +20,44 @@ class Transaction extends Model
     protected static function booted(): void
     {
         static::created(function (Transaction $transaction) {
-            if ($transaction->type !== 'expense') {
-                return;
+            if ($transaction->type === 'expense') {
+                $transaction->loadMissing('accountModel');
+                $account = $transaction->accountModel;
+                if ($account && $account->isCreditCard()) {
+                    CreditCardStatement::materializeForCycle(
+                        $account,
+                        (int) $transaction->reference_month,
+                        (int) $transaction->reference_year
+                    );
+                }
             }
-            $transaction->loadMissing('accountModel');
-            $account = $transaction->accountModel;
-            if (! $account || ! $account->isCreditCard()) {
-                return;
-            }
-            CreditCardStatement::materializeForCycle(
-                $account,
-                (int) $transaction->reference_month,
-                (int) $transaction->reference_year
+
+            Account::applyLedgerEffectToStoredBalance(
+                $transaction->account_id !== null ? (int) $transaction->account_id : null,
+                (int) $transaction->couple_id,
+                $transaction->type,
+                $transaction->amount,
+                false
             );
         });
 
         static::updated(function (Transaction $transaction) {
             $old = $transaction->getOriginal();
+
+            Account::applyLedgerEffectToStoredBalance(
+                isset($old['account_id']) && $old['account_id'] !== null ? (int) $old['account_id'] : null,
+                (int) $transaction->couple_id,
+                isset($old['type']) ? (string) $old['type'] : null,
+                $old['amount'] ?? '0',
+                true
+            );
+            Account::applyLedgerEffectToStoredBalance(
+                $transaction->account_id !== null ? (int) $transaction->account_id : null,
+                (int) $transaction->couple_id,
+                $transaction->type,
+                $transaction->amount,
+                false
+            );
 
             if (($old['type'] ?? '') === 'expense' && ! empty($old['account_id'])) {
                 $oldAccount = Account::find($old['account_id']);
@@ -80,6 +101,14 @@ class Transaction extends Model
             foreach ($ids as $statementId) {
                 CreditCardStatement::query()->find($statementId)?->syncPaidMetadata();
             }
+
+            Account::applyLedgerEffectToStoredBalance(
+                $transaction->account_id !== null ? (int) $transaction->account_id : null,
+                (int) $transaction->couple_id,
+                $transaction->type,
+                $transaction->amount,
+                true
+            );
 
             if ($transaction->type !== 'expense' || ! $transaction->account_id) {
                 return;

@@ -34,6 +34,17 @@ class TransactionController extends Controller
         $selectedYear = (int) ($validated['year'] ?? $now->year);
         $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
 
+        $filteredRegularAccountBalance = null;
+        if ($filterAccountId !== null) {
+            $filteredAcc = Account::query()
+                ->where('couple_id', $couple->id)
+                ->whereKey($filterAccountId)
+                ->first();
+            if ($filteredAcc && ! $filteredAcc->isCreditCard()) {
+                $filteredRegularAccountBalance = (float) $filteredAcc->balance;
+            }
+        }
+
         $transactions = $couple->transactions()
             ->with(['category', 'user', 'accountModel'])
             ->where('reference_month', $selectedMonth)
@@ -161,6 +172,7 @@ class TransactionController extends Controller
             'selectedMonthYearLabel',
             'years',
             'filterAccountId',
+            'filteredRegularAccountBalance',
             'transactionDeleteMeta'
         ));
     }
