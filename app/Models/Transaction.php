@@ -5,11 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model
 {
     use HasFactory;
+
+    /**
+     * @var array<int, list<int>>
+     */
+    protected static array $creditCardStatementIdsToSyncAfterDelete = [];
 
     protected static function booted(): void
     {
@@ -56,7 +62,25 @@ class Transaction extends Model
             }
         });
 
+        static::deleting(function (Transaction $transaction) {
+            $ids = DB::table('credit_card_statement_payments')
+                ->where('transaction_id', $transaction->id)
+                ->pluck('credit_card_statement_id')
+                ->all();
+
+            if ($ids !== []) {
+                self::$creditCardStatementIdsToSyncAfterDelete[$transaction->id] = $ids;
+            }
+        });
+
         static::deleted(function (Transaction $transaction) {
+            $ids = self::$creditCardStatementIdsToSyncAfterDelete[$transaction->id] ?? [];
+            unset(self::$creditCardStatementIdsToSyncAfterDelete[$transaction->id]);
+
+            foreach ($ids as $statementId) {
+                CreditCardStatement::query()->find($statementId)?->syncPaidMetadata();
+            }
+
             if ($transaction->type !== 'expense' || ! $transaction->account_id) {
                 return;
             }
@@ -72,15 +96,6 @@ class Transaction extends Model
                 (int) $transaction->reference_month,
                 (int) $transaction->reference_year
             );
-        });
-
-        static::deleting(function (Transaction $transaction) {
-            CreditCardStatement::query()
-                ->where('payment_transaction_id', $transaction->id)
-                ->update([
-                    'payment_transaction_id' => null,
-                    'paid_at' => null,
-                ]);
         });
     }
 
@@ -159,21 +174,23 @@ class Transaction extends Model
             return false;
         }
 
-        return CreditCardStatement::query()
+        $stmt = CreditCardStatement::query()
             ->where('couple_id', $this->couple_id)
             ->where('account_id', $this->account_id)
             ->where('reference_month', $this->reference_month)
             ->where('reference_year', $this->reference_year)
-            ->whereNotNull('paid_at')
-            ->exists();
+            ->first();
+
+        return $stmt !== null && $stmt->isPaid();
     }
 
     /**
-     * Fatura de cartão paga por este lançamento (conta corrente), se existir.
+     * Faturas de cartão às quais este lançamento (conta corrente) está vinculado como pagamento.
      */
-    public function creditCardStatementPaidFor(): HasOne
+    public function creditCardStatementsPaidFor(): BelongsToMany
     {
-        return $this->hasOne(CreditCardStatement::class, 'payment_transaction_id');
+        return $this->belongsToMany(CreditCardStatement::class, 'credit_card_statement_payments')
+            ->withTimestamps();
     }
 
     /**
@@ -181,6 +198,6 @@ class Transaction extends Model
      */
     public function scopeExcludingCreditCardInvoicePayments(Builder $query): Builder
     {
-        return $query->whereDoesntHave('creditCardStatementPaidFor');
+        return $query->whereDoesntHave('creditCardStatementsPaidFor');
     }
 }

@@ -19,17 +19,26 @@ class DashboardController extends Controller
         $year = intval($parts[0] ?? date('Y'));
         $month = intval($parts[1] ?? date('m'));
 
-        // Base das transações filtradas por mês/ano de referência (fatura/competência)
-        $query = $couple->transactions()
+        // Totais, alerta e “Onde gastaram”: sem pagamentos de fatura de cartão (evita duplicar com o gasto no cartão)
+        $statsTransactions = $couple->transactions()
             ->excludingCreditCardInvoicePayments()
             ->where('reference_month', $month)
-            ->where('reference_year', $year);
+            ->where('reference_year', $year)
+            ->with(['category', 'accountModel'])
+            ->latest('date')
+            ->get();
 
-        $transactions = $query->with(['category', 'accountModel'])->latest('date')->get();
+        // Lista “Lançamentos do Período”: todos os lançamentos do mês de referência (inclui quitações de fatura)
+        $transactions = $couple->transactions()
+            ->where('reference_month', $month)
+            ->where('reference_year', $year)
+            ->with(['category', 'accountModel'])
+            ->latest('date')
+            ->get();
 
-        // Resumo Geral baseado nos filtros
-        $totalIncome = $transactions->where('type', 'income')->sum('amount');
-        $totalExpense = $transactions->where('type', 'expense')->sum('amount');
+        // Resumo Geral baseado nos filtros (exclui pagamentos de fatura)
+        $totalIncome = $statsTransactions->where('type', 'income')->sum('amount');
+        $totalExpense = $statsTransactions->where('type', 'expense')->sum('amount');
         $balance = $totalIncome - $totalExpense;
 
         // Alerta de Gastos
@@ -39,7 +48,7 @@ class DashboardController extends Controller
         $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
 
         // Agrupamento Cruzado: Conta x Forma de Pagamento
-        $crossSummary = $transactions->where('type', 'expense')
+        $crossSummary = $statsTransactions->where('type', 'expense')
             ->whereNotNull('account_id')
             ->groupBy('account_id')
             ->map(function ($accountTransactions) {

@@ -58,7 +58,6 @@
                                     <div id="account-due-day-wrap" class="{{ $kindOld === Account::KIND_CREDIT_CARD ? '' : 'd-none' }}">
                                         <x-input-label for="credit_card_invoice_due_day" value="Dia de vencimento da fatura" />
                                         <x-text-input id="credit_card_invoice_due_day" name="credit_card_invoice_due_day" type="number" min="1" max="31" class="mt-1" placeholder="Ex.: 10 (padrão se vazio)" value="{{ old('_form') === 'account-store' ? old('credit_card_invoice_due_day') : '' }}" />
-                                        <p class="form-text mb-0">Só para cartão: usado para sugerir o vencimento em <a href="{{ route('credit-card-statements.index') }}">Faturas cartão</a> (mesmo mês da referência dos lançamentos). Se vazio ao cadastrar, assume o dia 10.</p>
                                         <x-input-error :messages="$errors->get('credit_card_invoice_due_day')" class="mt-2" />
                                     </div>
 

@@ -27,6 +27,14 @@ class Category extends Model
         return $this->system_key === self::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT;
     }
 
+    public static function creditCardInvoicePaymentForCouple(int $coupleId): ?self
+    {
+        return static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT)
+            ->first();
+    }
+
     /**
      * Categorias que o utilizador pode escolher em orçamento e no formulário de Lançamentos.
      */

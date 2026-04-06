@@ -54,7 +54,6 @@ class TransactionDestroyTest extends TestCase
             ->where('reference_year', 2026)
             ->update([
                 'paid_at' => '2026-04-20',
-                'payment_transaction_id' => null,
             ]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $purchase), [
@@ -146,15 +145,17 @@ class TransactionDestroyTest extends TestCase
             'reference_year' => 2026,
         ]);
 
-        CreditCardStatement::create([
+        $meta = CreditCardStatement::create([
             'couple_id' => $couple->id,
             'account_id' => $card->id,
             'reference_month' => 3,
             'reference_year' => 2026,
             'due_date' => null,
-            'paid_at' => '2026-04-10',
-            'payment_transaction_id' => $payment->id,
+            'paid_at' => null,
+            'spent_total' => '500.00',
         ]);
+        $meta->paymentTransactions()->attach($payment->id);
+        $meta->syncPaidMetadata();
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $payment), [
             'installment_scope' => 'single',
@@ -162,8 +163,8 @@ class TransactionDestroyTest extends TestCase
 
         $response->assertSessionHasNoErrors();
         $this->assertFalse(Transaction::query()->whereKey($payment->id)->exists());
-        $meta = CreditCardStatement::first();
-        $this->assertNull($meta->payment_transaction_id);
+        $meta->refresh();
+        $this->assertSame(0, $meta->paymentTransactions()->count());
         $this->assertNull($meta->paid_at);
     }
 

@@ -11,13 +11,12 @@
                         <div class="alert alert-success mb-4">{{ session('success') }}</div>
                     @endif
 
-                    @if ($errors->has('mode'))
-                        <div class="alert alert-danger mb-4">{{ $errors->first('mode') }}</div>
+                    @if ($errors->has('payment'))
+                        <div class="alert alert-danger mb-4">{{ $errors->first('payment') }}</div>
                     @endif
 
                     <p class="text-secondary small mb-4">
-                        Cada fatura corresponde ao <strong>mês de referência</strong> em que há despesa no cartão (igual aos lançamentos). O <strong>total</strong> fica <strong>gravado na fatura</strong> e é <strong>atualizado a cada lançamento</strong> (incluindo exclusões) naquele ciclo.
-                        O <strong>dia de vencimento padrão</strong> de cada cartão fica em <a href="{{ route('accounts.index') }}">Contas</a> (edição do cartão). Com o <strong>primeiro lançamento</strong> de despesa naquele cartão e mês de referência, a fatura já é criada com o vencimento previsto (mesmo mês da referência). Pode ajustar o vencimento em Editar quando quiser.
+                        Fatura = <strong>mês de referência</strong> do cartão; o total reflete os lançamentos desse ciclo (incluindo exclusões). Vencimento padrão no cartão (<a href="{{ route('accounts.index') }}">Contas</a>); ao primeiro lançamento do mês a fatura nasce com esse vencimento e pode ajustar-se em Editar.
                     </p>
 
                     @if ($cardAccounts->isEmpty())
@@ -48,7 +47,12 @@
                                             $cid = 'ccs-'.$cycle->account->id.'-'.$cycle->reference_year.'-'.$cycle->reference_month;
                                             $meta = $cycle->meta;
                                             $isPaid = $meta?->isPaid() ?? false;
-                                            $hasLink = $meta && $meta->payment_transaction_id;
+                                            $hasPayments = $meta && $meta->paymentTransactions->isNotEmpty();
+                                            $isFullyPaidByTx = $meta?->isFullyPaidByPayments() ?? false;
+                                            $showPaymentForms = $meta === null
+                                                || (! $isFullyPaidByTx
+                                                    && ! ($meta->paid_at !== null && $meta->paymentTransactions->isEmpty()));
+                                            $remaining = $meta ? $meta->remainingToPay() : (float) $cycle->spent_total;
                                             $virtualDue = $cycle->account->defaultStatementDueDate($cycle->reference_month, $cycle->reference_year);
                                             if ($meta?->due_date) {
                                                 $dueForDisplay = $meta->due_date;
@@ -82,11 +86,30 @@
                                                 @if ($isPaid)
                                                     <span class="badge text-bg-success">Paga</span>
                                                     <div class="small text-secondary">{{ $meta->paid_at?->format('d/m/Y') }}</div>
-                                                    @if ($meta->paymentTransaction)
-                                                        <div class="small">
-                                                            <a href="{{ route('transactions.index', ['month' => $meta->paymentTransaction->reference_month, 'year' => $meta->paymentTransaction->reference_year]) }}">Lançamento</a>
-                                                        </div>
+                                                    @if ($hasPayments)
+                                                        <ul class="list-unstyled small mb-0 mt-1">
+                                                            @foreach ($meta->paymentTransactions as $ptx)
+                                                                <li>
+                                                                    <a href="{{ route('transactions.index', ['month' => $ptx->reference_month, 'year' => $ptx->reference_year]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
+                                                                    — R$ {{ number_format((float) $ptx->amount, 2, ',', '.') }}
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
                                                     @endif
+                                                @elseif ($hasPayments)
+                                                    <span class="badge text-bg-info text-dark">Parcial</span>
+                                                    <div class="small text-secondary mt-1">
+                                                        Pago: R$ {{ number_format((float) $meta->paymentsTotal(), 2, ',', '.') }}
+                                                        · Pendente: R$ {{ number_format($remaining, 2, ',', '.') }}
+                                                    </div>
+                                                    <ul class="list-unstyled small mb-0 mt-1">
+                                                        @foreach ($meta->paymentTransactions as $ptx)
+                                                            <li>
+                                                                <a href="{{ route('transactions.index', ['month' => $ptx->reference_month, 'year' => $ptx->reference_year]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
+                                                                — R$ {{ number_format((float) $ptx->amount, 2, ',', '.') }}
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
                                                 @else
                                                     <span class="badge text-bg-warning text-dark">Aberta</span>
                                                 @endif
@@ -100,34 +123,25 @@
                                                     data-edit-action="{{ route('credit-card-statements.update', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
                                                     data-edit-subtitle="{{ $cycle->account->name }} — {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}"
                                                     data-edit-due="{{ $editDueValue }}"
-                                                    data-edit-paid="{{ $meta?->paid_at?->format('Y-m-d') ?? '' }}"
                                                 >Editar</button>
-                                                @if (! $hasLink)
+                                                @if ($showPaymentForms)
                                                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#pay-{{ $cid }}">Pagamento</button>
-                                                @else
-                                                    <form action="{{ route('credit-card-statements.detach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-outline-warning">Desvincular</button>
-                                                    </form>
-                                                @endif
-                                                @if ($meta)
-                                                    <form action="{{ route('credit-card-statements.destroy', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}" method="POST" class="d-inline" data-confirm-title="Limpar dados" data-confirm="Remove vencimento e pagamento salvos neste ciclo (não apaga lançamentos no cartão)." data-confirm-accept="Sim" data-confirm-cancel="Cancelar">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove só metadados">Limpar extras</button>
-                                                    </form>
                                                 @endif
                                             </td>
                                         </tr>
                                         <tr class="collapse bg-light" id="pay-{{ $cid }}">
                                             <td colspan="6" class="p-3">
-                                                <div class="row g-4">
-                                                    <div class="col-lg-6">
+                                                <div class="col-lg-8 col-xl-6">
                                                         <h4 class="h6 border-bottom pb-2">Gerar lançamento na conta</h4>
-                                                        <p class="small text-secondary">Valor sugerido: total da fatura (R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}).</p>
+                                                        <p class="small text-secondary">
+                                                            @if ($hasPayments && ! $isFullyPaidByTx)
+                                                                Valor sugerido: restante (R$ {{ number_format($remaining, 2, ',', '.') }}).
+                                                            @else
+                                                                Valor sugerido: total da fatura (R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}).
+                                                            @endif
+                                                        </p>
                                                         <form action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}" method="POST" class="vstack gap-2">
                                                             @csrf
-                                                            <input type="hidden" name="mode" value="create">
                                                             <div>
                                                                 <x-input-label for="pay-acc-{{ $cid }}" value="Conta" />
                                                                 <select id="pay-acc-{{ $cid }}" name="account_id" class="form-select mt-1" required>
@@ -145,48 +159,20 @@
                                                                     @endforeach
                                                                 </select>
                                                             </div>
-                                                            <div>
-                                                                <x-input-label for="pay-cat-{{ $cid }}" value="Categoria" />
-                                                                <select id="pay-cat-{{ $cid }}" name="category_id" class="form-select mt-1" required>
-                                                                    @foreach ($expenseCategories as $cat)
-                                                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                                                                    @endforeach
-                                                                </select>
-                                                            </div>
+                                                            <p class="small text-secondary mb-0">
+                                                                Categoria: <strong>{{ \App\Models\Category::NAME_CREDIT_CARD_INVOICE_PAYMENT }}</strong> (fixa para pagamento de fatura).
+                                                            </p>
                                                             <div>
                                                                 <x-input-label for="pay-date-{{ $cid }}" value="Data do pagamento" />
                                                                 <input type="date" id="pay-date-{{ $cid }}" name="paid_date" class="form-control mt-1" required value="{{ now()->format('Y-m-d') }}">
                                                             </div>
                                                             <div>
                                                                 <x-input-label for="pay-amt-{{ $cid }}" value="Valor (opcional)" />
-                                                                <input type="text" inputmode="decimal" id="pay-amt-{{ $cid }}" name="amount" class="form-control mt-1" placeholder="Padrão: R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}">
+                                                                <input type="text" inputmode="decimal" id="pay-amt-{{ $cid }}" name="amount" class="form-control mt-1" placeholder="Padrão: R$ {{ number_format($hasPayments && ! $isFullyPaidByTx ? $remaining : $cycle->spent_total, 2, ',', '.') }}">
                                                             </div>
-                                                            <x-primary-button type="submit" class="w-100 justify-content-center">Criar lançamento e marcar paga</x-primary-button>
+                                                            <x-primary-button type="submit" class="w-100 justify-content-center">Criar lançamento</x-primary-button>
                                                         </form>
-                                                    </div>
-                                                    <div class="col-lg-6">
-                                                        <h4 class="h6 border-bottom pb-2">Vincular lançamento existente</h4>
-                                                        <p class="small text-secondary">Use se o pagamento já foi lançado em Lançamentos.</p>
-                                                        @if ($linkableTransactions->isEmpty())
-                                                            <p class="small text-muted mb-0">Nenhum lançamento disponível (despesas em conta corrente não vinculadas).</p>
-                                                        @else
-                                                            <form action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}" method="POST" class="vstack gap-2">
-                                                                @csrf
-                                                                <input type="hidden" name="mode" value="link">
-                                                                <div>
-                                                                    <x-input-label for="pay-link-{{ $cid }}" value="Lançamento" />
-                                                                    <select id="pay-link-{{ $cid }}" name="existing_transaction_id" class="form-select mt-1" required>
-                                                                        <option value="">Selecione…</option>
-                                                                        @foreach ($linkableTransactions as $tx)
-                                                                            <option value="{{ $tx->id }}">{{ $tx->date->format('d/m/Y') }} — {{ $tx->accountModel->name }} — R$ {{ number_format((float) $tx->amount, 2, ',', '.') }} — {{ \Illuminate\Support\Str::limit($tx->description, 40) }}</option>
-                                                                        @endforeach
-                                                                    </select>
-                                                                    <x-input-error :messages="$errors->get('existing_transaction_id')" class="mt-2" />
-                                                                </div>
-                                                                <x-primary-button type="submit" class="w-100 justify-content-center">Vincular</x-primary-button>
-                                                            </form>
-                                                        @endif
-                                                    </div>
+                                                        <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente em <a href="{{ route('transactions.index') }}">Lançamentos</a>.</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -207,17 +193,10 @@
                                         </div>
                                         <div class="modal-body">
                                             <p class="small text-secondary mb-3" id="editStatementSubtitle"></p>
-                                            <div class="mb-3">
+                                            <div class="mb-0">
                                                 <x-input-label for="editStatementDue" value="Vencimento" />
                                                 <input type="date" name="due_date" id="editStatementDue" class="form-control mt-1" value="{{ old('due_date') }}">
-                                                <p class="form-text mb-0">Sugerido pelo dia configurado no cartão quando ainda não há vencimento gravado; pode alterar antes de salvar.</p>
                                                 <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
-                                            </div>
-                                            <div class="mb-0">
-                                                <x-input-label for="editStatementPaid" value="Data de pagamento" />
-                                                <input type="date" name="paid_at" id="editStatementPaid" class="form-control mt-1" value="{{ old('paid_at') }}">
-                                                <p class="form-text mb-0">Deixe vazio para marcar como não paga (e remover vínculo com lançamento).</p>
-                                                <x-input-error :messages="$errors->get('paid_at')" class="mt-2" />
                                             </div>
                                         </div>
                                         <div class="modal-footer">
@@ -251,7 +230,6 @@
                                     const form = document.getElementById('editStatementForm');
                                     const subtitleEl = document.getElementById('editStatementSubtitle');
                                     const dueInput = document.getElementById('editStatementDue');
-                                    const paidInput = document.getElementById('editStatementPaid');
                                     if (!modalEl || !form) return;
 
                                     modalEl.addEventListener('show.bs.modal', function (e) {
@@ -264,9 +242,6 @@
                                         if (dueInput) {
                                             dueInput.value = btn.getAttribute('data-edit-due') || '';
                                         }
-                                        if (paidInput) {
-                                            paidInput.value = btn.getAttribute('data-edit-paid') || '';
-                                        }
                                     });
 
                                     @if ($openEditReopen)
@@ -276,7 +251,6 @@
                                             subtitleEl.textContent = {!! json_encode($openEditSubtitleJs) !!};
                                         }
                                         if (dueInput) dueInput.value = {!! json_encode(old('due_date', '')) !!};
-                                        if (paidInput) paidInput.value = {!! json_encode(old('paid_at', '')) !!};
                                         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
                                             bootstrap.Modal.getOrCreateInstance(modalEl).show();
                                         }

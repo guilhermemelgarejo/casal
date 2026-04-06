@@ -67,7 +67,6 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'reference_year' => $refYear,
             'due_date' => Carbon::createFromDate($refYear, $refMonth, 10)->toDateString(),
             'paid_at' => null,
-            'payment_transaction_id' => null,
         ]);
 
         $paymentTx = Transaction::create([
@@ -84,7 +83,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'reference_year' => $refYear,
         ]);
 
-        $stmt->update(['payment_transaction_id' => $paymentTx->id, 'paid_at' => $paymentTx->date]);
+        $stmt->paymentTransactions()->attach($paymentTx->id);
 
         $period = sprintf('%04d-%02d', $refYear, $refMonth);
 
@@ -92,6 +91,8 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
         $dash->assertOk();
         $dash->assertSee('R$ 100,00', false);
         $dash->assertDontSee('R$ 600,00', false);
+        $dash->assertSee('Pagamento fatura Visa', false);
+        $dash->assertSee('R$ 500,00', false);
 
         $txPage = $this->actingAs($user)->get(route('transactions.index', ['month' => $refMonth, 'year' => $refYear]));
         $txPage->assertOk();
@@ -149,7 +150,6 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'reference_year' => $m === 1 ? $y - 1 : $y,
             'due_date' => now()->toDateString(),
             'paid_at' => null,
-            'payment_transaction_id' => null,
         ]);
 
         $pay = Transaction::create([
@@ -165,7 +165,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'reference_month' => $m,
             'reference_year' => $y,
         ]);
-        $stmt->update(['payment_transaction_id' => $pay->id, 'paid_at' => $pay->date]);
+        $stmt->paymentTransactions()->attach($pay->id);
 
         Budget::create([
             'couple_id' => $couple->id,

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CreditCardStatement extends Model
 {
@@ -58,7 +60,6 @@ class CreditCardStatement extends Model
             [
                 'due_date' => $suggested?->toDateString(),
                 'paid_at' => null,
-                'payment_transaction_id' => null,
                 'spent_total' => '0.00',
             ]
         );
@@ -95,7 +96,6 @@ class CreditCardStatement extends Model
         'spent_total',
         'due_date',
         'paid_at',
-        'payment_transaction_id',
     ];
 
     protected function casts(): array
@@ -109,9 +109,77 @@ class CreditCardStatement extends Model
         ];
     }
 
+    /**
+     * Soma dos valores dos lançamentos de conta corrente vinculados como pagamento desta fatura.
+     */
+    public function paymentsTotal(): float
+    {
+        return (float) $this->paymentTransactions()->sum('amount');
+    }
+
+    public function remainingToPay(): float
+    {
+        $total = (float) $this->spent_total;
+
+        return max(0, round($total - $this->paymentsTotal(), 2));
+    }
+
+    public function isFullyPaidByPayments(): bool
+    {
+        $total = (float) $this->spent_total;
+        if ($total < 0.005) {
+            return false;
+        }
+
+        return $this->paymentsTotal() + 0.005 >= $total;
+    }
+
+    /**
+     * Fatura quitada: soma dos pagamentos cobre o total, ou data de pagamento manual sem lançamentos vinculados.
+     */
     public function isPaid(): bool
     {
-        return $this->paid_at !== null;
+        if ($this->isFullyPaidByPayments()) {
+            return true;
+        }
+
+        return $this->paid_at !== null && $this->paymentTransactions()->count() === 0;
+    }
+
+    public function hasPartialPayments(): bool
+    {
+        return $this->paymentTransactions()->exists() && ! $this->isFullyPaidByPayments();
+    }
+
+    /**
+     * Ajusta {@see paid_at} consoante os lançamentos vinculados (parcial vs quitada).
+     */
+    public function syncPaidMetadata(): void
+    {
+        $count = $this->paymentTransactions()->count();
+        if ($count === 0) {
+            $this->update(['paid_at' => null]);
+
+            return;
+        }
+
+        if ($this->isFullyPaidByPayments()) {
+            $latest = $this->paymentTransactions()
+                ->reorder()
+                ->orderByDesc('transactions.date')
+                ->orderByDesc('transactions.id')
+                ->first();
+
+            $this->update([
+                'paid_at' => $latest?->date
+                    ? Carbon::parse($latest->date)->toDateString()
+                    : null,
+            ]);
+
+            return;
+        }
+
+        $this->update(['paid_at' => null]);
     }
 
     public function couple(): BelongsTo
@@ -124,8 +192,9 @@ class CreditCardStatement extends Model
         return $this->belongsTo(Account::class, 'account_id');
     }
 
-    public function paymentTransaction(): BelongsTo
+    public function paymentTransactions(): BelongsToMany
     {
-        return $this->belongsTo(Transaction::class, 'payment_transaction_id');
+        return $this->belongsToMany(Transaction::class, 'credit_card_statement_payments')
+            ->withTimestamps();
     }
 }

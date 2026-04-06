@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('categories', function (Blueprint $table) {
-            $table->string('system_key', 64)->nullable()->after('icon');
-        });
+        if (! Schema::hasColumn('categories', 'system_key')) {
+            Schema::table('categories', function (Blueprint $table) {
+                $table->string('system_key', 64)->nullable()->after('icon');
+            });
+        }
 
         $legacyNames = [
             'Pagamento fatura cartão',
@@ -33,9 +35,11 @@ return new class extends Migration
             }
         }
 
-        Schema::table('categories', function (Blueprint $table) {
-            $table->unique(['couple_id', 'system_key']);
-        });
+        if (! Schema::hasIndex('categories', ['couple_id', 'system_key'], 'unique')) {
+            Schema::table('categories', function (Blueprint $table) {
+                $table->unique(['couple_id', 'system_key']);
+            });
+        }
     }
 
     public function down(): void

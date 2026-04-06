@@ -42,7 +42,7 @@ class CreditCardStatementController extends Controller
 
             $metaByKey = CreditCardStatement::query()
                 ->where('couple_id', $coupleId)
-                ->with(['paymentTransaction.accountModel'])
+                ->with(['paymentTransactions.accountModel'])
                 ->get()
                 ->keyBy(fn (CreditCardStatement $s) => $this->cycleKey($s->account_id, $s->reference_year, $s->reference_month));
 
@@ -68,34 +68,10 @@ class CreditCardStatementController extends Controller
             ->orderBy('name')
             ->get();
 
-        $expenseCategories = $couple->categories()
-            ->where('type', 'expense')
-            ->orderBy('name')
-            ->get();
-
-        $usedPaymentTxIds = CreditCardStatement::query()
-            ->where('couple_id', $coupleId)
-            ->whereNotNull('payment_transaction_id')
-            ->pluck('payment_transaction_id')
-            ->all();
-
-        $linkableTransactions = Transaction::query()
-            ->where('couple_id', $coupleId)
-            ->where('type', 'expense')
-            ->whereHas('accountModel', fn ($q) => $q->where('kind', Account::KIND_REGULAR))
-            ->with(['accountModel', 'category'])
-            ->when(count($usedPaymentTxIds) > 0, fn ($q) => $q->whereNotIn('id', $usedPaymentTxIds))
-            ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->limit(80)
-            ->get();
-
         return view('credit-card-statements.index', compact(
             'cardAccounts',
             'invoiceCycles',
-            'regularAccounts',
-            'expenseCategories',
-            'linkableTransactions'
+            'regularAccounts'
         ));
     }
 
@@ -107,13 +83,8 @@ class CreditCardStatementController extends Controller
             abort(404);
         }
 
-        $request->merge([
-            'paid_at' => $request->filled('paid_at') ? $request->input('paid_at') : null,
-        ]);
-
         $validator = Validator::make($request->all(), [
             'due_date' => ['nullable', 'date'],
-            'paid_at' => ['nullable', 'date'],
         ]);
 
         if ($validator->fails()) {
@@ -131,17 +102,9 @@ class CreditCardStatementController extends Controller
 
         $meta = $this->firstOrCreateMeta($account, $referenceMonth, $referenceYear);
 
-        $paidAt = $validated['paid_at'] ?? null;
-        $updates = [
+        $meta->update([
             'due_date' => $validated['due_date'] ?? null,
-            'paid_at' => $paidAt,
-        ];
-
-        if ($paidAt === null) {
-            $updates['payment_transaction_id'] = null;
-        }
-
-        $meta->update($updates);
+        ]);
 
         return back()->with('success', 'Fatura atualizada.');
     }
@@ -156,9 +119,11 @@ class CreditCardStatementController extends Controller
 
         $meta = $this->firstOrCreateMeta($account, $referenceMonth, $referenceYear);
 
-        if ($meta->payment_transaction_id !== null) {
+        $meta->refresh();
+
+        if ($meta->isFullyPaidByPayments()) {
             return back()->withErrors([
-                'mode' => 'Já existe um lançamento vinculado. Remova o vínculo antes de registrar outro pagamento.',
+                'payment' => 'A fatura já está quitada pelos lançamentos vinculados.',
             ]);
         }
 
@@ -169,53 +134,20 @@ class CreditCardStatementController extends Controller
         }
 
         $validated = $request->validate([
-            'mode' => ['required', 'string', Rule::in(['create', 'link'])],
-            'existing_transaction_id' => ['required_if:mode,link', 'nullable', 'integer', 'exists:transactions,id'],
-            'account_id' => ['required_if:mode,create', 'nullable', 'integer', 'exists:accounts,id'],
-            'payment_method' => ['required_if:mode,create', 'nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
-            'category_id' => ['required_if:mode,create', 'nullable', 'integer', 'exists:categories,id'],
-            'paid_date' => ['required_if:mode,create', 'nullable', 'date'],
+            'account_id' => ['required', 'integer', 'exists:accounts,id'],
+            'payment_method' => ['required', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
+            'paid_date' => ['required', 'date'],
             'amount' => ['nullable', 'numeric', 'min:0.01'],
         ]);
 
         $coupleId = Auth::user()->couple_id;
         $cycleTotal = $this->cycleSpentTotal($account, $referenceMonth, $referenceYear);
+        $cycleTotalFloat = (float) $cycleTotal;
+        $paidSoFar = $meta->paymentsTotal();
 
-        if ($validated['mode'] === 'link') {
-            if (empty($validated['existing_transaction_id'])) {
-                return back()->withErrors(['existing_transaction_id' => 'Selecione um lançamento.'])->withInput();
-            }
-
-            $tx = Transaction::find($validated['existing_transaction_id']);
-            if (! $tx || $tx->couple_id !== $coupleId || $tx->type !== 'expense') {
-                abort(403);
-            }
-
-            $txAccount = $tx->accountModel;
-            if (! $txAccount || $txAccount->couple_id !== $coupleId || $txAccount->isCreditCard()) {
-                return back()->withErrors(['existing_transaction_id' => 'O lançamento deve ser uma despesa em conta corrente (não cartão).'])->withInput();
-            }
-
-            $already = CreditCardStatement::query()
-                ->where('payment_transaction_id', $tx->id)
-                ->where('id', '!=', $meta->id)
-                ->exists();
-
-            if ($already) {
-                return back()->withErrors(['existing_transaction_id' => 'Este lançamento já está vinculado a outra fatura.'])->withInput();
-            }
-
-            $meta->update([
-                'payment_transaction_id' => $tx->id,
-                'paid_at' => $tx->date->toDateString(),
-            ]);
-
-            return back()->with('success', 'Pagamento vinculado à fatura.');
-        }
-
-        if (empty($validated['account_id']) || empty($validated['category_id']) || empty($validated['paid_date'])) {
+        if (empty($validated['account_id']) || empty($validated['paid_date'])) {
             return back()->withErrors([
-                'account_id' => 'Conta, categoria e data de pagamento são obrigatórios para gerar o lançamento.',
+                'account_id' => 'Conta e data de pagamento são obrigatórios para gerar o lançamento.',
             ])->withInput();
         }
 
@@ -224,20 +156,21 @@ class CreditCardStatementController extends Controller
             abort(403);
         }
 
-        if (! $request->filled('payment_method')) {
-            return back()->withErrors(['payment_method' => 'Selecione a forma de pagamento.'])->withInput();
-        }
-
-        if (! $payAccount->allowsPaymentMethod($request->payment_method)) {
+        if (! $payAccount->allowsPaymentMethod($validated['payment_method'])) {
             return back()->withErrors(['payment_method' => 'Esta forma não está habilitada para a conta selecionada.'])->withInput();
         }
 
-        $category = Category::find($validated['category_id']);
-        if (! $category || $category->couple_id !== $coupleId || $category->type !== 'expense') {
-            abort(403);
+        $invoiceCategory = Category::creditCardInvoicePaymentForCouple($coupleId);
+        if (! $invoiceCategory) {
+            return back()->withErrors([
+                'account_id' => 'Categoria de quitação de fatura não encontrada para este casal.',
+            ])->withInput();
         }
 
-        $amountNormalized = $validated['amount'] ?? $cycleTotal;
+        $defaultAmount = $paidSoFar > 0.005
+            ? max(0.01, round($cycleTotalFloat - $paidSoFar, 2))
+            : $cycleTotalFloat;
+        $amountNormalized = $validated['amount'] ?? $defaultAmount;
         $amountStr = number_format((float) str_replace(',', '.', (string) $amountNormalized), 2, '.', '');
 
         $paidDate = Carbon::parse($validated['paid_date']);
@@ -256,12 +189,13 @@ class CreditCardStatementController extends Controller
             $refMonth,
             $refYear,
             $description,
-            $meta
+            $meta,
+            $invoiceCategory
         ) {
             $tx = Transaction::create([
                 'couple_id' => $coupleId,
                 'user_id' => Auth::id(),
-                'category_id' => $validated['category_id'],
+                'category_id' => $invoiceCategory->id,
                 'account_id' => $validated['account_id'],
                 'description' => $description,
                 'amount' => $amountStr,
@@ -272,44 +206,19 @@ class CreditCardStatementController extends Controller
                 'reference_year' => $refYear,
             ]);
 
-            $meta->update([
-                'payment_transaction_id' => $tx->id,
-                'paid_at' => $paidDate->toDateString(),
-            ]);
+            $meta->paymentTransactions()->attach($tx->id);
+            $meta->refresh();
+            $meta->syncPaidMetadata();
         });
 
-        return back()->with('success', 'Lançamento criado e fatura marcada como paga.');
-    }
+        $meta->refresh();
 
-    public function detachPayment(Account $account, int $referenceYear, int $referenceMonth)
-    {
-        $this->authorizeCreditCardAccount($account);
-
-        $meta = $this->findMeta($account, $referenceMonth, $referenceYear);
-        if (! $meta) {
-            abort(404);
-        }
-
-        $meta->update([
-            'payment_transaction_id' => null,
-            'paid_at' => null,
-        ]);
-
-        return back()->with('success', 'Vínculo de pagamento removido. O lançamento permanece em Lançamentos (exclua lá se quiser).');
-    }
-
-    public function destroy(Account $account, int $referenceYear, int $referenceMonth)
-    {
-        $this->authorizeCreditCardAccount($account);
-
-        $meta = $this->findMeta($account, $referenceMonth, $referenceYear);
-        if (! $meta) {
-            return back()->with('success', 'Não havia dados extras para este ciclo.');
-        }
-
-        $meta->delete();
-
-        return back()->with('success', 'Vencimento e dados de pagamento deste ciclo foram removidos. O total materializado da fatura foi removido; ao voltar a haver lançamentos no ciclo, o valor é recalculado.');
+        return back()->with(
+            'success',
+            $meta->isFullyPaidByPayments()
+                ? 'Lançamento criado e fatura quitada.'
+                : 'Lançamento criado. Ainda há valor pendente na fatura.'
+        );
     }
 
     private function authorizeCreditCardAccount(Account $account): void

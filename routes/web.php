@@ -42,14 +42,6 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
         ->whereNumber('referenceYear')
         ->whereNumber('referenceMonth')
         ->name('credit-card-statements.attach-payment');
-    Route::post('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}/pagamento/remover', [CreditCardStatementController::class, 'detachPayment'])
-        ->whereNumber('referenceYear')
-        ->whereNumber('referenceMonth')
-        ->name('credit-card-statements.detach-payment');
-    Route::delete('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}/metadados', [CreditCardStatementController::class, 'destroy'])
-        ->whereNumber('referenceYear')
-        ->whereNumber('referenceMonth')
-        ->name('credit-card-statements.destroy');
 
     Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
     Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');

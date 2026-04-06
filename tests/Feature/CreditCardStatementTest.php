@@ -41,7 +41,15 @@ class CreditCardStatementTest extends TestCase
             'color' => '#222',
         ]);
 
-        return compact('couple', 'user', 'card', 'checking', 'category');
+        $invoiceCategory = Category::create([
+            'couple_id' => $couple->id,
+            'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+            'type' => 'expense',
+            'color' => '#333',
+            'system_key' => Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT,
+        ]);
+
+        return compact('couple', 'user', 'card', 'checking', 'category', 'invoiceCategory');
     }
 
     private function cardExpense(User $user, Account $card, Category $category, int $month, int $year, string $amount = '100.00'): Transaction
@@ -90,7 +98,6 @@ class CreditCardStatementTest extends TestCase
             'spent_total' => '0.00',
             'due_date' => '2026-07-10',
             'paid_at' => null,
-            'payment_transaction_id' => null,
         ]);
 
         $this->cardExpense($user, $card, $category, 6, 2026, '10.00');
@@ -118,7 +125,6 @@ class CreditCardStatementTest extends TestCase
             'spent_total' => '0.00',
             'due_date' => '2026-06-25',
             'paid_at' => null,
-            'payment_transaction_id' => null,
         ]);
 
         $this->cardExpense($user, $card, $category, 6, 2026, '5.00');
@@ -186,10 +192,8 @@ class CreditCardStatementTest extends TestCase
         $this->cardExpense($user, $card, $category, 4, 2026, '25.00');
 
         $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 4]), [
-            'mode' => 'create',
             'account_id' => $checking->id,
             'payment_method' => 'Pix',
-            'category_id' => $category->id,
             'paid_date' => '2026-05-12',
         ])->assertSessionHasNoErrors();
 
@@ -204,21 +208,20 @@ class CreditCardStatementTest extends TestCase
         $this->assertTrue($meta->isPaid());
     }
 
-    public function test_editar_vencimento_e_data_pagamento_cria_ou_atualiza_metadados(): void
+    public function test_editar_apenas_vencimento_cria_ou_atualiza_metadados(): void
     {
         extract($this->seedCoupleWithAccounts());
         $this->cardExpense($user, $card, $category, 4, 2026);
 
         $this->actingAs($user)->put(route('credit-card-statements.update', [$card, 2026, 4]), [
             'due_date' => '2026-05-10',
-            'paid_at' => '2026-05-12',
         ])->assertSessionHasNoErrors();
 
         $meta = CreditCardStatement::first();
         $this->assertNotNull($meta);
         $this->assertSame('2026-05-10', $meta->due_date->toDateString());
-        $this->assertTrue($meta->isPaid());
-        $this->assertNull($meta->payment_transaction_id);
+        $this->assertFalse($meta->isPaid());
+        $this->assertNull($meta->paid_at);
     }
 
     public function test_gerar_lancamento_na_conta_marca_fatura_paga(): void
@@ -227,110 +230,101 @@ class CreditCardStatementTest extends TestCase
         $this->cardExpense($user, $card, $category, 2, 2026, '300.00');
 
         $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 2]), [
-            'mode' => 'create',
             'account_id' => $checking->id,
             'payment_method' => 'Pix',
-            'category_id' => $category->id,
             'paid_date' => '2026-03-08',
         ])->assertSessionHasNoErrors();
 
         $meta = CreditCardStatement::first();
         $this->assertNotNull($meta);
-        $this->assertNotNull($meta->payment_transaction_id);
+        $this->assertSame(1, $meta->paymentTransactions()->count());
         $this->assertTrue($meta->isPaid());
 
-        $tx = Transaction::find($meta->payment_transaction_id);
+        $tx = $meta->paymentTransactions()->first();
         $this->assertNotNull($tx);
         $this->assertSame($checking->id, $tx->account_id);
+        $this->assertSame($invoiceCategory->id, $tx->category_id);
         $this->assertEquals(300.0, (float) $tx->amount);
         $this->assertStringContainsString('Pagamento fatura', $tx->description);
     }
 
-    public function test_vincular_lancamento_existente(): void
-    {
-        extract($this->seedCoupleWithAccounts());
-        $this->cardExpense($user, $card, $category, 1, 2026, '50.00');
-
-        $tx = Transaction::create([
-            'couple_id' => $couple->id,
-            'user_id' => $user->id,
-            'category_id' => $category->id,
-            'account_id' => $checking->id,
-            'description' => 'Pagamento manual',
-            'amount' => '50.00',
-            'payment_method' => 'Pix',
-            'type' => 'expense',
-            'date' => '2026-02-04',
-            'reference_month' => 2,
-            'reference_year' => 2026,
-        ]);
-
-        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 1]), [
-            'mode' => 'link',
-            'existing_transaction_id' => $tx->id,
-        ])->assertSessionHasNoErrors();
-
-        $meta = CreditCardStatement::first();
-        $this->assertSame($tx->id, $meta->payment_transaction_id);
-        $this->assertSame('2026-02-04', $meta->paid_at->toDateString());
-    }
-
-    public function test_desvincular_remove_pagamento(): void
+    public function test_excluir_lancamento_pagamento_fatura_atualiza_metadados(): void
     {
         extract($this->seedCoupleWithAccounts());
         $this->cardExpense($user, $card, $category, 5, 2026, '10.00');
 
-        $tx = Transaction::create([
-            'couple_id' => $couple->id,
-            'user_id' => $user->id,
-            'category_id' => $category->id,
+        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 5]), [
             'account_id' => $checking->id,
-            'description' => 'X',
-            'amount' => '10.00',
             'payment_method' => 'Pix',
-            'type' => 'expense',
-            'date' => '2026-06-01',
-            'reference_month' => 6,
-            'reference_year' => 2026,
-        ]);
+            'paid_date' => '2026-06-01',
+        ])->assertSessionHasNoErrors();
 
-        CreditCardStatement::query()
+        $meta = CreditCardStatement::query()
             ->where('account_id', $card->id)
             ->where('reference_month', 5)
             ->where('reference_year', 2026)
-            ->update([
-                'paid_at' => '2026-06-01',
-                'payment_transaction_id' => $tx->id,
-            ]);
+            ->first();
+        $this->assertNotNull($meta);
+        $this->assertTrue($meta->isPaid());
+        $payTx = $meta->paymentTransactions()->first();
+        $this->assertNotNull($payTx);
 
-        $this->actingAs($user)->post(route('credit-card-statements.detach-payment', [$card, 2026, 5]))
-            ->assertSessionHasNoErrors();
-
-        $meta = CreditCardStatement::first();
-        $this->assertNull($meta->payment_transaction_id);
-        $this->assertNull($meta->paid_at);
-    }
-
-    public function test_nao_segundo_vinculo_se_ja_existe_pagamento(): void
-    {
-        extract($this->seedCoupleWithAccounts());
-        $this->cardExpense($user, $card, $category, 7, 2026, '10.00');
-
-        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 7]), [
-            'mode' => 'create',
-            'account_id' => $checking->id,
-            'payment_method' => 'Pix',
-            'category_id' => $category->id,
-            'paid_date' => '2026-08-02',
+        $this->actingAs($user)->delete(route('transactions.destroy', $payTx), [
+            'installment_scope' => 'single',
         ])->assertSessionHasNoErrors();
 
+        $meta->refresh();
+        $this->assertSame(0, $meta->paymentTransactions()->count());
+        $this->assertNull($meta->paid_at);
+        $this->assertFalse($meta->isPaid());
+    }
+
+    public function test_segundo_lancamento_parcial_quita_fatura(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $this->cardExpense($user, $card, $category, 7, 2026, '100.00');
+
         $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 7]), [
-            'mode' => 'create',
             'account_id' => $checking->id,
             'payment_method' => 'Pix',
-            'category_id' => $category->id,
+            'paid_date' => '2026-08-02',
+            'amount' => '50',
+        ])->assertSessionHasNoErrors();
+
+        $meta = CreditCardStatement::first();
+        $this->assertFalse($meta->isFullyPaidByPayments());
+        $this->assertNull($meta->paid_at);
+        $this->assertEquals(50.0, $meta->paymentsTotal());
+
+        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 7]), [
+            'account_id' => $checking->id,
+            'payment_method' => 'Pix',
             'paid_date' => '2026-08-03',
-        ])->assertSessionHasErrors('mode');
+            'amount' => '50',
+        ])->assertSessionHasNoErrors();
+
+        $meta->refresh();
+        $this->assertTrue($meta->isFullyPaidByPayments());
+        $this->assertNotNull($meta->paid_at);
+        $this->assertEquals(100.0, $meta->paymentsTotal());
+    }
+
+    public function test_nao_permite_novo_pagamento_apos_quitar_por_lancamentos(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+        $this->cardExpense($user, $card, $category, 9, 2026, '10.00');
+
+        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 9]), [
+            'account_id' => $checking->id,
+            'payment_method' => 'Pix',
+            'paid_date' => '2026-10-02',
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 9]), [
+            'account_id' => $checking->id,
+            'payment_method' => 'Pix',
+            'paid_date' => '2026-10-03',
+        ])->assertSessionHasErrors('payment');
     }
 
     public function test_outro_casal_nao_atualiza_fatura(): void
