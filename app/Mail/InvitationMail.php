@@ -2,21 +2,21 @@
 
 namespace App\Mail;
 
+use App\Models\Couple;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-
-use App\Models\User;
-use App\Models\Couple;
 
 class InvitationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     public $user;
+
     public $couple;
 
     /**
@@ -51,7 +51,7 @@ class InvitationMail extends Mailable
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {

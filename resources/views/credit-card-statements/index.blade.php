@@ -44,7 +44,6 @@
                                 <tbody>
                                     @foreach ($invoiceCycles as $cycle)
                                         @php
-                                            $cid = 'ccs-'.$cycle->account->id.'-'.$cycle->reference_year.'-'.$cycle->reference_month;
                                             $meta = $cycle->meta;
                                             $isPaid = $meta?->isPaid() ?? false;
                                             $hasPayments = $meta && $meta->paymentTransactions->isNotEmpty();
@@ -66,6 +65,11 @@
                                             }
                                             $editDueValue = $meta?->due_date?->format('Y-m-d')
                                                 ?? ($virtualDue?->format('Y-m-d') ?? '');
+                                            $payHint = ($hasPayments && ! $isFullyPaidByTx)
+                                                ? 'Valor sugerido: restante (R$ '.number_format($remaining, 2, ',', '.').').'
+                                                : 'Valor sugerido: total da fatura (R$ '.number_format($cycle->spent_total, 2, ',', '.').').';
+                                            $payDefaultAmount = $hasPayments && ! $isFullyPaidByTx ? $remaining : (float) $cycle->spent_total;
+                                            $payAmtPlaceholder = 'Padrão: R$ '.number_format($payDefaultAmount, 2, ',', '.');
                                         @endphp
                                         <tr>
                                             <td class="fw-medium">{{ $cycle->account->name }}</td>
@@ -125,60 +129,80 @@
                                                     data-edit-due="{{ $editDueValue }}"
                                                 >Editar</button>
                                                 @if ($showPaymentForms)
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#pay-{{ $cid }}">Pagamento</button>
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#payStatementModal"
+                                                        data-pay-action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
+                                                        data-pay-subtitle="{{ $cycle->account->name }} — {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}"
+                                                        data-pay-hint="{{ $payHint }}"
+                                                        data-pay-amount-placeholder="{{ $payAmtPlaceholder }}"
+                                                        data-pay-date-default="{{ now()->format('Y-m-d') }}"
+                                                    >Pagamento</button>
                                                 @endif
-                                            </td>
-                                        </tr>
-                                        <tr class="collapse bg-light" id="pay-{{ $cid }}">
-                                            <td colspan="6" class="p-3">
-                                                <div class="col-lg-8 col-xl-6">
-                                                        <h4 class="h6 border-bottom pb-2">Gerar lançamento na conta</h4>
-                                                        <p class="small text-secondary">
-                                                            @if ($hasPayments && ! $isFullyPaidByTx)
-                                                                Valor sugerido: restante (R$ {{ number_format($remaining, 2, ',', '.') }}).
-                                                            @else
-                                                                Valor sugerido: total da fatura (R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}).
-                                                            @endif
-                                                        </p>
-                                                        <form action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}" method="POST" class="vstack gap-2">
-                                                            @csrf
-                                                            <div>
-                                                                <x-input-label for="pay-acc-{{ $cid }}" value="Conta" />
-                                                                <select id="pay-acc-{{ $cid }}" name="account_id" class="form-select mt-1" required>
-                                                                    <option value="">Selecione…</option>
-                                                                    @foreach ($regularAccounts as $ra)
-                                                                        <option value="{{ $ra->id }}">{{ $ra->name }}</option>
-                                                                    @endforeach
-                                                                </select>
-                                                            </div>
-                                                            <div>
-                                                                <x-input-label for="pay-pm-{{ $cid }}" value="Forma de pagamento" />
-                                                                <select id="pay-pm-{{ $cid }}" name="payment_method" class="form-select mt-1" required>
-                                                                    @foreach (\App\Support\PaymentMethods::forRegularAccounts() as $pm)
-                                                                        <option value="{{ $pm }}">{{ $pm }}</option>
-                                                                    @endforeach
-                                                                </select>
-                                                            </div>
-                                                            <p class="small text-secondary mb-0">
-                                                                Categoria: <strong>{{ \App\Models\Category::NAME_CREDIT_CARD_INVOICE_PAYMENT }}</strong> (fixa para pagamento de fatura).
-                                                            </p>
-                                                            <div>
-                                                                <x-input-label for="pay-date-{{ $cid }}" value="Data do pagamento" />
-                                                                <input type="date" id="pay-date-{{ $cid }}" name="paid_date" class="form-control mt-1" required value="{{ now()->format('Y-m-d') }}">
-                                                            </div>
-                                                            <div>
-                                                                <x-input-label for="pay-amt-{{ $cid }}" value="Valor (opcional)" />
-                                                                <input type="text" inputmode="decimal" id="pay-amt-{{ $cid }}" name="amount" class="form-control mt-1" placeholder="Padrão: R$ {{ number_format($hasPayments && ! $isFullyPaidByTx ? $remaining : $cycle->spent_total, 2, ',', '.') }}">
-                                                            </div>
-                                                            <x-primary-button type="submit" class="w-100 justify-content-center">Criar lançamento</x-primary-button>
-                                                        </form>
-                                                        <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente em <a href="{{ route('transactions.index') }}">Lançamentos</a>.</p>
-                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div class="modal fade" id="payStatementModal" tabindex="-1" aria-labelledby="payStatementModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                <div class="modal-content">
+                                    <form id="payStatementForm" method="POST" action="#">
+                                        @csrf
+                                        <div class="modal-header">
+                                            <h2 class="modal-title h5 mb-0" id="payStatementModalLabel">Pagamento da fatura</h2>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="small text-secondary mb-2" id="payStatementSubtitle"></p>
+                                            <p class="small text-secondary mb-3" id="payStatementHint"></p>
+                                            <div class="vstack gap-3">
+                                                <div>
+                                                    <x-input-label for="payStatementAccountId" value="Conta" />
+                                                    <select id="payStatementAccountId" name="account_id" class="form-select mt-1" required>
+                                                        <option value="">Selecione…</option>
+                                                        @foreach ($regularAccounts as $ra)
+                                                            <option value="{{ $ra->id }}" @selected((string) old('account_id') === (string) $ra->id)>{{ $ra->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="payStatementPaymentMethod" value="Forma de pagamento" />
+                                                    <select id="payStatementPaymentMethod" name="payment_method" class="form-select mt-1" required>
+                                                        @foreach (\App\Support\PaymentMethods::forRegularAccounts() as $pm)
+                                                            <option value="{{ $pm }}" @selected(old('payment_method') === $pm)>{{ $pm }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    Categoria: <strong>{{ \App\Models\Category::NAME_CREDIT_CARD_INVOICE_PAYMENT }}</strong> (fixa para pagamento de fatura).
+                                                </p>
+                                                <div>
+                                                    <x-input-label for="payStatementPaidDate" value="Data do pagamento" />
+                                                    <input type="date" id="payStatementPaidDate" name="paid_date" class="form-control mt-1" required value="{{ old('paid_date', now()->format('Y-m-d')) }}">
+                                                    <x-input-error :messages="$errors->get('paid_date')" class="mt-2" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="payStatementAmount" value="Valor (opcional)" />
+                                                    <input type="text" inputmode="decimal" id="payStatementAmount" name="amount" class="form-control mt-1" value="{{ old('amount') }}" placeholder="">
+                                                    <x-input-error :messages="$errors->get('amount')" class="mt-2" />
+                                                </div>
+                                            </div>
+                                            <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente em <a href="{{ route('transactions.index') }}">Lançamentos</a>.</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <x-primary-button type="submit">Criar lançamento</x-primary-button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="modal fade" id="editStatementModal" tabindex="-1" aria-labelledby="editStatementModalLabel" aria-hidden="true">
@@ -222,37 +246,125 @@
                             $openEditSubtitleJs = $openEditReopen
                                 ? $openEditAccount->name.' — '.sprintf('%02d/%d', $openEdit['reference_month'], $openEdit['reference_year'])
                                 : '';
+
+                            $openPay = session('open_statement_payment');
+                            $openPayCardAccount = $openPay ? $cardAccounts->firstWhere('id', $openPay['account_id']) : null;
+                            $openPayCycle = ($openPayCardAccount && $invoiceCycles->isNotEmpty())
+                                ? $invoiceCycles->first(function ($c) use ($openPay) {
+                                    return (int) $c->account->id === (int) $openPay['account_id']
+                                        && (int) $c->reference_year === (int) $openPay['reference_year']
+                                        && (int) $c->reference_month === (int) $openPay['reference_month'];
+                                })
+                                : null;
+                            $openPayReopen = $openPayCardAccount !== null && $openPayCycle !== null;
+                            if ($openPayReopen) {
+                                $opMeta = $openPayCycle->meta;
+                                $opHasPayments = $opMeta && $opMeta->paymentTransactions->isNotEmpty();
+                                $opIsFullyPaidByTx = $opMeta?->isFullyPaidByPayments() ?? false;
+                                $opRemaining = $opMeta ? $opMeta->remainingToPay() : (float) $openPayCycle->spent_total;
+                                $openPayActionUrl = route('credit-card-statements.attach-payment', [$openPayCycle->account, $openPayCycle->reference_year, $openPayCycle->reference_month]);
+                                $openPaySubtitleJs = $openPayCycle->account->name.' — '.sprintf('%02d/%d', $openPayCycle->reference_month, $openPayCycle->reference_year);
+                                $openPayHintJs = ($opHasPayments && ! $opIsFullyPaidByTx)
+                                    ? 'Valor sugerido: restante (R$ '.number_format($opRemaining, 2, ',', '.').').'
+                                    : 'Valor sugerido: total da fatura (R$ '.number_format($openPayCycle->spent_total, 2, ',', '.').').';
+                                $openPayAmtPlaceholderJs = 'Padrão: R$ '.number_format($opHasPayments && ! $opIsFullyPaidByTx ? $opRemaining : (float) $openPayCycle->spent_total, 2, ',', '.');
+                            } else {
+                                $openPayActionUrl = '';
+                                $openPaySubtitleJs = '';
+                                $openPayHintJs = '';
+                                $openPayAmtPlaceholderJs = '';
+                            }
                         @endphp
                         @push('scripts')
                             <script>
                                 (function () {
-                                    const modalEl = document.getElementById('editStatementModal');
-                                    const form = document.getElementById('editStatementForm');
-                                    const subtitleEl = document.getElementById('editStatementSubtitle');
-                                    const dueInput = document.getElementById('editStatementDue');
-                                    if (!modalEl || !form) return;
+                                    const editModalEl = document.getElementById('editStatementModal');
+                                    const editForm = document.getElementById('editStatementForm');
+                                    const editSubtitleEl = document.getElementById('editStatementSubtitle');
+                                    const editDueInput = document.getElementById('editStatementDue');
+                                    if (editModalEl && editForm) {
+                                        editModalEl.addEventListener('show.bs.modal', function (e) {
+                                            const btn = e.relatedTarget;
+                                            if (!btn || !btn.hasAttribute('data-edit-action')) return;
+                                            editForm.action = btn.getAttribute('data-edit-action');
+                                            if (editSubtitleEl) {
+                                                editSubtitleEl.textContent = btn.getAttribute('data-edit-subtitle') || '';
+                                            }
+                                            if (editDueInput) {
+                                                editDueInput.value = btn.getAttribute('data-edit-due') || '';
+                                            }
+                                        });
+                                    }
 
-                                    modalEl.addEventListener('show.bs.modal', function (e) {
-                                        const btn = e.relatedTarget;
-                                        if (!btn || !btn.hasAttribute('data-edit-action')) return;
-                                        form.action = btn.getAttribute('data-edit-action');
-                                        if (subtitleEl) {
-                                            subtitleEl.textContent = btn.getAttribute('data-edit-subtitle') || '';
-                                        }
-                                        if (dueInput) {
-                                            dueInput.value = btn.getAttribute('data-edit-due') || '';
-                                        }
-                                    });
+                                    const payModalEl = document.getElementById('payStatementModal');
+                                    const payForm = document.getElementById('payStatementForm');
+                                    if (payModalEl && payForm) {
+                                        const paySubtitleEl = document.getElementById('payStatementSubtitle');
+                                        const payHintEl = document.getElementById('payStatementHint');
+                                        const payAmountInput = document.getElementById('payStatementAmount');
+                                        const payDateInput = document.getElementById('payStatementPaidDate');
+                                        const payAccSelect = document.getElementById('payStatementAccountId');
+                                        const payPmSelect = document.getElementById('payStatementPaymentMethod');
+
+                                        payModalEl.addEventListener('show.bs.modal', function (e) {
+                                            const btn = e.relatedTarget;
+                                            if (!btn || !btn.hasAttribute('data-pay-action')) return;
+                                            payForm.action = btn.getAttribute('data-pay-action') || '#';
+                                            if (paySubtitleEl) {
+                                                paySubtitleEl.textContent = btn.getAttribute('data-pay-subtitle') || '';
+                                            }
+                                            if (payHintEl) {
+                                                payHintEl.textContent = btn.getAttribute('data-pay-hint') || '';
+                                            }
+                                            if (payAmountInput) {
+                                                payAmountInput.placeholder = btn.getAttribute('data-pay-amount-placeholder') || '';
+                                                payAmountInput.value = '';
+                                            }
+                                            const ddef = btn.getAttribute('data-pay-date-default');
+                                            if (payDateInput && ddef) {
+                                                payDateInput.value = ddef;
+                                            }
+                                            if (payAccSelect) {
+                                                payAccSelect.value = '';
+                                            }
+                                            if (payPmSelect && payPmSelect.options.length) {
+                                                payPmSelect.selectedIndex = 0;
+                                            }
+                                        });
+                                    }
 
                                     @if ($openEditReopen)
                                     document.addEventListener('DOMContentLoaded', function () {
-                                        form.action = {!! json_encode($openEditUpdateUrl) !!};
-                                        if (subtitleEl) {
-                                            subtitleEl.textContent = {!! json_encode($openEditSubtitleJs) !!};
+                                        if (!editForm || !editModalEl) return;
+                                        editForm.action = {!! json_encode($openEditUpdateUrl) !!};
+                                        if (editSubtitleEl) {
+                                            editSubtitleEl.textContent = {!! json_encode($openEditSubtitleJs) !!};
                                         }
-                                        if (dueInput) dueInput.value = {!! json_encode(old('due_date', '')) !!};
+                                        if (editDueInput) editDueInput.value = {!! json_encode(old('due_date', '')) !!};
                                         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                                            bootstrap.Modal.getOrCreateInstance(editModalEl).show();
+                                        }
+                                    });
+                                    @endif
+
+                                    @if ($openPayReopen)
+                                    document.addEventListener('DOMContentLoaded', function () {
+                                        if (!payForm || !payModalEl) return;
+                                        payForm.action = {!! json_encode($openPayActionUrl) !!};
+                                        const paySubtitleEl = document.getElementById('payStatementSubtitle');
+                                        const payHintEl = document.getElementById('payStatementHint');
+                                        const payAmountInput = document.getElementById('payStatementAmount');
+                                        if (paySubtitleEl) {
+                                            paySubtitleEl.textContent = {!! json_encode($openPaySubtitleJs) !!};
+                                        }
+                                        if (payHintEl) {
+                                            payHintEl.textContent = {!! json_encode($openPayHintJs) !!};
+                                        }
+                                        if (payAmountInput) {
+                                            payAmountInput.placeholder = {!! json_encode($openPayAmtPlaceholderJs) !!};
+                                        }
+                                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                            bootstrap.Modal.getOrCreateInstance(payModalEl).show();
                                         }
                                     });
                                     @endif

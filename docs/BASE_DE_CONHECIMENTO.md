@@ -41,10 +41,10 @@ app/
   Models/               # User (Billable Cashier), Couple, Category, Transaction, Account, CreditCardStatement, Budget
   Support/PaymentMethods.php, Support/Billing.php
 bootstrap/app.php       # aliases de middleware; exceção CSRF `stripe/*`; redirect pós-login → dashboard
-config/duozen.php       # trial, admins, isentos, flags de faturamento (compat: config/casal.php)
+config/duozen.php       # trial, admins, isentos, flags de faturamento (`DUOZEN_*` no `.env`)
 routes/web.php          # rotas da app + require auth.php
 routes/auth.php         # Breeze
-database/migrations/
+database/migrations/   # um único ficheiro: `2026_04_06_200000_database_schema.php` (schema completo)
 database/factories/
 database/seeders/DatabaseSeeder.php
 resources/views/        # layouts, dashboard, couple, categories, transactions, welcome, auth/*, partials/subscription-public-info (texto trial/plano na landing e registo)
@@ -60,14 +60,14 @@ public/vendor/bootstrap, public/css, public/js, `public/favicon.png` (marca; fal
 - **`auth`** sem `has-couple` — perfil (`profile.*`), casal (`couple.*`): criar, entrar, convidar, atualizar, sair.
 - **`auth` + `has-couple`** — assinatura (`billing.*`): página do plano, Checkout Stripe, sucesso, portal de faturamento.
 - **`auth` + `has-couple` + `couple-billing`** — dashboard, categorias, lançamentos, contas, orçamentos (exige plano ativo quando o faturamento está aplicado).
-- **`auth` + `duozen-admin`** — `admin/assinaturas`: listagem gerencial de subscrições (Cashier). Acesso: utilizadores com `couple_id` = `config('duozen.subscription_admin_couple_id')` (por omissão casal **id 1**, via `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID`) **ou** e-mail em `DUOZEN_ADMIN_EMAILS` (compatível com `CASAL_*`).
+- **`auth` + `duozen-admin`** — `admin/assinaturas`: listagem gerencial de subscrições (Cashier). Acesso: utilizadores com `couple_id` = `config('duozen.subscription_admin_couple_id')` (por omissão casal **id 1**, via `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID`) **ou** e-mail em `DUOZEN_ADMIN_EMAILS`.
 
 Ficheiro principal: `routes/web.php`.
 
 Comportamento:
 
 - Utilizador autenticado **sem** `couple_id` acede a rotas `has-couple` → redirecionado para `couple.index` com flash de erro (`app/Http/Middleware/EnsureHasCouple.php`).
-- Com faturamento ativo (`App\Support\Billing::isEnforced()`: `STRIPE_SECRET` + `STRIPE_PRICE_ID` preenchidos e `DUOZEN_BILLING_DISABLED` falso), utilizador com casal sem subscrição válida no casal → redirecionado para `billing.index` (`EnsureCoupleBillingActive`). **Isentos de cobrança:** e-mails em `DUOZEN_ADMIN_EMAILS` (ou `User::isCasalAdmin()` por casal administrador — inclui casal id 1 por omissão) ou `DUOZEN_BILLING_EXEMPT_EMAILS` (`config/duozen.php`). **Acesso ao casal:** basta **um** membro com subscrição `default` válida (trial ou paga) — `User::coupleHasBillingAccess()`. (Compat: `CASAL_*`.)
+- Com faturamento ativo (`App\Support\Billing::isEnforced()`: `STRIPE_SECRET` + `STRIPE_PRICE_ID` preenchidos e `DUOZEN_BILLING_DISABLED` falso), utilizador com casal sem subscrição válida no casal → redirecionado para `billing.index` (`EnsureCoupleBillingActive`). **Isentos de cobrança:** e-mails em `DUOZEN_ADMIN_EMAILS` (ou `User::isCasalAdmin()` por casal administrador — inclui casal id 1 por omissão) ou `DUOZEN_BILLING_EXEMPT_EMAILS` (`config/duozen.php`). **Acesso ao casal:** basta **um** membro com subscrição `default` válida (trial ou paga) — `User::coupleHasBillingAccess()`.
 - Após login, redirect intencionado: **dashboard** (`bootstrap/app.php` → `redirectUsersTo`).
 
 **Verificação de e-mail:** rotas existem em `routes/auth.php`, mas em `app/Models/User.php` a interface `MustVerifyEmail` está **comentada** — o acesso **não** exige e-mail verificado nas rotas `auth` atuais.
@@ -79,22 +79,18 @@ Comportamento:
 | Modelo | Notas |
 |--------|--------|
 | `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`) |
-| `Couple` | `name`, `invite_code` (único), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts |
-| `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon`, `system_key` (nullable). Categoria de quitação de fatura: `system_key` = `Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT` (nome por omissão `NAME_CREDIT_CARD_INVOICE_PAYMENT`). **Não** editável nem excluível em `CategoryController`; **não** aparece em orçamento nem no select de Lançamentos (`scopeExcludingCreditCardInvoicePayment`). Migração `2026_04_06_120000_*` preenche `system_key` para linhas antigas com nomes legados. |
-| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `credit_card_invoice_due_day` (nullable, 1–31, só cartão): dia para sugerir vencimento em faturas (`Account::defaultStatementDueDate()` — **mesmo mês civil** que `reference_month`/`reference_year` do ciclo); ao cadastrar cartão sem valor, o controlador assume **10**. **Conta `regular`:** formas de pagamento em lançamentos = lista canónica `PaymentMethods::forRegularAccounts()` (`Account::getEffectivePaymentMethods()`). **Cartão:** só crédito no fluxo de lançamentos (sem `payment_method` na transação). Coluna legada `allowed_payment_methods` foi removida (`2026_04_05_120000_*`). |
-| `CreditCardStatement` | **Metadados** do ciclo de fatura: `couple_id`, `account_id` (cartão), `reference_month`/`reference_year`, **`spent_total`** (decimal, soma materializada das despesas no cartão naquele ciclo), `due_date` (nullable), `paid_at` (nullable). **Pagamentos:** N:N com `Transaction` via tabela pivot **`credit_card_statement_payments`** (`credit_card_statement_id`, `transaction_id`, único por `transaction_id`). Vários lançamentos em conta corrente podem pagar a mesma fatura; **`paid_at`** é preenchido quando a soma dos vinculados ≥ `spent_total` (data = último lançamento por `date`/`id`); com pagamento parcial, `paid_at` fica vazio. Dados antigos podem ainda ter `paid_at` manual sem pivot; a UI de faturas já não altera `paid_at`. **`materializeForCycle()`** (`firstOrCreate`): cria com `due_date` sugerido; **atualiza** `due_date` quando está vazio ou ainda coincide com a sugestão antiga (mês seguinte à referência, `Account::legacyDefaultStatementDueDate()`), sem sobrescrever vencimento personalizado; chama **`refreshSpentTotalForCycle()`**. **`sumCardExpensesForCycle()`** calcula essa soma. **`syncPaidMetadata()`** alinha `paid_at` aos vínculos. Na listagem de faturas, o total mostrado usa **`spent_total`** quando existe linha de metadados; senão cai na agregação em tempo real. **“Sug.”** no vencimento quando não há `due_date` gravado mas o cartão tem dia configurado (`defaultStatementDueDate`). **Único** por (`account_id`, `reference_month`, `reference_year`). Migrações: `2026_04_06_130000_*` pivot + remove `payment_transaction_id`; `2026_04_05_100000_*` `spent_total`; `2026_04_02_100000_*` removeu `total_amount` e tornou `due_date` opcional. |
-| `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method` (nullable: preenchido só em conta `regular`, ex. Pix), `type`, `date`, `installment_parent_id`; relação `accountModel`; parcelas no cartão via `installment_parent_id`; relação N:N **`creditCardStatementsPaidFor`** (pivot `credit_card_statement_payments`) quando o lançamento é pagamento de fatura. **Evento `created`:** despesa em **cartão** → `CreditCardStatement::materializeForCycle()` (materializa fatura + `spent_total`). **Evento `updated`:** recalcula `spent_total` do ciclo antigo (se antes era despesa em cartão) e, se passou a ser despesa em cartão, `materializeForCycle()` no ciclo novo. **`deleting`:** guarda IDs de faturas ligadas na pivot a este `transaction_id`. **`deleted`:** para essas faturas, **`CreditCardStatement::syncPaidMetadata()`** (pivot já removida por cascade); depois, se a transação era despesa no **cartão**, **`refreshSpentTotalForCycle()`** no ciclo. **Scope** `excludingCreditCardInvoicePayments()`: exclui despesas que tenham qualquer fatura em `creditCardStatementsPaidFor` — usado em **totais do painel**, **resumo/agrupamentos em Lançamentos** e **gasto por categoria em Orçamentos**. |
+| `Couple` | `name`, `invite_code` (único), `billing_owner_user_id` (nullable, Cashier), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts |
+| `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon`, `system_key` (nullable), índice único (`couple_id`, `system_key`). Categoria de quitação de fatura: `system_key` = `Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT` (nome por omissão `NAME_CREDIT_CARD_INVOICE_PAYMENT`). **Não** editável nem excluível em `CategoryController`; **não** aparece em orçamento nem no select de Lançamentos (`scopeExcludingCreditCardInvoicePayment`). |
+| `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `credit_card_invoice_due_day` (nullable, 1–31, só cartão): dia para sugerir vencimento em faturas (`Account::defaultStatementDueDate()` — **mesmo mês civil** que `reference_month`/`reference_year` do ciclo); ao cadastrar cartão sem valor, o controlador assume **10**. **Conta `regular`:** formas de pagamento em lançamentos = lista canónica `PaymentMethods::forRegularAccounts()` (`Account::getEffectivePaymentMethods()`). **Cartão:** só crédito no fluxo de lançamentos (sem `payment_method` na transação). |
+| `CreditCardStatement` | **Metadados** do ciclo de fatura: `couple_id`, `account_id` (cartão), `reference_month`/`reference_year`, **`spent_total`** (decimal, soma materializada das despesas no cartão naquele ciclo), `due_date` (nullable), `paid_at` (nullable). **Pagamentos:** N:N com `Transaction` via tabela pivot **`credit_card_statement_payments`** (`credit_card_statement_id`, `transaction_id`, único por `transaction_id`). Vários lançamentos em conta corrente podem pagar a mesma fatura; **`paid_at`** é preenchido quando a soma dos vinculados ≥ `spent_total` (data = último lançamento por `date`/`id`); com pagamento parcial, `paid_at` fica vazio. Dados antigos podem ainda ter `paid_at` manual sem pivot; a UI de faturas já não altera `paid_at`. **`materializeForCycle()`** (`firstOrCreate`): cria com `due_date` sugerido (`defaultStatementDueDate`, mesmo mês da referência); se o registo já existir **sem** `due_date`, preenche com essa sugestão — **não** altera `due_date` já definido; chama **`refreshSpentTotalForCycle()`**. **`sumCardExpensesForCycle()`** calcula essa soma. **`syncPaidMetadata()`** alinha `paid_at` aos vínculos. Na listagem de faturas, o total mostrado usa **`spent_total`** quando existe linha de metadados; senão cai na agregação em tempo real. **“Sug.”** no vencimento quando não há `due_date` gravado mas o cartão tem dia configurado (`defaultStatementDueDate`). **Único** por (`account_id`, `reference_month`, `reference_year`). |
+| `Transaction` | `couple_id`, `user_id`, `category_id`, `account_id`, `description`, `amount`, `payment_method` (nullable: preenchido só em conta `regular`, ex. Pix), `type`, `date`, `reference_month`, `reference_year`, `installment_parent_id`; relação `accountModel`; parcelas no cartão via `installment_parent_id`; relação N:N **`creditCardStatementsPaidFor`** (pivot `credit_card_statement_payments`) quando o lançamento é pagamento de fatura. **Evento `created`:** despesa em **cartão** → `CreditCardStatement::materializeForCycle()` (materializa fatura + `spent_total`). **Evento `updated`:** recalcula `spent_total` do ciclo antigo (se antes era despesa em cartão) e, se passou a ser despesa em cartão, `materializeForCycle()` no ciclo novo. **`deleting`:** guarda IDs de faturas ligadas na pivot a este `transaction_id`. **`deleted`:** para essas faturas, **`CreditCardStatement::syncPaidMetadata()`** (pivot já removida por cascade); depois, se a transação era despesa no **cartão**, **`refreshSpentTotalForCycle()`** no ciclo. **Scope** `excludingCreditCardInvoicePayments()`: exclui despesas que tenham qualquer fatura em `creditCardStatementsPaidFor` — usado em **totais do painel**, **resumo/agrupamentos em Lançamentos** e **gasto por categoria em Orçamentos**. |
 | `Budget` | `couple_id`, `category_id`, `amount`, `month`, `year` |
-
-Coluna legada em `transactions`: `account` (string), de migração antiga; fluxo atual usa **`account_id`** e modelo `Account`.
 
 ---
 
 ## 6. Formas de pagamento (conta) e cartões
 
 Em `app/Support/PaymentMethods.php`, **`forRegularAccounts()`** (e alias `all()`): Dinheiro, Cartão de Débito, Pix, Boleto. **Não** existe “Cartão de Crédito” como forma de pagamento: crédito é o registro `Account` com `kind=credit_card`, escolhido no lançamento com `funding=credit_card`.
-
-Constante `PaymentMethods::LEGACY_CREDIT_CARD` e migração `2026_04_01_120000_*` tratam dados antigos que gravavam esse rótulo em `transactions.payment_method`.
 
 O cadastro de contas **não** pergunta formas de pagamento: fica implícito conforme o `kind`.
 
@@ -134,7 +130,7 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 
 ### `CreditCardStatementController`
 
-- Rotas sob **`/faturas-cartao`** (`credit-card-statements.index`, `update`, `attach-payment`), middleware `auth` + `has-couple` + `couple-billing`. **index:** agrupa **despesas** por (`account_id` cartão, `reference_month`, `reference_year`); coluna de total usa **`spent_total`** do merge com `credit_card_statements` quando existe metadado, senão a soma agregada das transações; **vencimento “Sug.”** quando não há `due_date` gravado mas o cartão tem dia configurado (`defaultStatementDueDate`). Pagamento só por **criar** lançamento na conta corrente (sem vincular lançamento existente).
+- Rotas sob **`/faturas-cartao`** (`credit-card-statements.index`, `update`, `attach-payment`), middleware `auth` + `has-couple` + `couple-billing`. **index:** agrupa **despesas** por (`account_id` cartão, `reference_month`, `reference_year`); coluna de total usa **`spent_total`** do merge com `credit_card_statements` quando existe metadado, senão a soma agregada das transações; **vencimento “Sug.”** quando não há `due_date` gravado mas o cartão tem dia configurado (`defaultStatementDueDate`). **Pagamento** abre em **modal** Bootstrap (mesmo padrão que “Editar”); em erro de validação, `open_statement_payment` reabre a modal com `old()`. Pagamento só por **criar** lançamento na conta corrente (sem vincular lançamento existente).
 - **update** `PUT .../faturas-cartao/{account}/{referenceYear}/{referenceMonth}`: só **`due_date`** opcional; não altera `paid_at` (derivado dos lançamentos de quitação). Garante linha via `CreditCardStatement::materializeForCycle()` se ainda não existir. Exige pelo menos uma despesa no cartão naquele ciclo (senão 404).
 - **attach-payment** `POST .../pagamento`: **vários** pagamentos por fatura; bloqueado se a soma dos vinculados já cobre `spent_total`. Valor: se `amount` omitido, **restante** ou total do ciclo. Categoria fixa `Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT`. **`syncPaidMetadata()`** após cada attach. **Não** há rotas de desvincular nem de apagar só metadados: rever pagamentos **excluindo** o lançamento em `Transaction` (a pivot cai por FK e `Transaction` `deleted` chama **`syncPaidMetadata()`** nas faturas afetadas).
 
@@ -151,7 +147,7 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 
 ### `BillingController`
 
-- **index:** estado do plano; se faturamento desativado ou Stripe incompleto, mensagem informativa; senão CTA para Checkout com trial (`DUOZEN_TRIAL_DAYS`, default 14) ou link para Customer Portal se já subscrito. (Compat: `CASAL_TRIAL_DAYS`.)
+- **index:** estado do plano; se faturamento desativado ou Stripe incompleto, mensagem informativa; senão CTA para Checkout com trial (`DUOZEN_TRIAL_DAYS`, default 14) ou link para Customer Portal se já subscrito.
 - **checkout:** `newSubscription('default', STRIPE_PRICE_ID)->trialDays(...)->checkout()` (cartão no Stripe).
 - **success:** lê `session_id` do Checkout, obtém a subscrição no Stripe e grava/atualiza `subscriptions` / `subscription_items` via `App\Support\Billing::syncSubscriptionFromStripeSubscription` (garante acesso logo após pagar mesmo que o webhook ainda não tenha corrido — típico em local sem Stripe CLI); também define o **dono da assinatura do casal** (`couples.billing_owner_user_id`) no primeiro membro que ativar; depois redirect ao dashboard com flash.
 - **portal:** redirect ao Stripe Billing Portal (quem tem subscrição `default`).
@@ -191,10 +187,10 @@ Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/
 
 ## 11. Seeders
 
-- `database/seeders/ProtectedUsersSeeder.php` — `firstOrCreate` por e-mail para `guilherme.melgarejo@gmail.com` e `tainarygg@gmail.com` (só insere se não existirem; não atualiza dados de contas já existentes). Senha inicial de desenvolvimento ao **criar**: `password` (igual ao utilizador de teste).
-- `database/seeders/DatabaseSeeder.php` — chama `ProtectedUsersSeeder` e garante `test@example.com` com `firstOrCreate` (evita duplicar ao repetir `db:seed`).
+- `database/seeders/ProtectedUsersSeeder.php` — `firstOrCreate` por e-mail para `guilherme.melgarejo@gmail.com` e `tainarygg@gmail.com` (só insere se não existirem; não altera nome/senha de quem já existe). Senha inicial ao **criar**: `password`. Cria (ou reutiliza) um casal de desenvolvimento com `invite_code` fixo `DuoZenDev1`, categorias padrão iguais às do fluxo “criar casal” na app, e associa cada utilizador protegido a esse casal **apenas** se `couple_id` estiver vazio.
+- `database/seeders/DatabaseSeeder.php` — chama apenas `ProtectedUsersSeeder`.
 
-Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base**; volte a correr `php artisan db:seed` (ou `migrate:fresh --seed`) para recriar as contas protegidas e a de teste.
+Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base**; volte a correr `php artisan db:seed` (ou `migrate:fresh --seed`) para recriar as contas protegidas e o casal de seed.
 
 ---
 
@@ -204,7 +200,8 @@ Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base**; volte a correr
 2. E-mail verificado não obrigatório para uso normal.
 3. Casal pode ficar sem utilizadores no registo (não há delete automático ao sair o último).
 4. Navbar usa `route('dashboard')`; utilizadores sem casal são empurrados para `couple.index` pelo middleware.
-5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). O Cashier mantém o estado atualizado via webhooks; a rota **billing success** também sincroniza a subscrição a partir da sessão de Checkout (útil quando o webhook não atinge o ambiente, p.ex. `localhost` sem Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1. (Compat: `CASAL_*`.)
+5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). O Cashier mantém o estado atualizado via webhooks; a rota **billing success** também sincroniza a subscrição a partir da sessão de Checkout (útil quando o webhook não atinge o ambiente, p.ex. `localhost` sem Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1.
+6. **Migrações:** o schema está num único ficheiro `database/migrations/2026_04_06_200000_database_schema.php`. Bases locais que ainda tenham entradas antigas na tabela `migrations` devem usar `php artisan migrate:fresh` (e `--seed` se precisar de dados) para alinhar com o repositório.
 
 ---
 
@@ -212,6 +209,7 @@ Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base**; volte a correr
 
 ```bash
 php artisan migrate
+php artisan migrate:fresh --seed   # recriar schema a partir do único migrate + seeders
 php artisan test
 ./vendor/bin/pint
 php artisan route:clear   # se rotas novas não aparecerem (evitar route cache desatualizado)

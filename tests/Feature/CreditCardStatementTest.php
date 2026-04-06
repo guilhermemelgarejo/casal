@@ -85,7 +85,7 @@ class CreditCardStatementTest extends TestCase
             ->assertSee('04/2026', false);
     }
 
-    public function test_materialize_atualiza_vencimento_legado_do_mes_seguinte(): void
+    public function test_materialize_preserva_vencimento_ja_definido(): void
     {
         extract($this->seedCoupleWithAccounts());
         $card->update(['credit_card_invoice_due_day' => 10]);
@@ -109,7 +109,7 @@ class CreditCardStatementTest extends TestCase
             ->first();
 
         $this->assertNotNull($meta);
-        $this->assertSame('2026-06-10', $meta->due_date->toDateString());
+        $this->assertSame('2026-07-10', $meta->due_date->toDateString());
     }
 
     public function test_materialize_nao_sobrescreve_vencimento_personalizado(): void

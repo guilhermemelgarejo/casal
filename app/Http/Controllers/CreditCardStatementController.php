@@ -133,12 +133,23 @@ class CreditCardStatementController extends Controller
             ]);
         }
 
-        $validated = $request->validate([
+        $paymentFlash = $this->openStatementPaymentFlash($account, $referenceYear, $referenceMonth);
+
+        $validator = Validator::make($request->all(), [
             'account_id' => ['required', 'integer', 'exists:accounts,id'],
             'payment_method' => ['required', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
             'paid_date' => ['required', 'date'],
             'amount' => ['nullable', 'numeric', 'min:0.01'],
         ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->withInput()
+                ->with('open_statement_payment', $paymentFlash);
+        }
+
+        $validated = $validator->validated();
 
         $coupleId = Auth::user()->couple_id;
         $cycleTotal = $this->cycleSpentTotal($account, $referenceMonth, $referenceYear);
@@ -148,7 +159,7 @@ class CreditCardStatementController extends Controller
         if (empty($validated['account_id']) || empty($validated['paid_date'])) {
             return back()->withErrors([
                 'account_id' => 'Conta e data de pagamento são obrigatórios para gerar o lançamento.',
-            ])->withInput();
+            ])->withInput()->with('open_statement_payment', $paymentFlash);
         }
 
         $payAccount = Account::find($validated['account_id']);
@@ -157,14 +168,16 @@ class CreditCardStatementController extends Controller
         }
 
         if (! $payAccount->allowsPaymentMethod($validated['payment_method'])) {
-            return back()->withErrors(['payment_method' => 'Esta forma não está habilitada para a conta selecionada.'])->withInput();
+            return back()->withErrors(['payment_method' => 'Esta forma não está habilitada para a conta selecionada.'])
+                ->withInput()
+                ->with('open_statement_payment', $paymentFlash);
         }
 
         $invoiceCategory = Category::creditCardInvoicePaymentForCouple($coupleId);
         if (! $invoiceCategory) {
             return back()->withErrors([
                 'account_id' => 'Categoria de quitação de fatura não encontrada para este casal.',
-            ])->withInput();
+            ])->withInput()->with('open_statement_payment', $paymentFlash);
         }
 
         $defaultAmount = $paidSoFar > 0.005
@@ -226,6 +239,18 @@ class CreditCardStatementController extends Controller
         if ($account->couple_id !== Auth::user()->couple_id || ! $account->isCreditCard()) {
             abort(403);
         }
+    }
+
+    /**
+     * @return array{account_id: int, reference_year: int, reference_month: int}
+     */
+    private function openStatementPaymentFlash(Account $account, int $referenceYear, int $referenceMonth): array
+    {
+        return [
+            'account_id' => $account->id,
+            'reference_year' => $referenceYear,
+            'reference_month' => $referenceMonth,
+        ];
     }
 
     private function cycleKey(int $accountId, int $referenceYear, int $referenceMonth): string

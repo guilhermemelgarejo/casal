@@ -107,7 +107,6 @@ class Transaction extends Model
         'description',
         'amount',
         'payment_method',
-        'account',
         'type',
         'date',
         'reference_month',

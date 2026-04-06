@@ -46,29 +46,6 @@ class Account extends Model
         return $base->copy()->day($dom)->startOfDay();
     }
 
-    /**
-     * Regra antiga de vencimento (mês civil seguinte à referência).
-     * Usada só para alinhar faturas já gravadas com a sugestão automática anterior.
-     */
-    public function legacyDefaultStatementDueDate(int $referenceMonth, int $referenceYear): ?Carbon
-    {
-        if (! $this->isCreditCard() || $this->credit_card_invoice_due_day === null) {
-            return null;
-        }
-
-        $day = (int) $this->credit_card_invoice_due_day;
-        if ($day < 1 || $day > 31) {
-            return null;
-        }
-
-        $tz = config('app.timezone');
-        $base = Carbon::create($referenceYear, $referenceMonth, 1, 0, 0, 0, $tz);
-        $dueMonth = $base->copy()->addMonth();
-        $dom = min($day, $dueMonth->daysInMonth);
-
-        return $dueMonth->copy()->day($dom)->startOfDay();
-    }
-
     public static function kinds(): array
     {
         return [

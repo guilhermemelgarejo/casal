@@ -39,16 +39,4 @@ class AccountDefaultStatementDueDateTest extends TestCase
             'dia 31 em fevereiro leap' => [2, 2024, 31, '2024-02-29'],
         ];
     }
-
-    public function test_legacy_usa_mes_seguinte_para_migracao(): void
-    {
-        $account = new Account([
-            'kind' => Account::KIND_CREDIT_CARD,
-            'credit_card_invoice_due_day' => 10,
-        ]);
-        $got = $account->legacyDefaultStatementDueDate(6, 2026);
-
-        $this->assertNotNull($got);
-        $this->assertSame('2026-07-10', $got->toDateString());
-    }
 }
