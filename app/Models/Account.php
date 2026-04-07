@@ -24,7 +24,72 @@ class Account extends Model
         return [
             'credit_card_invoice_due_day' => 'integer',
             'balance' => 'decimal:2',
+            'credit_card_limit_total' => 'decimal:2',
+            'credit_card_limit_available' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Cartão com limite configurado (cadastro e edição na app). Fora disto, não há validação de teto em lançamentos.
+     */
+    public function tracksCreditCardLimit(): bool
+    {
+        return $this->isCreditCard()
+            && $this->credit_card_limit_total !== null
+            && (float) $this->credit_card_limit_total > 0;
+    }
+
+    /**
+     * Soma do restante a pagar nas faturas em aberto (metadados materializados), apenas.
+     */
+    public static function outstandingCreditCardUtilizationAmount(self $account): string
+    {
+        if (! $account->isCreditCard()) {
+            return '0.00';
+        }
+
+        $sum = '0.00';
+
+        $statements = CreditCardStatement::query()
+            ->where('couple_id', $account->couple_id)
+            ->where('account_id', $account->id)
+            ->get();
+
+        foreach ($statements as $stmt) {
+            if ($stmt->isPaid()) {
+                continue;
+            }
+            $remaining = number_format($stmt->remainingToPay(), 2, '.', '');
+            $sum = bcadd($sum, $remaining, 2);
+        }
+
+        return number_format((float) $sum, 2, '.', '');
+    }
+
+    /**
+     * Atualiza {@see $credit_card_limit_available} com base no limite total e nas faturas em aberto.
+     */
+    public function recalculateCreditCardLimitAvailable(): void
+    {
+        if (! $this->isCreditCard()) {
+            return;
+        }
+
+        $this->refresh();
+
+        if ($this->credit_card_limit_total === null || (float) $this->credit_card_limit_total <= 0) {
+            $this->forceFill(['credit_card_limit_available' => null])->saveQuietly();
+
+            return;
+        }
+
+        $limit = number_format((float) $this->credit_card_limit_total, 2, '.', '');
+        $outstanding = self::outstandingCreditCardUtilizationAmount($this);
+        $available = bcsub($limit, $outstanding, 2);
+
+        $this->forceFill([
+            'credit_card_limit_available' => $available,
+        ])->saveQuietly();
     }
 
     /**

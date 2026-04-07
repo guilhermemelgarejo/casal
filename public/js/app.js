@@ -387,7 +387,11 @@ document.addEventListener('DOMContentLoaded', () => {
             items.forEach((item) => {
                 const o = document.createElement('option');
                 o.value = String(item.id);
-                o.textContent = item.name;
+                let label = item.name;
+                if (item.limit_tracked && item.limit_available_label) {
+                    label = `${item.name} (disp. R$ ${item.limit_available_label})`;
+                }
+                o.textContent = label;
                 sel.appendChild(o);
             });
             if (selectedId && items.some((i) => String(i.id) === String(selectedId))) {

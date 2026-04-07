@@ -61,6 +61,13 @@
                                         <x-input-error :messages="$errors->get('credit_card_invoice_due_day')" class="mt-2" />
                                     </div>
 
+                                    <div id="account-limit-wrap" class="{{ $kindOld === Account::KIND_CREDIT_CARD ? '' : 'd-none' }}">
+                                        <x-input-label for="credit_card_limit_total" value="Limite total do cartão (R$)" />
+                                        <x-text-input id="credit_card_limit_total" name="credit_card_limit_total" type="number" step="0.01" min="0.01" class="mt-1" placeholder="Opcional — ex.: 5000" value="{{ old('_form') === 'account-store' ? old('credit_card_limit_total') : '' }}" />
+                                        <x-input-error :messages="$errors->get('credit_card_limit_total')" class="mt-2" />
+                                        <p class="form-text mb-0">Opcional: sem limite, o cartão não é controlado nos lançamentos. Com limite, o disponível segue as faturas em aberto (pode ficar negativo se ultrapassar).</p>
+                                    </div>
+
                                     <x-primary-button class="w-100 justify-content-center">
                                         Cadastrar conta
                                     </x-primary-button>
@@ -90,15 +97,29 @@
                                                 <div class="min-w-0">
                                                     <h4 class="h6 mb-1">{{ $account->name }}</h4>
                                                     <div class="small text-secondary mb-1">{{ $typeLabel }}</div>
-                                                    <div class="d-flex flex-wrap gap-1 mb-1">
-                                                        @if($account->isCreditCard())
+                                                    @if($account->isCreditCard())
+                                                        <div class="d-flex flex-wrap gap-1 mb-1">
                                                             <span class="badge rounded-pill bg-body-secondary text-body border">Cartão de crédito</span>
+                                                        </div>
+                                                        @if($account->tracksCreditCardLimit())
+                                                            <p class="small mb-1">
+                                                                <span class="text-secondary">Limite total</span>
+                                                                <span class="fw-semibold ms-1">R$ {{ number_format((float) $account->credit_card_limit_total, 2, ',', '.') }}</span>
+                                                            </p>
+                                                            <p class="small mb-2">
+                                                                <span class="text-secondary">Limite disponível</span>
+                                                                <span class="fw-semibold ms-1 {{ (float) ($account->credit_card_limit_available ?? 0) < 0 ? 'text-danger' : 'text-body' }}">R$ {{ number_format((float) ($account->credit_card_limit_available ?? 0), 2, ',', '.') }}</span>
+                                                            </p>
                                                         @else
+                                                            <p class="small text-secondary mb-2">Sem limite configurado</p>
+                                                        @endif
+                                                    @else
+                                                        <div class="d-flex flex-wrap gap-1 mb-1">
                                                             @foreach ($account->getEffectivePaymentMethods() as $pm)
                                                                 <span class="badge rounded-pill bg-body-secondary text-body border">{{ $pm }}</span>
                                                             @endforeach
-                                                        @endif
-                                                    </div>
+                                                        </div>
+                                                    @endif
                                                     @if (! $account->isCreditCard())
                                                         @php
                                                             $accBal = (float) $account->balance;
@@ -107,7 +128,6 @@
                                                             <span class="text-secondary">Saldo atual</span>
                                                             <span class="fw-semibold {{ $accBal >= 0 ? 'text-body' : 'text-danger' }} ms-1">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
                                                         </p>
-                                                        <p class="form-text mb-2">Guardado na base de dados e atualizado só pelos lançamentos desta conta.</p>
                                                     @endif
                                                     <p class="small text-secondary mb-0">Cadastrada em {{ $account->created_at->format('d/m/Y') }}</p>
                                                 </div>
@@ -164,6 +184,12 @@
                                                             <p class="form-text mb-0">Vazio = sem data sugerida automaticamente nas faturas deste cartão.</p>
                                                             <x-input-error :messages="$errors->get('credit_card_invoice_due_day')" class="mt-2" />
                                                         </div>
+                                                        <div>
+                                                            <x-input-label for="edit-limit-{{ $account->id }}" value="Limite total do cartão (R$)" />
+                                                            <x-text-input id="edit-limit-{{ $account->id }}" name="credit_card_limit_total" type="number" step="0.01" min="0.01" class="mt-1" placeholder="Ex.: 5000" value="{{ old('_form') === 'account-update-'.$account->id ? old('credit_card_limit_total') : ($account->credit_card_limit_total !== null ? $account->credit_card_limit_total : '') }}" />
+                                                            <p class="form-text mb-0">Ao guardar, o limite disponível é recalculado com base nas faturas em aberto. Vazio = deixar de usar limite neste cartão.</p>
+                                                            <x-input-error :messages="$errors->get('credit_card_limit_total')" class="mt-2" />
+                                                        </div>
                                                     @endif
 
                                                     <div class="d-flex flex-wrap gap-2">
@@ -193,10 +219,13 @@
             (function () {
                 const typeSel = document.getElementById('type');
                 const wrap = document.getElementById('account-due-day-wrap');
+                const limitWrap = document.getElementById('account-limit-wrap');
                 if (!typeSel || !wrap) return;
                 const cardKind = @json(Account::KIND_CREDIT_CARD);
                 function syncDueDayField() {
-                    wrap.classList.toggle('d-none', typeSel.value !== cardKind);
+                    const isCard = typeSel.value === cardKind;
+                    wrap.classList.toggle('d-none', !isCard);
+                    if (limitWrap) limitWrap.classList.toggle('d-none', !isCard);
                 }
                 typeSel.addEventListener('change', syncDueDayField);
                 syncDueDayField();

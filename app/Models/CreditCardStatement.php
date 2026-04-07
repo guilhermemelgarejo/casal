@@ -149,11 +149,7 @@ class CreditCardStatement extends Model
         $count = $this->paymentTransactions()->count();
         if ($count === 0) {
             $this->update(['paid_at' => null]);
-
-            return;
-        }
-
-        if ($this->isFullyPaidByPayments()) {
+        } elseif ($this->isFullyPaidByPayments()) {
             $latest = $this->paymentTransactions()
                 ->reorder()
                 ->orderByDesc('transactions.date')
@@ -165,11 +161,12 @@ class CreditCardStatement extends Model
                     ? Carbon::parse($latest->date)->toDateString()
                     : null,
             ]);
-
-            return;
+        } else {
+            $this->update(['paid_at' => null]);
         }
 
-        $this->update(['paid_at' => null]);
+        $this->loadMissing('account');
+        $this->account?->recalculateCreditCardLimitAvailable();
     }
 
     public function couple(): BelongsTo

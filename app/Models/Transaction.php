@@ -39,6 +39,13 @@ class Transaction extends Model
                 $transaction->amount,
                 false
             );
+
+            if ($transaction->type === 'expense' && $transaction->account_id) {
+                $transaction->loadMissing('accountModel');
+                if ($transaction->accountModel?->isCreditCard()) {
+                    $transaction->accountModel->recalculateCreditCardLimitAvailable();
+                }
+            }
         });
 
         static::updated(function (Transaction $transaction) {
@@ -80,6 +87,23 @@ class Transaction extends Model
                         (int) $transaction->reference_year
                     );
                 }
+            }
+
+            $cardIds = [];
+            if (($old['type'] ?? '') === 'expense' && ! empty($old['account_id'])) {
+                $oldAcc = Account::find($old['account_id']);
+                if ($oldAcc?->isCreditCard()) {
+                    $cardIds[] = $oldAcc->id;
+                }
+            }
+            if ($transaction->type === 'expense' && $transaction->account_id) {
+                $transaction->loadMissing('accountModel');
+                if ($transaction->accountModel?->isCreditCard()) {
+                    $cardIds[] = $transaction->accountModel->id;
+                }
+            }
+            foreach (array_unique($cardIds) as $cid) {
+                Account::query()->find($cid)?->recalculateCreditCardLimitAvailable();
             }
         });
 
@@ -125,6 +149,8 @@ class Transaction extends Model
                 (int) $transaction->reference_month,
                 (int) $transaction->reference_year
             );
+
+            $account->recalculateCreditCardLimitAvailable();
         });
     }
 

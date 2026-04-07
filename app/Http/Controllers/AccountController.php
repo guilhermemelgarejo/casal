@@ -23,11 +23,17 @@ class AccountController extends Controller
             'kind' => ['required', 'string', Rule::in(Account::kinds())],
             'color' => 'required|string|size:7',
             'credit_card_invoice_due_day' => ['nullable', 'integer', 'min:1', 'max:31'],
+            'credit_card_limit_total' => ['nullable', 'numeric', 'min:0.01', 'max:99999999.99'],
         ]);
 
         $isCard = $validated['kind'] === Account::KIND_CREDIT_CARD;
 
-        Auth::user()->couple->accounts()->create([
+        $limitTotal = null;
+        if ($isCard && $request->filled('credit_card_limit_total')) {
+            $limitTotal = number_format((float) $validated['credit_card_limit_total'], 2, '.', '');
+        }
+
+        $account = Auth::user()->couple->accounts()->create([
             'name' => $validated['name'],
             'kind' => $validated['kind'],
             'color' => $validated['color'],
@@ -37,6 +43,11 @@ class AccountController extends Controller
                     : 10)
                 : null,
         ]);
+
+        if ($isCard && $limitTotal !== null) {
+            $account->forceFill(['credit_card_limit_total' => $limitTotal])->save();
+            $account->recalculateCreditCardLimitAvailable();
+        }
 
         return back()->with('success', 'Conta cadastrada com sucesso!');
     }
@@ -53,6 +64,7 @@ class AccountController extends Controller
         ];
         if ($account->isCreditCard()) {
             $rules['credit_card_invoice_due_day'] = ['nullable', 'integer', 'min:1', 'max:31'];
+            $rules['credit_card_limit_total'] = ['nullable', 'numeric', 'min:0.01', 'max:99999999.99'];
         }
 
         $validated = $request->validate($rules);
@@ -66,6 +78,14 @@ class AccountController extends Controller
                     : null)
                 : null,
         ]);
+
+        if ($account->isCreditCard()) {
+            $limitTotal = $request->filled('credit_card_limit_total')
+                ? number_format((float) $validated['credit_card_limit_total'], 2, '.', '')
+                : null;
+            $account->forceFill(['credit_card_limit_total' => $limitTotal])->save();
+            $account->recalculateCreditCardLimitAvailable();
+        }
 
         return back()->with('success', 'Conta atualizada com sucesso!');
     }

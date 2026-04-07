@@ -150,6 +150,8 @@ return new class extends Migration
             $table->string('color')->default('#4f46e5');
             $table->unsignedTinyInteger('credit_card_invoice_due_day')->nullable();
             $table->decimal('balance', 15, 2)->default(0);
+            $table->decimal('credit_card_limit_total', 15, 2)->nullable();
+            $table->decimal('credit_card_limit_available', 15, 2)->nullable();
             $table->timestamps();
         });
 

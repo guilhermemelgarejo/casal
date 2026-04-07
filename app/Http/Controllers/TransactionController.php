@@ -15,6 +15,8 @@ use Illuminate\Validation\Rule;
 
 class TransactionController extends Controller
 {
+    private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING = 'credit_limit_overflow_pending';
+
     public function index(Request $request)
     {
         $now = Carbon::now();
@@ -141,6 +143,10 @@ class TransactionController extends Controller
             'cards' => $cardAccounts->map(fn (Account $a) => [
                 'id' => $a->id,
                 'name' => $a->name,
+                'limit_tracked' => $a->tracksCreditCardLimit(),
+                'limit_available_label' => $a->tracksCreditCardLimit()
+                    ? number_format((float) $a->credit_card_limit_available, 2, ',', '.')
+                    : null,
             ])->values()->all(),
         ];
 
@@ -237,6 +243,7 @@ class TransactionController extends Controller
             'date' => 'required|date',
             'reference_month' => 'nullable|integer|min:1|max:12',
             'reference_year' => 'nullable|integer|min:2000|max:2100',
+            'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
         ]);
 
         $category = Category::find($request->category_id);
@@ -304,6 +311,7 @@ class TransactionController extends Controller
         $remainderCents = $amountCents - ($baseCents * $installments);
 
         $startDate = Carbon::parse($request->date);
+        $startDateStr = $startDate->toDateString();
         $baseDescription = (string) $request->description;
         $installmentParentId = null;
 
@@ -321,6 +329,59 @@ class TransactionController extends Controller
             $referenceYear = (int) ($request->input('reference_year') ?: $startDate->year);
         }
         $referenceBase = Carbon::createFromDate($referenceYear, $referenceMonth, 1);
+
+        if ($isCredit && $request->type === 'expense') {
+            $account->refresh();
+            if ($account->tracksCreditCardLimit()) {
+                $purchaseTotal = number_format((float) $amountNormalized, 2, '.', '');
+                $outstanding = Account::outstandingCreditCardUtilizationAmount($account);
+                $after = bcadd($outstanding, $purchaseTotal, 2);
+                $limit = number_format((float) $account->credit_card_limit_total, 2, '.', '');
+
+                if (bccomp($after, $limit, 2) <= 0) {
+                    session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
+                } elseif ($this->creditLimitOverflowProposalMatches(
+                    $request,
+                    session(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING),
+                    $purchaseTotal,
+                    $installments,
+                    $referenceMonth,
+                    $referenceYear,
+                    $startDateStr,
+                    $baseDescription,
+                )) {
+                    session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
+                } else {
+                    $token = bin2hex(random_bytes(32));
+                    session([
+                        self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING => [
+                            'token' => $token,
+                            'account_id' => (int) $request->account_id,
+                            'purchase_total' => $purchaseTotal,
+                            'installments' => $installments,
+                            'reference_month' => $referenceMonth,
+                            'reference_year' => $referenceYear,
+                            'category_id' => (int) $request->category_id,
+                            'description' => $baseDescription,
+                            'date' => $startDateStr,
+                            'type' => (string) $request->type,
+                        ],
+                    ]);
+
+                    $projectedAvailable = bcsub($limit, $after, 2);
+
+                    return back()
+                        ->withInput()
+                        ->with('credit_limit_overflow', [
+                            'token' => $token,
+                            'limit_total' => $limit,
+                            'outstanding_before' => $outstanding,
+                            'purchase_total' => $purchaseTotal,
+                            'projected_available' => $projectedAvailable,
+                        ]);
+                }
+            }
+        }
 
         DB::transaction(function () use (
             $installments,
@@ -441,5 +502,39 @@ class TransactionController extends Controller
         $transaction->delete();
 
         return back()->with('success', 'Lançamento excluído!');
+    }
+
+    /**
+     * Garante que o segundo envio corresponde ao mesmo pedido já avisado (evita confirmar com valores alterados).
+     *
+     * @param  array<string, mixed>|null  $pending
+     */
+    private function creditLimitOverflowProposalMatches(
+        Request $request,
+        ?array $pending,
+        string $purchaseTotal,
+        int $installments,
+        int $referenceMonth,
+        int $referenceYear,
+        string $startDateStr,
+        string $baseDescription,
+    ): bool {
+        if (! is_array($pending) || ! isset($pending['token'], $pending['purchase_total'])) {
+            return false;
+        }
+
+        if (! hash_equals($pending['token'], (string) $request->input('credit_limit_confirm_token', ''))) {
+            return false;
+        }
+
+        return (int) $pending['account_id'] === (int) $request->account_id
+            && (string) $pending['purchase_total'] === $purchaseTotal
+            && (int) $pending['installments'] === $installments
+            && (int) $pending['reference_month'] === $referenceMonth
+            && (int) $pending['reference_year'] === $referenceYear
+            && (int) $pending['category_id'] === (int) $request->category_id
+            && (string) $pending['description'] === $baseDescription
+            && (string) $pending['date'] === $startDateStr
+            && ($pending['type'] ?? '') === (string) $request->type;
     }
 }

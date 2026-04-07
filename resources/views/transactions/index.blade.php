@@ -302,6 +302,22 @@
                                     >
                                         @csrf
 
+                                        @if (session('credit_limit_overflow'))
+                                            @php $clOverflow = session('credit_limit_overflow'); @endphp
+                                            <div class="alert alert-warning mb-0" role="alert">
+                                                <p class="mb-2 fw-semibold">Limite do cartão</p>
+                                                <p class="small mb-2">Com este lançamento, o uso ultrapassaria o limite total configurado. O limite disponível materializado ficaria negativo.</p>
+                                                <ul class="small mb-2 ps-3">
+                                                    <li>Limite total: R$ {{ number_format((float) $clOverflow['limit_total'], 2, ',', '.') }}</li>
+                                                    <li>Em aberto nas faturas (restante a pagar): R$ {{ number_format((float) $clOverflow['outstanding_before'], 2, ',', '.') }}</li>
+                                                    <li>Valor deste lançamento: R$ {{ number_format((float) $clOverflow['purchase_total'], 2, ',', '.') }}</li>
+                                                    <li>Limite disponível passaria a: <strong class="text-danger">R$ {{ number_format((float) $clOverflow['projected_available'], 2, ',', '.') }}</strong></li>
+                                                </ul>
+                                                <p class="small mb-0 text-secondary">Se os dados estão corretos, clique outra vez em «Salvar Lançamento» para confirmar.</p>
+                                            </div>
+                                            <input type="hidden" name="credit_limit_confirm_token" value="{{ $clOverflow['token'] }}">
+                                        @endif
+
                                         <input type="hidden" name="funding" id="tx-funding" value="@if($txFormMode === 'cards_only')credit_card@elseif($txFormMode === 'regular_only')account@else{{ old('funding', '') }}@endif">
 
                                         @if($txFormMode !== 'cards_only')
