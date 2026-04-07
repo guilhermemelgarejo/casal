@@ -45,7 +45,7 @@ bootstrap/app.php       # aliases de middleware; exceção CSRF `stripe/*`; redi
 config/duozen.php       # trial, admins, isentos, flags de faturamento (`DUOZEN_*` no `.env`)
 routes/web.php          # rotas da app + require auth.php
 routes/auth.php         # Breeze
-database/migrations/   # `2026_04_06_200000_database_schema.php` (schema completo); `2026_04_06_210000_add_balance_to_accounts_table.php` (coluna `balance` em bases que já tinham corrido o schema antes); `2026_04_07_120000_add_credit_card_limits_to_accounts_table.php` (limites de cartão em bases antigas)
+database/migrations/   # `2026_04_06_200000_database_schema.php` (schema completo, única migração)
 database/factories/
 database/seeders/DatabaseSeeder.php
 resources/views/        # layouts, dashboard, couple, categories, transactions, welcome, auth/*, partials/subscription-public-info (texto trial/plano na landing e registo)
@@ -202,7 +202,7 @@ Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base**; volte a correr
 3. Casal pode ficar sem utilizadores no registo (não há delete automático ao sair o último).
 4. Navbar usa `route('dashboard')`; utilizadores sem casal são empurrados para `couple.index` pelo middleware.
 5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). O Cashier mantém o estado atualizado via webhooks; a rota **billing success** também sincroniza a subscrição a partir da sessão de Checkout (útil quando o webhook não atinge o ambiente, p.ex. `localhost` sem Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1.
-6. **Migrações:** schema principal em `database/migrations/2026_04_06_200000_database_schema.php` (inclui `accounts.balance` e colunas `credit_card_limit_*` em instalações novas). Ficheiros aditivos: `2026_04_06_210000_add_balance_to_accounts_table.php`; `2026_04_07_120000_add_credit_card_limits_to_accounts_table.php` (limites de cartão se ainda não existirem). Bases locais desalinhadas podem usar `php artisan migrate:fresh` (e `--seed`) ou `php artisan migrate` +, se necessário, `php artisan accounts:sync-balances` e `php artisan accounts:recalc-credit-card-limits` após dados antigos.
+6. **Migrações:** schema em `database/migrations/2026_04_06_200000_database_schema.php` (única migração; inclui `accounts.balance` e colunas `credit_card_limit_*`). Bases locais desalinhadas podem usar `php artisan migrate:fresh` (e `--seed`) ou `php artisan migrate` +, se necessário, `php artisan accounts:sync-balances` e `php artisan accounts:recalc-credit-card-limits` após dados antigos.
 
 ---
 

@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Schema completo (única migração; inclui `accounts.balance` e limites de cartão).
+ */
 return new class extends Migration
 {
     public function up(): void
