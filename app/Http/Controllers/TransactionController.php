@@ -7,11 +7,13 @@ use App\Models\Category;
 use App\Models\Transaction;
 use App\Support\PaymentMethods;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TransactionController extends Controller
 {
@@ -246,154 +248,27 @@ class TransactionController extends Controller
             'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
         ]);
 
-        $category = Category::find($request->category_id);
-        if ($category->couple_id !== Auth::user()->couple_id) {
-            abort(403);
+        $resolved = $this->resolveNewTransactionContext($request);
+        if (isset($resolved['errors'])) {
+            return back()->withErrors($resolved['errors'])->withInput();
+        }
+        $ctx = $resolved;
+
+        $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmed($request, $ctx);
+        if ($limitRedirect !== null) {
+            return $limitRedirect;
         }
 
-        if ($category->isCreditCardInvoicePayment()) {
-            return back()->withErrors([
-                'category_id' => 'Esta categoria é reservada para pagamentos de fatura de cartão. Use Faturas de cartão para registar a quitação.',
-            ])->withInput();
-        }
-
-        $account = Account::find($request->account_id);
-        if (! $account || $account->couple_id !== Auth::user()->couple_id) {
-            abort(403);
-        }
-
-        $funding = $request->input('funding');
-
-        if ($funding === 'credit_card') {
-            if (! $account->isCreditCard()) {
-                return back()->withErrors([
-                    'account_id' => 'Selecione um cartão de crédito cadastrado.',
-                ])->withInput();
-            }
-            if ($request->filled('payment_method')) {
-                return back()->withErrors([
-                    'payment_method' => 'Em cartão de crédito não informe forma de pagamento separada; o cartão já identifica o meio.',
-                ])->withInput();
-            }
-            $paymentMethod = null;
-        } else {
-            if ($account->isCreditCard()) {
-                return back()->withErrors([
-                    'account_id' => 'Para Pix, débito, dinheiro etc., escolha uma conta (não um cartão de crédito).',
-                ])->withInput();
-            }
-            if (! $request->filled('payment_method')) {
-                return back()->withErrors([
-                    'payment_method' => 'Selecione a forma de pagamento.',
-                ])->withInput();
-            }
-            if (! $account->allowsPaymentMethod($request->payment_method)) {
-                return back()->withErrors([
-                    'payment_method' => 'Esta forma de pagamento não está habilitada para a conta selecionada.',
-                ])->withInput();
-            }
-            $paymentMethod = $request->payment_method;
-        }
-
-        if ($category->type !== $request->type) {
-            return back()->withErrors(['category_id' => 'A categoria selecionada não corresponde ao tipo de lançamento (Receita/Despesa).'])->withInput();
-        }
-
-        $isCredit = $funding === 'credit_card';
-        $installments = $isCredit ? (int) $request->input('installments', 1) : 1;
-        if ($isCredit && $installments < 1) {
-            return back()->withErrors(['installments' => 'Informe a quantidade de parcelas.'])->withInput();
-        }
-
-        $amountNormalized = str_replace(',', '.', (string) $request->amount);
-        $amountCents = (int) round(((float) $amountNormalized) * 100);
-        $baseCents = intdiv($amountCents, $installments);
-        $remainderCents = $amountCents - ($baseCents * $installments);
-
-        $startDate = Carbon::parse($request->date);
-        $startDateStr = $startDate->toDateString();
-        $baseDescription = (string) $request->description;
         $installmentParentId = null;
+        DB::transaction(function () use ($ctx, &$installmentParentId, $request) {
+            $installments = $ctx['installments'];
+            $baseCents = $ctx['baseCents'];
+            $remainderCents = $ctx['remainderCents'];
+            $startDate = $ctx['startDate'];
+            $referenceBase = $ctx['referenceBase'];
+            $baseDescription = $ctx['baseDescription'];
+            $paymentMethod = $ctx['paymentMethod'];
 
-        if ($isCredit) {
-            if ($request->filled('reference_month') && $request->filled('reference_year')) {
-                $referenceMonth = (int) $request->input('reference_month');
-                $referenceYear = (int) $request->input('reference_year');
-            } else {
-                $refDefault = Carbon::now()->startOfMonth()->addMonth();
-                $referenceMonth = (int) $refDefault->month;
-                $referenceYear = (int) $refDefault->year;
-            }
-        } else {
-            $referenceMonth = (int) ($request->input('reference_month') ?: $startDate->month);
-            $referenceYear = (int) ($request->input('reference_year') ?: $startDate->year);
-        }
-        $referenceBase = Carbon::createFromDate($referenceYear, $referenceMonth, 1);
-
-        if ($isCredit && $request->type === 'expense') {
-            $account->refresh();
-            if ($account->tracksCreditCardLimit()) {
-                $purchaseTotal = number_format((float) $amountNormalized, 2, '.', '');
-                $outstanding = Account::outstandingCreditCardUtilizationAmount($account);
-                $after = bcadd($outstanding, $purchaseTotal, 2);
-                $limit = number_format((float) $account->credit_card_limit_total, 2, '.', '');
-
-                if (bccomp($after, $limit, 2) <= 0) {
-                    session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
-                } elseif ($this->creditLimitOverflowProposalMatches(
-                    $request,
-                    session(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING),
-                    $purchaseTotal,
-                    $installments,
-                    $referenceMonth,
-                    $referenceYear,
-                    $startDateStr,
-                    $baseDescription,
-                )) {
-                    session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
-                } else {
-                    $token = bin2hex(random_bytes(32));
-                    session([
-                        self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING => [
-                            'token' => $token,
-                            'account_id' => (int) $request->account_id,
-                            'purchase_total' => $purchaseTotal,
-                            'installments' => $installments,
-                            'reference_month' => $referenceMonth,
-                            'reference_year' => $referenceYear,
-                            'category_id' => (int) $request->category_id,
-                            'description' => $baseDescription,
-                            'date' => $startDateStr,
-                            'type' => (string) $request->type,
-                        ],
-                    ]);
-
-                    $projectedAvailable = bcsub($limit, $after, 2);
-
-                    return back()
-                        ->withInput()
-                        ->with('credit_limit_overflow', [
-                            'token' => $token,
-                            'limit_total' => $limit,
-                            'outstanding_before' => $outstanding,
-                            'purchase_total' => $purchaseTotal,
-                            'projected_available' => $projectedAvailable,
-                        ]);
-                }
-            }
-        }
-
-        DB::transaction(function () use (
-            $installments,
-            $baseCents,
-            $remainderCents,
-            $startDate,
-            $referenceBase,
-            $baseDescription,
-            &$installmentParentId,
-            $request,
-            $paymentMethod
-        ) {
             for ($i = 0; $i < $installments; $i++) {
                 $parcelIndex = $i + 1;
                 $cents = $baseCents + ($i === $installments - 1 ? $remainderCents : 0);
@@ -433,6 +308,246 @@ class TransactionController extends Controller
         });
 
         return back()->with('success', 'Lançamento realizado!');
+    }
+
+    /**
+     * Verificação AJAX antes de gravar: devolve token de confirmação se o limite for ultrapassado.
+     */
+    public function creditLimitPrecheck(Request $request)
+    {
+        try {
+            $request->validate([
+                'funding' => ['required', 'string', Rule::in(['account', 'credit_card'])],
+                'category_id' => 'required|exists:categories,id',
+                'account_id' => 'required|exists:accounts,id',
+                'description' => 'required|string|max:255',
+                'amount' => 'required|numeric|min:0.01',
+                'payment_method' => ['nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
+                'installments' => 'nullable|integer|min:1|max:12',
+                'type' => 'required|in:income,expense',
+                'date' => 'required|date',
+                'reference_month' => 'nullable|integer|min:1|max:12',
+                'reference_year' => 'nullable|integer|min:2000|max:2100',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Os dados do lançamento não são válidos.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        $resolved = $this->resolveNewTransactionContext($request);
+        if (isset($resolved['errors'])) {
+            return response()->json([
+                'message' => 'Não foi possível validar o lançamento.',
+                'errors' => $resolved['errors'],
+            ], 422);
+        }
+        $ctx = $resolved;
+
+        if (! $ctx['isCredit'] || $ctx['category']->type !== 'expense') {
+            return response()->json(['overflow' => false]);
+        }
+
+        $account = $ctx['account'];
+        $account->refresh();
+        if (! $account->tracksCreditCardLimit()) {
+            return response()->json(['overflow' => false]);
+        }
+
+        $purchaseTotal = number_format((float) $ctx['amountNormalized'], 2, '.', '');
+        $outstanding = Account::outstandingCreditCardUtilizationAmount($account);
+        $after = bcadd($outstanding, $purchaseTotal, 2);
+        $limit = number_format((float) $account->credit_card_limit_total, 2, '.', '');
+
+        if (bccomp($after, $limit, 2) <= 0) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
+
+            return response()->json(['overflow' => false]);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        session([
+            self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING => [
+                'token' => $token,
+                'account_id' => (int) $request->account_id,
+                'purchase_total' => $purchaseTotal,
+                'installments' => $ctx['installments'],
+                'reference_month' => $ctx['referenceMonth'],
+                'reference_year' => $ctx['referenceYear'],
+                'category_id' => (int) $request->category_id,
+                'description' => $ctx['baseDescription'],
+                'date' => $ctx['startDateStr'],
+                'type' => (string) $request->type,
+            ],
+        ]);
+
+        return response()->json([
+            'overflow' => true,
+            'token' => $token,
+            'limit_total' => $limit,
+            'outstanding_before' => $outstanding,
+            'purchase_total' => $purchaseTotal,
+            'projected_available' => bcsub($limit, $after, 2),
+        ]);
+    }
+
+    /**
+     * @return array{errors: array<string, array<int, string>>}|array<string, mixed>
+     */
+    private function resolveNewTransactionContext(Request $request): array
+    {
+        $category = Category::find($request->category_id);
+        if (! $category || $category->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        if ($category->isCreditCardInvoicePayment()) {
+            return ['errors' => [
+                'category_id' => ['Esta categoria é reservada para pagamentos de fatura de cartão. Use Faturas de cartão para registar a quitação.'],
+            ]];
+        }
+
+        $account = Account::find($request->account_id);
+        if (! $account || $account->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        $funding = $request->input('funding');
+
+        if ($funding === 'credit_card') {
+            if (! $account->isCreditCard()) {
+                return ['errors' => [
+                    'account_id' => ['Selecione um cartão de crédito cadastrado.'],
+                ]];
+            }
+            if ($request->filled('payment_method')) {
+                return ['errors' => [
+                    'payment_method' => ['Em cartão de crédito não informe forma de pagamento separada; o cartão já identifica o meio.'],
+                ]];
+            }
+            $paymentMethod = null;
+        } else {
+            if ($account->isCreditCard()) {
+                return ['errors' => [
+                    'account_id' => ['Para Pix, débito, dinheiro etc., escolha uma conta (não um cartão de crédito).'],
+                ]];
+            }
+            if (! $request->filled('payment_method')) {
+                return ['errors' => [
+                    'payment_method' => ['Selecione a forma de pagamento.'],
+                ]];
+            }
+            if (! $account->allowsPaymentMethod($request->payment_method)) {
+                return ['errors' => [
+                    'payment_method' => ['Esta forma de pagamento não está habilitada para a conta selecionada.'],
+                ]];
+            }
+            $paymentMethod = $request->payment_method;
+        }
+
+        if ($category->type !== $request->type) {
+            return ['errors' => [
+                'category_id' => ['A categoria selecionada não corresponde ao tipo de lançamento (Receita/Despesa).'],
+            ]];
+        }
+
+        $isCredit = $funding === 'credit_card';
+        $installments = $isCredit ? (int) $request->input('installments', 1) : 1;
+        if ($isCredit && $installments < 1) {
+            return ['errors' => [
+                'installments' => ['Informe a quantidade de parcelas.'],
+            ]];
+        }
+
+        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $amountCents = (int) round(((float) $amountNormalized) * 100);
+        $baseCents = intdiv($amountCents, $installments);
+        $remainderCents = $amountCents - ($baseCents * $installments);
+
+        $startDate = Carbon::parse($request->date);
+        $startDateStr = $startDate->toDateString();
+        $baseDescription = (string) $request->description;
+
+        if ($isCredit) {
+            if ($request->filled('reference_month') && $request->filled('reference_year')) {
+                $referenceMonth = (int) $request->input('reference_month');
+                $referenceYear = (int) $request->input('reference_year');
+            } else {
+                $refDefault = Carbon::now()->startOfMonth()->addMonth();
+                $referenceMonth = (int) $refDefault->month;
+                $referenceYear = (int) $refDefault->year;
+            }
+        } else {
+            $referenceMonth = (int) ($request->input('reference_month') ?: $startDate->month);
+            $referenceYear = (int) ($request->input('reference_year') ?: $startDate->year);
+        }
+        $referenceBase = Carbon::createFromDate($referenceYear, $referenceMonth, 1);
+
+        return [
+            'category' => $category,
+            'account' => $account,
+            'funding' => $funding,
+            'paymentMethod' => $paymentMethod,
+            'isCredit' => $isCredit,
+            'installments' => $installments,
+            'amountNormalized' => $amountNormalized,
+            'amountCents' => $amountCents,
+            'baseCents' => $baseCents,
+            'remainderCents' => $remainderCents,
+            'startDate' => $startDate,
+            'startDateStr' => $startDateStr,
+            'baseDescription' => $baseDescription,
+            'referenceMonth' => $referenceMonth,
+            'referenceYear' => $referenceYear,
+            'referenceBase' => $referenceBase,
+        ];
+    }
+
+    /**
+     * Bloqueia gravação se ultrapassar o limite sem token válido (confirmação via precheck + Swal).
+     */
+    private function rejectCreditCardLimitIfUnconfirmed(Request $request, array $ctx): ?RedirectResponse
+    {
+        if (! $ctx['isCredit'] || $request->type !== 'expense') {
+            return null;
+        }
+
+        $account = $ctx['account'];
+        $account->refresh();
+        if (! $account->tracksCreditCardLimit()) {
+            return null;
+        }
+
+        $purchaseTotal = number_format((float) $ctx['amountNormalized'], 2, '.', '');
+        $outstanding = Account::outstandingCreditCardUtilizationAmount($account);
+        $after = bcadd($outstanding, $purchaseTotal, 2);
+        $limit = number_format((float) $account->credit_card_limit_total, 2, '.', '');
+
+        if (bccomp($after, $limit, 2) <= 0) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
+
+            return null;
+        }
+
+        if ($this->creditLimitOverflowProposalMatches(
+            $request,
+            session(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING),
+            $purchaseTotal,
+            $ctx['installments'],
+            $ctx['referenceMonth'],
+            $ctx['referenceYear'],
+            $ctx['startDateStr'],
+            $ctx['baseDescription'],
+        )) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
+
+            return null;
+        }
+
+        return back()->withErrors([
+            'amount' => 'O limite do cartão exige confirmação no aviso antes de guardar. Recarregue a página e tente de novo.',
+        ])->withInput();
     }
 
     public function destroy(Request $request, Transaction $transaction)

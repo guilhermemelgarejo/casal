@@ -25,6 +25,7 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
 
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+    Route::post('/transactions/credit-limit-precheck', [TransactionController::class, 'creditLimitPrecheck'])->name('transactions.credit-limit-precheck');
     Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
     Route::delete('/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
 

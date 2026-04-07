@@ -181,7 +181,7 @@ class CreditCardLimitTest extends TestCase
         $this->assertSame('400.00', $card->credit_card_limit_available);
     }
 
-    public function test_store_lancamento_ultrapassa_limite_exige_segundo_envio_com_token(): void
+    public function test_store_ultrapassa_limite_apos_precheck_e_token(): void
     {
         extract($this->seedCoupleWithCardAndLimit('1000.00'));
 
@@ -212,11 +212,10 @@ class CreditCardLimitTest extends TestCase
             'reference_year' => 2026,
         ];
 
-        $this->actingAs($user)->post(route('transactions.store'), $payload)
-            ->assertSessionHas('credit_limit_overflow')
-            ->assertSessionMissing('success');
-
-        $token = session('credit_limit_overflow')['token'];
+        $precheck = $this->actingAs($user)->postJson(route('transactions.credit-limit-precheck'), $payload);
+        $precheck->assertOk();
+        $precheck->assertJson(['overflow' => true]);
+        $token = $precheck->json('token');
         $this->assertIsString($token);
         $this->assertSame(64, strlen($token));
 

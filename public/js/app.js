@@ -477,5 +477,119 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             applyPaymentFlow(paymentFlow.value);
         }
+
+        const precheckUrl = txForm.dataset.creditLimitPrecheckUrl || '';
+        const typeSelect = document.getElementById('transaction-type');
+
+        txForm.addEventListener('submit', async (e) => {
+            if (txForm.dataset.txCreditLimitSubmitting === '1') {
+                txForm.dataset.txCreditLimitSubmitting = '0';
+                return;
+            }
+
+            const existingToken = txForm.querySelector('input[name="credit_limit_confirm_token"]');
+            if (existingToken?.value) {
+                return;
+            }
+
+            const fundingVal = fundingInput?.value || '';
+            if (fundingVal !== 'credit_card' || !typeSelect || typeSelect.value !== 'expense') {
+                return;
+            }
+
+            if (!precheckUrl) {
+                return;
+            }
+
+            e.preventDefault();
+
+            let res;
+            try {
+                res = await fetch(precheckUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                    body: new FormData(txForm),
+                });
+            } catch {
+                window.alert('Não foi possível verificar o limite do cartão. Tente de novo.');
+                return;
+            }
+
+            let data = {};
+            try {
+                data = await res.json();
+            } catch {
+                data = {};
+            }
+
+            if (!res.ok) {
+                const errs = data.errors || {};
+                const first = Object.values(errs).flat()[0] || data.message || 'Verifique os dados do lançamento.';
+                window.alert(first);
+                return;
+            }
+
+            if (!data.overflow) {
+                txForm.dataset.txCreditLimitSubmitting = '1';
+                txForm.submit();
+                return;
+            }
+
+            const fmtMoney = (n) => {
+                const x = Number.parseFloat(String(n).replace(',', '.'));
+                if (Number.isNaN(x)) {
+                    return String(n);
+                }
+                return x.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+
+            const listHtml = `<ul class="text-start small mb-0 ps-3"><li>Limite total: R$ ${fmtMoney(data.limit_total)}</li><li>Em aberto nas faturas: R$ ${fmtMoney(data.outstanding_before)}</li><li>Este lançamento: R$ ${fmtMoney(data.purchase_total)}</li><li>Limite disponível passaria a: <strong class="text-danger">R$ ${fmtMoney(data.projected_available)}</strong></li></ul>`;
+            const bodyHtml = `<p class="mb-2 text-start">Este valor faz ultrapassar o limite total do cartão.</p>${listHtml}`;
+
+            const attachTokenAndSubmit = () => {
+                let input = txForm.querySelector('input[name="credit_limit_confirm_token"]');
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'credit_limit_confirm_token';
+                    txForm.appendChild(input);
+                }
+                input.value = data.token || '';
+                txForm.dataset.txCreditLimitSubmitting = '1';
+                txForm.submit();
+            };
+
+            if (typeof Swal === 'undefined') {
+                if (window.confirm(`${bodyHtml.replace(/<[^>]+>/g, ' ')}\n\nRegistar mesmo assim?`)) {
+                    attachTokenAndSubmit();
+                }
+                return;
+            }
+
+            const result = await Swal.fire({
+                icon: 'warning',
+                title: 'Limite do cartão',
+                html: bodyHtml,
+                showCancelButton: true,
+                focusCancel: true,
+                confirmButtonText: 'Registar mesmo assim',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#0d6efd',
+                cancelButtonColor: '#6c757d',
+                customClass: {
+                    confirmButton: 'btn btn-primary px-3',
+                    cancelButton: 'btn btn-outline-secondary px-4',
+                },
+                buttonsStyling: false,
+            });
+
+            if (result.isConfirmed) {
+                attachTokenAndSubmit();
+            }
+        });
     }
 });
