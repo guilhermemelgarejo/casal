@@ -26,69 +26,87 @@
                         <div class="card border shadow-sm h-100">
                             <div class="card-header bg-white py-3 border-bottom">
                                 <div class="vstack gap-0">
-                                    <div>
-                                        <h3 class="h5 mb-0">Lançamentos</h3>
-                                        <p class="small text-secondary mb-0 mt-1">Histórico e movimentações do período</p>
+                                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                                        <div class="min-w-0">
+                                            <h3 class="h5 mb-0">Lançamentos</h3>
+                                            <p class="small text-secondary mb-0 mt-1">Histórico e movimentações do período</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary flex-shrink-0"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalNewTransaction"
+                                        >
+                                            Novo lançamento
+                                        </button>
                                     </div>
 
                                     <div class="border-top pt-3 mt-3 min-w-0">
-                                    <form method="GET" action="{{ route('transactions.index') }}" class="d-flex align-items-stretch flex-nowrap gap-2 w-100 min-w-0">
-                                        <div class="input-group input-group-sm min-w-0" style="flex: 0 1 6.75rem;">
-                                            <span class="input-group-text text-secondary px-2">Mês</span>
-                                            <select
-                                                id="filter-month"
-                                                name="month"
-                                                class="form-select min-w-0 px-2"
-                                                aria-label="Mês"
-                                            >
-                                                @for($m = 1; $m <= 12; $m++)
-                                                    <option value="{{ $m }}" {{ (int) $selectedMonth === $m ? 'selected' : '' }}>
-                                                        {{ str_pad((string) $m, 2, '0', STR_PAD_LEFT) }}
-                                                    </option>
-                                                @endfor
-                                            </select>
+                                    <form method="GET" action="{{ route('transactions.index') }}" class="row g-2 gx-2 gy-2 align-items-end">
+                                        <div class="col-6 col-lg-2 min-w-0">
+                                            <div class="input-group">
+                                                <span class="input-group-text text-secondary px-2">Mês</span>
+                                                <select
+                                                    id="filter-month"
+                                                    name="month"
+                                                    class="form-select min-w-0 px-2"
+                                                    aria-label="Mês"
+                                                >
+                                                    @for($m = 1; $m <= 12; $m++)
+                                                        <option value="{{ $m }}" {{ (int) $selectedMonth === $m ? 'selected' : '' }}>
+                                                            {{ str_pad((string) $m, 2, '0', STR_PAD_LEFT) }}
+                                                        </option>
+                                                    @endfor
+                                                </select>
+                                            </div>
                                         </div>
 
-                                        <div class="input-group input-group-sm min-w-0" style="flex: 0 1 7.25rem;">
-                                            <span class="input-group-text text-secondary px-2">Ano</span>
-                                            <select
-                                                id="filter-year"
-                                                name="year"
-                                                class="form-select min-w-0 px-2"
-                                                aria-label="Ano"
-                                            >
-                                                @foreach($years as $y)
-                                                    <option value="{{ $y }}" {{ (int) $selectedYear === (int) $y ? 'selected' : '' }}>
-                                                        {{ $y }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                        <div class="col-6 col-lg-2 min-w-0">
+                                            <div class="input-group">
+                                                <span class="input-group-text text-secondary px-2">Ano</span>
+                                                <select
+                                                    id="filter-year"
+                                                    name="year"
+                                                    class="form-select min-w-0 px-2"
+                                                    aria-label="Ano"
+                                                >
+                                                    @foreach($years as $y)
+                                                        <option value="{{ $y }}" {{ (int) $selectedYear === (int) $y ? 'selected' : '' }}>
+                                                            {{ $y }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
                                         </div>
 
-                                        <div class="input-group input-group-sm min-w-0" style="flex: 1 1 5rem;">
-                                            <span class="input-group-text text-secondary px-2">Conta</span>
-                                            <select
-                                                id="filter-account"
-                                                name="account_id"
-                                                class="form-select min-w-0 px-2"
-                                                aria-label="Filtrar por conta"
-                                            >
-                                                <option value="" {{ $filterAccountId === null ? 'selected' : '' }}>Todas</option>
-                                                @foreach($accountsSortedForFilter as $acc)
-                                                    <option value="{{ $acc->id }}" {{ (int) $filterAccountId === (int) $acc->id ? 'selected' : '' }}>
-                                                        @if($acc->isCreditCard())
-                                                            {{ $acc->name }} (cartão)
-                                                        @else
-                                                            {{ $acc->name }}
-                                                        @endif
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                        <div class="col-12 col-lg min-w-0">
+                                            <div class="input-group">
+                                                <span class="input-group-text text-secondary px-2">Conta</span>
+                                                <select
+                                                    id="filter-account"
+                                                    name="account_id"
+                                                    class="form-select min-w-0 px-2"
+                                                    aria-label="Filtrar por conta"
+                                                >
+                                                    <option value="" {{ $filterAccountId === null ? 'selected' : '' }}>Todas</option>
+                                                    @foreach($accountsSortedForFilter as $acc)
+                                                        <option value="{{ $acc->id }}" {{ (int) $filterAccountId === (int) $acc->id ? 'selected' : '' }}>
+                                                            @if($acc->isCreditCard())
+                                                                {{ $acc->name }} (cartão)
+                                                            @else
+                                                                {{ $acc->name }}
+                                                            @endif
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
                                         </div>
 
-                                        <div class="btn-group btn-group-sm flex-shrink-0 align-self-center" role="group" aria-label="Ações do filtro">
-                                            <button type="submit" class="btn btn-primary">Filtrar</button>
-                                            <a href="{{ route('transactions.index') }}" class="btn btn-outline-secondary">Atual</a>
+                                        <div class="col-12 col-lg-auto">
+                                            <div class="d-flex gap-2" role="group" aria-label="Ações do filtro">
+                                                <button type="submit" class="btn btn-primary flex-grow-1 flex-lg-grow-0">Filtrar</button>
+                                                <a href="{{ route('transactions.index') }}" class="btn btn-outline-secondary flex-grow-1 flex-lg-grow-0">Atual</a>
+                                            </div>
                                         </div>
                                     </form>
                                     @if ($filteredRegularAccountBalance !== null)
@@ -203,7 +221,7 @@
                         </div>
                     </div>
 
-                    {{-- Resumo e formulário: mesma linguagem visual da listagem --}}
+                    {{-- Resumo lateral --}}
                     <div class="col-lg-4">
                         <div class="vstack gap-4">
                             <div class="card border shadow-sm">
@@ -272,203 +290,6 @@
                                     @endif
                                 </div>
                             </div>
-
-                            <div class="card border shadow-sm">
-                                <div class="card-header bg-white py-3 border-bottom">
-                                    <h3 class="h5 mb-0">Novo lançamento</h3>
-                                    <p class="small text-secondary mb-0 mt-1">Comece pela forma de pagamento; em seguida escolha o cartão ou a conta compatível.</p>
-                                </div>
-                                <div class="card-body p-3">
-                                    @if($accounts->isEmpty())
-                                        <div class="alert alert-warning mb-0">
-                                            Cadastre ao menos uma conta em
-                                            <a href="{{ route('accounts.index') }}" class="alert-link">Gerenciar contas</a>
-                                            para poder lançar movimentações.
-                                        </div>
-                                    @else
-                                    @php
-                                        $canPayWithAccount = $regularAccounts->isNotEmpty();
-                                        $canPayWithCard = $cardAccounts->isNotEmpty();
-                                    @endphp
-                                    <form
-                                        id="form-new-transaction"
-                                        action="{{ route('transactions.store') }}"
-                                        method="POST"
-                                        data-tx-form-mode="{{ $txFormMode }}"
-                                        data-tx-accounts='@json($txAccountsPayload)'
-                                        data-tx-old-account-id="{{ old('account_id', '') }}"
-                                        data-tx-default-ref-month="{{ $refDefaultMonth }}"
-                                        data-tx-default-ref-year="{{ $refDefaultYear }}"
-                                        data-credit-limit-precheck-url="{{ route('transactions.credit-limit-precheck') }}"
-                                    >
-                                        @csrf
-
-                                        <input type="hidden" name="funding" id="tx-funding" value="@if($txFormMode === 'cards_only')credit_card@elseif($txFormMode === 'regular_only')account@else{{ old('funding', '') }}@endif">
-
-                                        @if($txFormMode !== 'cards_only')
-                                            <input type="hidden" name="payment_method" id="tx-payment-method" value="{{ old('payment_method', '') }}" @if($txFormMode === 'both' && old('funding') === 'credit_card') disabled @endif>
-                                        @endif
-
-                                        <div class="vstack gap-3">
-                                            @if($txFormMode === 'cards_only')
-                                                <div>
-                                                    <x-input-label for="tx-account-id" value="Cartão de crédito" />
-                                                    <select name="account_id" id="tx-account-id" class="form-select mt-1" required>
-                                                        <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>Selecione o cartão…</option>
-                                                        @foreach($cardAccounts as $account)
-                                                            <option value="{{ $account->id }}" {{ (string) old('account_id') === (string) $account->id ? 'selected' : '' }}>{{ $account->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
-                                                </div>
-                                            @else
-                                                <div>
-                                                    <x-input-label for="payment_flow" value="Forma de pagamento" />
-                                                    <select id="payment_flow" class="form-select mt-1" required>
-                                                        <option value="" {{ $paymentFlowOld === '' ? 'selected' : '' }}>Selecione…</option>
-                                                        @if($txFormMode === 'both')
-                                                            <option value="__credit__" {{ $paymentFlowOld === '__credit__' ? 'selected' : '' }}>Cartão de crédito</option>
-                                                        @endif
-                                                        @foreach(\App\Support\PaymentMethods::forRegularAccounts() as $pm)
-                                                            <option value="{{ $pm }}" {{ $paymentFlowOld === $pm ? 'selected' : '' }}>{{ $pm }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <p class="form-text mb-0" id="payment-flow-hint">Depois aparecem só cartões ou contas compatíveis com essa forma.</p>
-                                                    <x-input-error :messages="$errors->get('funding')" class="mt-2" />
-                                                    <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
-                                                </div>
-
-                                                <div id="tx-destination-wrap" class="{{ $paymentFlowOld !== '' ? '' : 'd-none' }}">
-                                                    <label class="form-label" for="tx-account-id" id="tx-destination-label">
-                                                        @if($paymentFlowOld === '__credit__')
-                                                            Cartão de crédito
-                                                        @elseif($paymentFlowOld !== '')
-                                                            Conta
-                                                        @else
-                                                            Conta ou cartão
-                                                        @endif
-                                                    </label>
-                                                    <select id="tx-account-id" class="form-select mt-1"></select>
-                                                    <p class="form-text mb-0 d-none text-warning" id="tx-no-account-hint">Nenhuma conta permite esta forma. Ajuste em Gerenciar contas.</p>
-                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
-                                                </div>
-                                            @endif
-
-                                            <p class="form-text mb-0">
-                                                <a href="{{ route('accounts.index') }}">Gerenciar contas e cartões</a>
-                                            </p>
-
-                                            <div>
-                                                <x-input-label for="transaction-type" value="Tipo de Lançamento" />
-                                                <select id="transaction-type" name="type" class="form-select mt-1">
-                                                    <option value="expense" {{ old('type', 'expense') === 'expense' ? 'selected' : '' }}>Despesa (Saída)</option>
-                                                    <option value="income" {{ old('type') === 'income' ? 'selected' : '' }}>Receita (Entrada)</option>
-                                                </select>
-                                                <x-input-error :messages="$errors->get('type')" class="mt-2" />
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="category_id" value="Categoria" />
-                                                <select id="category_id" name="category_id" class="form-select mt-1">
-                                                    @foreach($categories as $c)
-                                                        <option
-                                                            value="{{ $c->id }}"
-                                                            data-type="{{ $c->type }}"
-                                                            {{ (string) old('category_id') === (string) $c->id ? 'selected' : '' }}
-                                                        >
-                                                            {{ $c->name }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                <x-input-error :messages="$errors->get('category_id')" class="mt-2" />
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="description" value="Descrição" />
-                                                <x-text-input id="description" name="description" type="text" class="mt-1" required value="{{ old('description') }}" placeholder="Ex: Compras do mês" />
-                                                <x-input-error :messages="$errors->get('description')" class="mt-2" />
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="amount" value="Valor (R$)" />
-                                                <x-text-input id="amount" name="amount" type="number" step="0.01" class="mt-1" required value="{{ old('amount') }}" placeholder="0,00" />
-                                                <x-input-error :messages="$errors->get('amount')" class="mt-2" />
-                                            </div>
-
-                                            @php
-                                                $isCreditRender = $txFormMode === 'cards_only' || $fundingOld === 'credit_card' || $paymentFlowOld === '__credit__';
-                                                $installmentsOld = (int) old('installments', 1);
-
-                                                $dateForRef = old('date', date('Y-m-d'));
-                                                $hasOldRef = old('reference_month') !== null && old('reference_month') !== ''
-                                                    && old('reference_year') !== null && old('reference_year') !== '';
-                                                if ($hasOldRef) {
-                                                    $parsedRefMonth = (int) old('reference_month');
-                                                    $parsedRefYear = (int) old('reference_year');
-                                                } elseif ($isCreditRender) {
-                                                    $parsedRefMonth = $refDefaultMonth;
-                                                    $parsedRefYear = $refDefaultYear;
-                                                } else {
-                                                    $parsedRefMonth = (int) date('m', strtotime($dateForRef));
-                                                    $parsedRefYear = (int) date('Y', strtotime($dateForRef));
-                                                }
-                                            @endphp
-                                            <div id="installments-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
-                                                <x-input-label for="installments" value="Parcelas (crédito)" />
-                                                <select
-                                                    id="installments"
-                                                    name="installments"
-                                                    class="form-select mt-1"
-                                                    {{ $isCreditRender ? 'required' : '' }}
-                                                >
-                                                    @for($i = 1; $i <= 12; $i++)
-                                                        <option value="{{ $i }}" {{ $installmentsOld === $i ? 'selected' : '' }}>{{ $i }}</option>
-                                                    @endfor
-                                                </select>
-                                                <x-input-error :messages="$errors->get('installments')" class="mt-2" />
-                                                <p class="form-text mb-0">Geramos 1 lançamento por mês de referência.</p>
-                                            </div>
-
-                                            <div id="reference-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
-                                                <x-input-label value="Mês de referência (fatura)" />
-                                                <div class="row g-2 mt-1">
-                                                    <div class="col-6">
-                                                        <select id="reference_month" name="reference_month" class="form-select">
-                                                            @for($m = 1; $m <= 12; $m++)
-                                                                <option value="{{ $m }}" {{ (int) $parsedRefMonth === $m ? 'selected' : '' }}>
-                                                                    {{ str_pad((string) $m, 2, '0', STR_PAD_LEFT) }}
-                                                                </option>
-                                                            @endfor
-                                                        </select>
-                                                        <x-input-error :messages="$errors->get('reference_month')" class="mt-2" />
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <select id="reference_year" name="reference_year" class="form-select">
-                                                            @foreach($years as $y)
-                                                                <option value="{{ $y }}" {{ (int) $parsedRefYear === (int) $y ? 'selected' : '' }}>
-                                                                    {{ $y }}
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                        <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
-                                                    </div>
-                                                </div>
-                                                <p class="form-text mb-0">Por padrão usamos o mês seguinte à data de hoje no fuso da aplicação ({{ config('app.timezone') }}). Ajuste se precisar.</p>
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="date" value="Data" />
-                                                <x-text-input id="date" name="date" type="date" class="mt-1" value="{{ old('date', date('Y-m-d')) }}" required />
-                                                <x-input-error :messages="$errors->get('date')" class="mt-2" />
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <x-primary-button class="w-100 justify-content-center">Salvar Lançamento</x-primary-button>
-                                        </div>
-                                    </form>
-                                    @endif
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -476,5 +297,232 @@
             </div>
         </div>
     </div>
+
+    @php
+        $openNewTransactionModal = $errors->hasAny([
+            'funding', 'category_id', 'account_id', 'description', 'amount', 'payment_method',
+            'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
+        ]);
+    @endphp
+    <div class="modal fade" id="modalNewTransaction" tabindex="-1" aria-labelledby="modalNewTransactionLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="modalNewTransactionLabel">Novo lançamento</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                @if($accounts->isEmpty())
+                    <div class="modal-body overflow-auto" style="max-height: calc(100vh - 12rem);">
+                        <div class="alert alert-warning mb-0">
+                            Cadastre ao menos uma conta em
+                            <a href="{{ route('accounts.index') }}" class="alert-link">Gerenciar contas</a>
+                            para poder lançar movimentações.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+                        <a href="{{ route('accounts.index') }}" class="btn btn-primary">Ir para contas</a>
+                    </div>
+                @else
+                    <form
+                        id="form-new-transaction"
+                        action="{{ route('transactions.store') }}"
+                        method="POST"
+                        data-tx-form-mode="{{ $txFormMode }}"
+                        data-tx-accounts='@json($txAccountsPayload)'
+                        data-tx-old-account-id="{{ old('account_id', '') }}"
+                        data-tx-default-ref-month="{{ $refDefaultMonth }}"
+                        data-tx-default-ref-year="{{ $refDefaultYear }}"
+                        data-credit-limit-precheck-url="{{ route('transactions.credit-limit-precheck') }}"
+                    >
+                        @csrf
+                        <div class="modal-body overflow-auto" style="max-height: calc(100vh - 12rem);">
+                            <p class="small text-secondary mb-3">Comece pela forma de pagamento; em seguida escolha o cartão ou a conta compatível.</p>
+
+                            <input type="hidden" name="funding" id="tx-funding" value="@if($txFormMode === 'cards_only')credit_card@elseif($txFormMode === 'regular_only')account@else{{ old('funding', '') }}@endif">
+
+                            @if($txFormMode !== 'cards_only')
+                                <input type="hidden" name="payment_method" id="tx-payment-method" value="{{ old('payment_method', '') }}" @if($txFormMode === 'both' && old('funding') === 'credit_card') disabled @endif>
+                            @endif
+
+                            <div class="vstack gap-3">
+                                @if($txFormMode === 'cards_only')
+                                    <div>
+                                        <x-input-label for="tx-account-id" value="Cartão de crédito" />
+                                        <select name="account_id" id="tx-account-id" class="form-select mt-1" required>
+                                            <option value="" disabled {{ old('account_id') ? '' : 'selected' }}>Selecione o cartão…</option>
+                                            @foreach($cardAccounts as $account)
+                                                <option value="{{ $account->id }}" {{ (string) old('account_id') === (string) $account->id ? 'selected' : '' }}>{{ $account->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                    </div>
+                                @else
+                                    <div class="row g-2">
+                                        <div class="col-12 col-md-6">
+                                            <x-input-label for="payment_flow" value="Forma de pagamento" />
+                                            <select id="payment_flow" class="form-select mt-1" required>
+                                                <option value="" {{ $paymentFlowOld === '' ? 'selected' : '' }}>Selecione…</option>
+                                                @if($txFormMode === 'both')
+                                                    <option value="__credit__" {{ $paymentFlowOld === '__credit__' ? 'selected' : '' }}>Cartão de crédito</option>
+                                                @endif
+                                                @foreach(\App\Support\PaymentMethods::forRegularAccounts() as $pm)
+                                                    <option value="{{ $pm }}" {{ $paymentFlowOld === $pm ? 'selected' : '' }}>{{ $pm }}</option>
+                                                @endforeach
+                                            </select>
+                                            <x-input-error :messages="$errors->get('funding')" class="mt-2" />
+                                            <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
+                                        </div>
+
+                                        <div class="col-12 col-md-6">
+                                            <div id="tx-destination-wrap" class="{{ $paymentFlowOld !== '' ? '' : 'd-none' }}">
+                                                <label class="form-label" for="tx-account-id" id="tx-destination-label">
+                                                    @if($paymentFlowOld === '__credit__')
+                                                        Cartão de crédito
+                                                    @elseif($paymentFlowOld !== '')
+                                                        Conta
+                                                    @else
+                                                        Conta ou cartão
+                                                    @endif
+                                                </label>
+                                                <select id="tx-account-id" class="form-select mt-1"></select>
+                                                <p class="form-text mb-0 d-none text-warning" id="tx-no-account-hint">Nenhuma conta permite esta forma. Ajuste em Gerenciar contas.</p>
+                                                <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <p class="form-text mb-0">
+                                    <a href="{{ route('accounts.index') }}">Gerenciar contas e cartões</a>
+                                </p>
+
+                                <div>
+                                    <x-input-label for="transaction-type" value="Tipo de Lançamento" />
+                                    <select id="transaction-type" name="type" class="form-select mt-1">
+                                        <option value="expense" {{ old('type', 'expense') === 'expense' ? 'selected' : '' }}>Despesa (Saída)</option>
+                                        <option value="income" {{ old('type') === 'income' ? 'selected' : '' }}>Receita (Entrada)</option>
+                                    </select>
+                                    <x-input-error :messages="$errors->get('type')" class="mt-2" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="category_id" value="Categoria" />
+                                    <select id="category_id" name="category_id" class="form-select mt-1">
+                                        @foreach($categories as $c)
+                                            <option
+                                                value="{{ $c->id }}"
+                                                data-type="{{ $c->type }}"
+                                                {{ (string) old('category_id') === (string) $c->id ? 'selected' : '' }}
+                                            >
+                                                {{ $c->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('category_id')" class="mt-2" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="description" value="Descrição" />
+                                    <x-text-input id="description" name="description" type="text" class="mt-1" required value="{{ old('description') }}" placeholder="Ex: Compras do mês" />
+                                    <x-input-error :messages="$errors->get('description')" class="mt-2" />
+                                </div>
+
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <x-input-label for="amount" value="Valor (R$)" />
+                                        <x-text-input id="amount" name="amount" type="number" step="0.01" class="mt-1" required value="{{ old('amount') }}" placeholder="0,00" />
+                                        <x-input-error :messages="$errors->get('amount')" class="mt-2" />
+                                    </div>
+                                    <div class="col-6">
+                                        <x-input-label for="date" value="Data" />
+                                        <x-text-input id="date" name="date" type="date" class="mt-1" value="{{ old('date', date('Y-m-d')) }}" required />
+                                        <x-input-error :messages="$errors->get('date')" class="mt-2" />
+                                    </div>
+                                </div>
+
+                                @php
+                                    $isCreditRender = $txFormMode === 'cards_only' || $fundingOld === 'credit_card' || $paymentFlowOld === '__credit__';
+                                    $installmentsOld = (int) old('installments', 1);
+
+                                    $dateForRef = old('date', date('Y-m-d'));
+                                    $hasOldRef = old('reference_month') !== null && old('reference_month') !== ''
+                                        && old('reference_year') !== null && old('reference_year') !== '';
+                                    if ($hasOldRef) {
+                                        $parsedRefMonth = (int) old('reference_month');
+                                        $parsedRefYear = (int) old('reference_year');
+                                    } elseif ($isCreditRender) {
+                                        $parsedRefMonth = $refDefaultMonth;
+                                        $parsedRefYear = $refDefaultYear;
+                                    } else {
+                                        $parsedRefMonth = (int) date('m', strtotime($dateForRef));
+                                        $parsedRefYear = (int) date('Y', strtotime($dateForRef));
+                                    }
+                                @endphp
+                                <div id="installments-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
+                                    <x-input-label for="installments" value="Parcelas (crédito)" />
+                                    <select
+                                        id="installments"
+                                        name="installments"
+                                        class="form-select mt-1"
+                                        {{ $isCreditRender ? 'required' : '' }}
+                                    >
+                                        @for($i = 1; $i <= 12; $i++)
+                                            <option value="{{ $i }}" {{ $installmentsOld === $i ? 'selected' : '' }}>{{ $i }}</option>
+                                        @endfor
+                                    </select>
+                                    <x-input-error :messages="$errors->get('installments')" class="mt-2" />
+                                    <p class="form-text mb-0">Geramos 1 lançamento por mês de referência.</p>
+                                </div>
+
+                                <div id="reference-wrapper" class="{{ $isCreditRender ? '' : 'd-none' }}">
+                                    <x-input-label value="Mês de referência (fatura)" />
+                                    <div class="row g-2 mt-1">
+                                        <div class="col-6">
+                                            <select id="reference_month" name="reference_month" class="form-select">
+                                                @for($m = 1; $m <= 12; $m++)
+                                                    <option value="{{ $m }}" {{ (int) $parsedRefMonth === $m ? 'selected' : '' }}>
+                                                        {{ str_pad((string) $m, 2, '0', STR_PAD_LEFT) }}
+                                                    </option>
+                                                @endfor
+                                            </select>
+                                            <x-input-error :messages="$errors->get('reference_month')" class="mt-2" />
+                                        </div>
+                                        <div class="col-6">
+                                            <select id="reference_year" name="reference_year" class="form-select">
+                                                @foreach($years as $y)
+                                                    <option value="{{ $y }}" {{ (int) $parsedRefYear === (int) $y ? 'selected' : '' }}>
+                                                        {{ $y }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <x-primary-button>Salvar lançamento</x-primary-button>
+                        </div>
+                    </form>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    @if ($openNewTransactionModal)
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    var el = document.getElementById('modalNewTransaction');
+                    if (!el || typeof bootstrap === 'undefined') return;
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                });
+            </script>
+        @endpush
+    @endif
 
 </x-app-layout>
