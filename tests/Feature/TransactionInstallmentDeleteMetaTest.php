@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
-use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,10 +32,9 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'color' => '#222',
         ]);
 
-        $parent = Transaction::create([
+        $parent = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 1/2)',
             'amount' => '50.00',
@@ -46,12 +44,11 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'reference_month' => 4,
             'reference_year' => 2026,
             'installment_parent_id' => null,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 2/2)',
             'amount' => '50.00',
@@ -61,7 +58,7 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'reference_month' => 5,
             'reference_year' => 2026,
             'installment_parent_id' => $parent->id,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
         $response = $this->actingAs($user)->get(route('transactions.index', [
             'month' => 4,

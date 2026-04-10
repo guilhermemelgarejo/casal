@@ -168,7 +168,13 @@
                                         <td class="text-secondary small text-nowrap">{{ $transaction->date->format('d/m/Y') }}</td>
                                         <td class="fw-medium">{{ $transaction->description }}</td>
                                         <td>
-                                            <span class="badge rounded-pill" style="background-color: {{ $transaction->category->color ?? '#ccc' }}">{{ $transaction->category->name }}</span>
+                                            <div class="d-flex flex-column gap-1 align-items-start">
+                                                @forelse($transaction->categorySplits as $sp)
+                                                    <span class="badge rounded-pill text-white" style="background-color: {{ $sp->category->color ?? '#ccc' }}">{{ $sp->category->name }} · R$ {{ number_format((float) $sp->amount, 2, ',', '.') }}</span>
+                                                @empty
+                                                    <span class="text-secondary small">—</span>
+                                                @endforelse
+                                            </div>
                                         </td>
                                         <td class="small">{{ $transaction->accountModel->name ?? '-' }}</td>
                                         <td class="text-end fw-bold text-nowrap {{ $transaction->type === 'income' ? 'text-success' : 'text-danger' }}">

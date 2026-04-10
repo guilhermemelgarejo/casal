@@ -24,11 +24,32 @@
                             Cadastre um <strong>cartão de crédito</strong> em
                             <a href="{{ route('accounts.index') }}">Contas</a> e faça lançamentos no cartão para ver as faturas aqui.
                         </div>
-                    @elseif ($invoiceCycles->isEmpty())
-                        <div class="alert alert-info mb-0">
-                            Ainda não há despesas em cartão com mês de referência. Use <a href="{{ route('transactions.index') }}">Lançamentos</a> com forma &quot;Cartão de crédito&quot;.
-                        </div>
                     @else
+                        <form method="GET" action="{{ route('credit-card-statements.index') }}" class="row g-2 align-items-end mb-4">
+                            <div class="col-12 col-sm-8 col-md-6 col-lg-4">
+                                <x-input-label for="filter-card-account" value="Cartão de crédito" />
+                                <select id="filter-card-account" name="account_id" class="form-select mt-1" aria-label="Filtrar por cartão">
+                                    <option value="" {{ $filterCardId === null ? 'selected' : '' }}>Todos os cartões</option>
+                                    @foreach ($cardAccounts as $ca)
+                                        <option value="{{ $ca->id }}" {{ (int) $filterCardId === (int) $ca->id ? 'selected' : '' }}>{{ $ca->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-auto d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-primary">Filtrar</button>
+                                <a href="{{ route('credit-card-statements.index') }}" class="btn btn-outline-secondary">Limpar</a>
+                            </div>
+                        </form>
+
+                        @if ($invoiceCycles->isEmpty())
+                        <div class="alert alert-info mb-0">
+                            @if ($filterCardId !== null)
+                                Não há faturas com despesas neste cartão. Escolha outro cartão ou <a href="{{ route('credit-card-statements.index') }}">veja todos</a>.
+                            @else
+                                Ainda não há despesas em cartão com mês de referência. Use <a href="{{ route('transactions.index') }}">Lançamentos</a> com forma &quot;Cartão de crédito&quot;.
+                            @endif
+                        </div>
+                        @else
                         <div class="table-responsive border rounded">
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
@@ -371,6 +392,7 @@
                                 })();
                             </script>
                         @endpush
+                        @endif
                     @endif
                 </div>
             </div>

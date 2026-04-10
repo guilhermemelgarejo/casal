@@ -7,7 +7,6 @@ use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Couple;
 use App\Models\CreditCardStatement;
-use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,10 +45,9 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
         $refMonth = 6;
         $refYear = 2026;
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $catExpense->id,
             'account_id' => $checking->id,
             'description' => 'Supermercado',
             'amount' => '100.00',
@@ -58,7 +56,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'date' => Carbon::createFromDate($refYear, $refMonth, 5)->toDateString(),
             'reference_month' => $refMonth,
             'reference_year' => $refYear,
-        ]);
+        ], [['category_id' => $catExpense->id, 'amount' => '100.00']]);
 
         $stmt = CreditCardStatement::create([
             'couple_id' => $couple->id,
@@ -69,10 +67,9 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'paid_at' => null,
         ]);
 
-        $paymentTx = Transaction::create([
+        $paymentTx = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $catExpense->id,
             'account_id' => $checking->id,
             'description' => 'Pagamento fatura Visa (05/'.$refYear.')',
             'amount' => '500.00',
@@ -81,7 +78,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'date' => Carbon::createFromDate($refYear, $refMonth, 8)->toDateString(),
             'reference_month' => $refMonth,
             'reference_year' => $refYear,
-        ]);
+        ], [['category_id' => $catExpense->id, 'amount' => '500.00']]);
 
         $stmt->paymentTransactions()->attach($paymentTx->id);
 
@@ -129,10 +126,9 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
         $m = (int) date('m');
         $y = (int) date('Y');
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $cat->id,
             'account_id' => $checking->id,
             'description' => 'Item',
             'amount' => '40.00',
@@ -141,7 +137,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'date' => now()->toDateString(),
             'reference_month' => $m,
             'reference_year' => $y,
-        ]);
+        ], [['category_id' => $cat->id, 'amount' => '40.00']]);
 
         $stmt = CreditCardStatement::create([
             'couple_id' => $couple->id,
@@ -152,10 +148,9 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'paid_at' => null,
         ]);
 
-        $pay = Transaction::create([
+        $pay = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $cat->id,
             'account_id' => $checking->id,
             'description' => 'Pagamento fatura',
             'amount' => '200.00',
@@ -164,7 +159,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'date' => now()->toDateString(),
             'reference_month' => $m,
             'reference_year' => $y,
-        ]);
+        ], [['category_id' => $cat->id, 'amount' => '200.00']]);
         $stmt->paymentTransactions()->attach($pay->id);
 
         Budget::create([

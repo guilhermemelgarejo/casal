@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -35,7 +36,9 @@ class CreditCardInvoiceCategoryExclusionTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
             'funding' => 'account',
-            'category_id' => $catInvoice->id,
+            'category_allocations' => [
+                ['category_id' => $catInvoice->id, 'amount' => '10.00'],
+            ],
             'account_id' => $regular->id,
             'description' => 'Teste',
             'amount' => '10.00',
@@ -44,11 +47,8 @@ class CreditCardInvoiceCategoryExclusionTest extends TestCase
             'date' => '2026-04-05',
         ]);
 
-        $response->assertSessionHasErrors('category_id');
-        $this->assertDatabaseMissing('transactions', [
-            'couple_id' => $couple->id,
-            'category_id' => $catInvoice->id,
-        ]);
+        $response->assertSessionHasErrors('category_allocations');
+        $this->assertSame(0, Transaction::query()->where('couple_id', $couple->id)->count());
     }
 
     public function test_store_orcamento_rejeita_categoria_pagamento_fatura(): void

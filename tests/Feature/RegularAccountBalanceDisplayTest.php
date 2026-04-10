@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
-use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,10 +32,9 @@ class RegularAccountBalanceDisplayTest extends TestCase
             'color' => '#111111',
         ]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $cat->id,
             'account_id' => $account->id,
             'description' => 'Pix recebido',
             'amount' => 250,
@@ -45,7 +43,7 @@ class RegularAccountBalanceDisplayTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $cat->id, 'amount' => '250.00']]);
 
         $response = $this->actingAs($user)->get(route('accounts.index'));
 
@@ -74,10 +72,9 @@ class RegularAccountBalanceDisplayTest extends TestCase
             'color' => '#111111',
         ]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $cat->id,
             'account_id' => $account->id,
             'description' => 'Compra',
             'amount' => 40,
@@ -86,7 +83,7 @@ class RegularAccountBalanceDisplayTest extends TestCase
             'date' => '2026-03-01',
             'reference_month' => 3,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $cat->id, 'amount' => '40.00']]);
 
         $response = $this->actingAs($user)->get(route('transactions.index', [
             'month' => 4,

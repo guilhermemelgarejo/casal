@@ -51,9 +51,9 @@ class Category extends Model
         return $this->belongsTo(Couple::class);
     }
 
-    public function transactions()
+    public function transactionCategorySplits()
     {
-        return $this->hasMany(Transaction::class);
+        return $this->hasMany(TransactionCategorySplit::class);
     }
 
     public function budgets()

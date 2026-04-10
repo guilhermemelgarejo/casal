@@ -36,7 +36,9 @@ class TransactionReferencePeriodTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
             'funding' => 'credit_card',
-            'category_id' => $category->id,
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '100.00'],
+            ],
             'account_id' => $account->id,
             'description' => 'Compra',
             'amount' => 100,
@@ -94,7 +96,9 @@ class TransactionReferencePeriodTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
             'funding' => 'account',
-            'category_id' => $category->id,
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '10.00'],
+            ],
             'account_id' => $account->id,
             'description' => 'Compra',
             'amount' => 10,
@@ -129,7 +133,9 @@ class TransactionReferencePeriodTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('transactions.store'), [
             'funding' => 'credit_card',
-            'category_id' => $category->id,
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '5.00'],
+            ],
             'account_id' => $card->id,
             'description' => 'X',
             'amount' => 5,
@@ -165,7 +171,9 @@ class TransactionReferencePeriodTest extends TestCase
 
             $response = $this->actingAs($user)->post(route('transactions.store'), [
                 'funding' => 'credit_card',
-                'category_id' => $category->id,
+                'category_allocations' => [
+                    ['category_id' => $category->id, 'amount' => '50.00'],
+                ],
                 'account_id' => $card->id,
                 'description' => 'Item',
                 'amount' => 50,

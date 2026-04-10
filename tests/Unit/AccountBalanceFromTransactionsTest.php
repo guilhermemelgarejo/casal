@@ -5,7 +5,6 @@ namespace Tests\Unit;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
-use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -39,10 +38,9 @@ class AccountBalanceFromTransactionsTest extends TestCase
             'color' => '#111111',
         ]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $catInc->id,
             'account_id' => $account->id,
             'description' => 'Entrada',
             'amount' => 100,
@@ -51,12 +49,11 @@ class AccountBalanceFromTransactionsTest extends TestCase
             'date' => '2026-04-01',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $catInc->id, 'amount' => '100.00']]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $catExp->id,
             'account_id' => $account->id,
             'description' => 'Saída',
             'amount' => 30.5,
@@ -65,7 +62,7 @@ class AccountBalanceFromTransactionsTest extends TestCase
             'date' => '2026-04-02',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $catExp->id, 'amount' => '30.50']]);
 
         $balances = Account::balancesFromTransactionsByAccountId([$account->id]);
 
@@ -110,10 +107,9 @@ class AccountBalanceFromTransactionsTest extends TestCase
             'color' => '#111111',
         ]);
 
-        $tx = Transaction::create([
+        $tx = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $catExp->id,
             'account_id' => $account->id,
             'description' => 'Compra',
             'amount' => 25,
@@ -122,7 +118,7 @@ class AccountBalanceFromTransactionsTest extends TestCase
             'date' => '2026-04-01',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $catExp->id, 'amount' => '25.00']]);
 
         $account->refresh();
         $this->assertEqualsWithDelta(-25.0, (float) $account->balance, 0.001);

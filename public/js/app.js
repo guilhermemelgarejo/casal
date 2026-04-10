@@ -58,27 +58,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const typeSelect = document.getElementById('transaction-type');
-    const catSelect = document.getElementById('category_id');
-    if (typeSelect && catSelect) {
-        const filterCategories = (resetSelection) => {
+    const txFormSetup = document.getElementById('form-new-transaction');
+    const splitCatSelects = txFormSetup ? txFormSetup.querySelectorAll('.js-tx-split-cat') : [];
+
+    if (typeSelect) {
+        const filterSplitCats = (resetSelection) => {
             const t = typeSelect.value;
-            catSelect.querySelectorAll('option').forEach((opt) => {
-                if (!opt.value) {
-                    return;
+            splitCatSelects.forEach((sel) => {
+                sel.querySelectorAll('option').forEach((opt) => {
+                    if (!opt.value) {
+                        return;
+                    }
+                    opt.hidden = opt.dataset.type !== t;
+                });
+                if (resetSelection) {
+                    sel.value = '';
+                } else {
+                    const cur = sel.querySelector(`option[value="${sel.value}"]`);
+                    if (cur && cur.hidden) {
+                        sel.value = '';
+                    }
                 }
-                opt.hidden = opt.dataset.type !== t;
             });
-            if (resetSelection) {
-                catSelect.value = '';
-            } else {
-                const sel = catSelect.querySelector(`option[value="${catSelect.value}"]`);
-                if (sel && sel.hidden) {
-                    catSelect.value = '';
-                }
-            }
         };
-        typeSelect.addEventListener('change', () => filterCategories(true));
-        filterCategories(false);
+
+        typeSelect.addEventListener('change', () => filterSplitCats(true));
+        filterSplitCats(false);
+    }
+
+    const txAllocWrap = document.getElementById('tx-category-allocations-wrap');
+    const txAddCatRow = document.getElementById('tx-add-cat-row');
+    const txRemoveCatRow = document.getElementById('tx-remove-cat-row');
+    if (txAllocWrap && txAddCatRow && txRemoveCatRow) {
+        const allocRows = () => Array.from(txAllocWrap.querySelectorAll('.tx-cat-alloc-row'));
+
+        const visibleAllocRows = () => allocRows().filter((row) => !row.classList.contains('d-none'));
+
+        txAddCatRow.addEventListener('click', () => {
+            const hidden = allocRows().find((row) => row.classList.contains('d-none'));
+            if (!hidden) {
+                return;
+            }
+            hidden.classList.remove('d-none');
+        });
+
+        txRemoveCatRow.addEventListener('click', () => {
+            const vis = visibleAllocRows();
+            if (vis.length <= 1) {
+                return;
+            }
+            const last = vis[vis.length - 1];
+            last.classList.add('d-none');
+            const sel = last.querySelector('.js-tx-split-cat');
+            const amt = last.querySelector('.js-tx-split-amount');
+            if (sel) sel.value = '';
+            if (amt) amt.value = '';
+        });
     }
 
     const showIncome = document.getElementById('budget-income-display');
@@ -479,7 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const precheckUrl = txForm.dataset.creditLimitPrecheckUrl || '';
-        const typeSelect = document.getElementById('transaction-type');
 
         txForm.addEventListener('submit', async (e) => {
             if (txForm.dataset.txCreditLimitSubmitting === '1') {

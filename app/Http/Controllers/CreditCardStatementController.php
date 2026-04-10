@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
 
 class CreditCardStatementController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $couple = Auth::user()->couple;
         $coupleId = $couple->id;
@@ -26,7 +26,17 @@ class CreditCardStatementController extends Controller
             ->orderBy('name')
             ->get();
 
-        $cardIds = $cardAccounts->pluck('id')->all();
+        $filterCardId = null;
+        if ($request->filled('account_id')) {
+            $wanted = (int) $request->input('account_id');
+            if ($cardAccounts->contains(fn (Account $a) => (int) $a->id === $wanted)) {
+                $filterCardId = $wanted;
+            }
+        }
+
+        $cardIds = $filterCardId !== null
+            ? [$filterCardId]
+            : $cardAccounts->pluck('id')->all();
 
         $invoiceCycles = collect();
         if ($cardIds !== []) {
@@ -42,6 +52,7 @@ class CreditCardStatementController extends Controller
 
             $metaByKey = CreditCardStatement::query()
                 ->where('couple_id', $coupleId)
+                ->when($filterCardId !== null, fn ($q) => $q->where('account_id', $filterCardId))
                 ->with(['paymentTransactions.accountModel'])
                 ->get()
                 ->keyBy(fn (CreditCardStatement $s) => $this->cycleKey($s->account_id, $s->reference_year, $s->reference_month));
@@ -71,7 +82,8 @@ class CreditCardStatementController extends Controller
         return view('credit-card-statements.index', compact(
             'cardAccounts',
             'invoiceCycles',
-            'regularAccounts'
+            'regularAccounts',
+            'filterCardId'
         ));
     }
 
@@ -208,7 +220,6 @@ class CreditCardStatementController extends Controller
             $tx = Transaction::create([
                 'couple_id' => $coupleId,
                 'user_id' => Auth::id(),
-                'category_id' => $invoiceCategory->id,
                 'account_id' => $validated['account_id'],
                 'description' => $description,
                 'amount' => $amountStr,
@@ -217,6 +228,10 @@ class CreditCardStatementController extends Controller
                 'date' => $paidDate->toDateString(),
                 'reference_month' => $refMonth,
                 'reference_year' => $refYear,
+            ]);
+
+            $tx->syncCategorySplits([
+                ['category_id' => $invoiceCategory->id, 'amount' => $amountStr],
             ]);
 
             $meta->paymentTransactions()->attach($tx->id);

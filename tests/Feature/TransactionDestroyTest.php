@@ -34,10 +34,9 @@ class TransactionDestroyTest extends TestCase
             'color' => '#222',
         ]);
 
-        $purchase = Transaction::create([
+        $purchase = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra no cartão',
             'amount' => '80.00',
@@ -46,7 +45,7 @@ class TransactionDestroyTest extends TestCase
             'date' => '2026-04-05',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '80.00']]);
 
         CreditCardStatement::query()
             ->where('account_id', $card->id)
@@ -83,10 +82,9 @@ class TransactionDestroyTest extends TestCase
             'color' => '#222',
         ]);
 
-        $purchase = Transaction::create([
+        $purchase = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra',
             'amount' => '40.00',
@@ -95,7 +93,7 @@ class TransactionDestroyTest extends TestCase
             'date' => '2026-04-05',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '40.00']]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $purchase), [
             'installment_scope' => 'single',
@@ -131,10 +129,9 @@ class TransactionDestroyTest extends TestCase
             'color' => '#222',
         ]);
 
-        $payment = Transaction::create([
+        $payment = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $checking->id,
             'description' => 'Pagamento fatura',
             'amount' => '500.00',
@@ -143,7 +140,7 @@ class TransactionDestroyTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '500.00']]);
 
         $meta = CreditCardStatement::create([
             'couple_id' => $couple->id,
@@ -187,10 +184,9 @@ class TransactionDestroyTest extends TestCase
             'color' => '#222',
         ]);
 
-        $parent = Transaction::create([
+        $parent = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 1/2)',
             'amount' => '50.00',
@@ -200,12 +196,11 @@ class TransactionDestroyTest extends TestCase
             'reference_month' => 4,
             'reference_year' => 2026,
             'installment_parent_id' => null,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 2/2)',
             'amount' => '50.00',
@@ -215,7 +210,7 @@ class TransactionDestroyTest extends TestCase
             'reference_month' => 5,
             'reference_year' => 2026,
             'installment_parent_id' => $parent->id,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $parent), [
             'installment_scope' => 'single',
@@ -244,10 +239,9 @@ class TransactionDestroyTest extends TestCase
             'color' => '#222',
         ]);
 
-        $parent = Transaction::create([
+        $parent = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 1/2)',
             'amount' => '50.00',
@@ -257,12 +251,11 @@ class TransactionDestroyTest extends TestCase
             'reference_month' => 4,
             'reference_year' => 2026,
             'installment_parent_id' => null,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        $child = Transaction::create([
+        $child = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 2/2)',
             'amount' => '50.00',
@@ -272,7 +265,7 @@ class TransactionDestroyTest extends TestCase
             'reference_month' => 5,
             'reference_year' => 2026,
             'installment_parent_id' => $parent->id,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $child), [
             'installment_scope' => 'single',
@@ -302,10 +295,9 @@ class TransactionDestroyTest extends TestCase
             'color' => '#222',
         ]);
 
-        $parent = Transaction::create([
+        $parent = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 1/2)',
             'amount' => '50.00',
@@ -315,12 +307,11 @@ class TransactionDestroyTest extends TestCase
             'reference_month' => 4,
             'reference_year' => 2026,
             'installment_parent_id' => null,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        $child = Transaction::create([
+        $child = $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra (Parcela 2/2)',
             'amount' => '50.00',
@@ -330,7 +321,7 @@ class TransactionDestroyTest extends TestCase
             'reference_month' => 5,
             'reference_year' => 2026,
             'installment_parent_id' => $parent->id,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
         $response = $this->actingAs($user)->delete(route('transactions.destroy', $child), [
             'installment_scope' => 'all',

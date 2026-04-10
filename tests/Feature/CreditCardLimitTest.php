@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
-use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -80,10 +79,9 @@ class CreditCardLimitTest extends TestCase
 
         $this->assertSame('1000.00', $card->fresh()->credit_card_limit_available);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra',
             'amount' => '250.00',
@@ -92,7 +90,7 @@ class CreditCardLimitTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '250.00']]);
 
         $this->assertSame('750.00', $card->fresh()->credit_card_limit_available);
     }
@@ -101,10 +99,9 @@ class CreditCardLimitTest extends TestCase
     {
         extract($this->seedCoupleWithCardAndLimit('1000.00'));
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra grande',
             'amount' => '1200.00',
@@ -113,7 +110,7 @@ class CreditCardLimitTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '1200.00']]);
 
         $this->assertSame('-200.00', $card->fresh()->credit_card_limit_available);
     }
@@ -122,10 +119,9 @@ class CreditCardLimitTest extends TestCase
     {
         extract($this->seedCoupleWithCardAndLimit('1000.00'));
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra',
             'amount' => '400.00',
@@ -134,7 +130,7 @@ class CreditCardLimitTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '400.00']]);
 
         $this->assertSame('600.00', $card->fresh()->credit_card_limit_available);
 
@@ -152,10 +148,9 @@ class CreditCardLimitTest extends TestCase
     {
         extract($this->seedCoupleWithCardAndLimit('1000.00'));
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra',
             'amount' => '400.00',
@@ -164,7 +159,7 @@ class CreditCardLimitTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '400.00']]);
 
         $this->assertSame('600.00', $card->fresh()->credit_card_limit_available);
 
@@ -185,10 +180,9 @@ class CreditCardLimitTest extends TestCase
     {
         extract($this->seedCoupleWithCardAndLimit('1000.00'));
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra',
             'amount' => '600.00',
@@ -197,11 +191,13 @@ class CreditCardLimitTest extends TestCase
             'date' => '2026-04-10',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '600.00']]);
 
         $payload = [
             'funding' => 'credit_card',
-            'category_id' => $category->id,
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '500.00'],
+            ],
             'account_id' => $card->id,
             'description' => 'Outra compra',
             'amount' => '500',

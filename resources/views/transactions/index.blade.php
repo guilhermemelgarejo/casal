@@ -159,9 +159,13 @@
                                                         <div class="small text-muted">{{ $transaction->user->name }}</div>
                                                     </td>
                                                     <td>
-                                                        <span class="badge rounded-pill text-white" style="background-color: {{ $transaction->category->color ?? '#ccc' }}">
-                                                            {{ $transaction->category->name }}
-                                                        </span>
+                                                        <div class="d-flex flex-column gap-1 align-items-start">
+                                                            @forelse($transaction->categorySplits as $sp)
+                                                                <span class="badge rounded-pill text-white" style="background-color: {{ $sp->category->color ?? '#ccc' }}">{{ $sp->category->name }} · R$ {{ number_format((float) $sp->amount, 2, ',', '.') }}</span>
+                                                            @empty
+                                                                <span class="text-secondary small">—</span>
+                                                            @endforelse
+                                                        </div>
                                                     </td>
                                                     <td class="small">
                                                         @php $accRow = $transaction->accountModel; @endphp
@@ -300,9 +304,17 @@
 
     @php
         $openNewTransactionModal = $errors->hasAny([
-            'funding', 'category_id', 'account_id', 'description', 'amount', 'payment_method',
+            'funding', 'account_id', 'description', 'amount', 'payment_method',
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
+            'category_allocations',
         ]);
+        $txAllocVisibleRows = 1;
+        for ($r = 0; $r < 5; $r++) {
+            $ov = old('category_allocations.'.$r.'.category_id');
+            if ($ov !== null && $ov !== '') {
+                $txAllocVisibleRows = max($txAllocVisibleRows, $r + 1);
+            }
+        }
     @endphp
     <div class="modal fade" id="modalNewTransaction" tabindex="-1" aria-labelledby="modalNewTransactionLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -407,19 +419,51 @@
                                 </div>
 
                                 <div>
-                                    <x-input-label for="category_id" value="Categoria" />
-                                    <select id="category_id" name="category_id" class="form-select mt-1">
-                                        @foreach($categories as $c)
-                                            <option
-                                                value="{{ $c->id }}"
-                                                data-type="{{ $c->type }}"
-                                                {{ (string) old('category_id') === (string) $c->id ? 'selected' : '' }}
-                                            >
-                                                {{ $c->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    <x-input-error :messages="$errors->get('category_id')" class="mt-2" />
+                                    <x-input-label value="Categorias e valores" />
+                                    <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total. A quitação de fatura de cartão continua só em <a href="{{ route('credit-card-statements.index') }}">Faturas cartão</a>.</p>
+                                    <div id="tx-category-allocations-wrap">
+                                        @for($si = 0; $si < 5; $si++)
+                                            <div class="tx-cat-alloc-row row g-2 mb-2 align-items-end {{ $si < $txAllocVisibleRows ? '' : 'd-none' }}" data-tx-alloc-row="{{ $si }}">
+                                                <div class="col-md-7">
+                                                    <label class="form-label small text-secondary mb-0" for="tx-split-cat-{{ $si }}">Categoria {{ $si + 1 }}</label>
+                                                    <select
+                                                        id="tx-split-cat-{{ $si }}"
+                                                        name="category_allocations[{{ $si }}][category_id]"
+                                                        class="form-select mt-1 js-tx-split-cat"
+                                                    >
+                                                        <option value="" {{ old('category_allocations.'.$si.'.category_id') ? '' : 'selected' }}>Selecione…</option>
+                                                        @foreach($categories as $c)
+                                                            <option
+                                                                value="{{ $c->id }}"
+                                                                data-type="{{ $c->type }}"
+                                                                {{ (string) old('category_allocations.'.$si.'.category_id') === (string) $c->id ? 'selected' : '' }}
+                                                            >
+                                                                {{ $c->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-5">
+                                                    <label class="form-label small text-secondary mb-0" for="tx-split-amt-{{ $si }}">Valor (R$)</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0.01"
+                                                        name="category_allocations[{{ $si }}][amount]"
+                                                        id="tx-split-amt-{{ $si }}"
+                                                        class="form-control mt-1 js-tx-split-amount"
+                                                        value="{{ old('category_allocations.'.$si.'.amount') }}"
+                                                        placeholder="0,00"
+                                                    >
+                                                </div>
+                                            </div>
+                                        @endfor
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="tx-add-cat-row">Adicionar categoria</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="tx-remove-cat-row">Remover última linha</button>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('category_allocations')" class="mt-2" />
                                 </div>
 
                                 <div>

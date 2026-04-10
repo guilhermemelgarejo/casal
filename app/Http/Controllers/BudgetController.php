@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Category;
+use App\Models\TransactionCategorySplit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -23,13 +24,16 @@ class BudgetController extends Controller
             ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment())
             ->get();
 
-        $spentByCategory = $couple->transactions()
-            ->excludingCreditCardInvoicePayments()
-            ->where('reference_month', (int) date('m'))
-            ->where('reference_year', (int) date('Y'))
-            ->get(['category_id', 'amount'])
+        $spentByCategory = TransactionCategorySplit::query()
+            ->whereHas('transaction', function ($q) use ($couple) {
+                $q->where('couple_id', $couple->id)
+                    ->where('reference_month', (int) date('m'))
+                    ->where('reference_year', (int) date('Y'))
+                    ->excludingCreditCardInvoicePayments();
+            })
+            ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
-            ->map(fn ($rows) => $rows->sum('amount'));
+            ->pluck('total', 'category_id');
 
         return view('budgets.index', compact('categories', 'budgets', 'spentByCategory'));
     }

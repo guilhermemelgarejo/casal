@@ -157,7 +157,6 @@ class Transaction extends Model
     protected $fillable = [
         'couple_id',
         'user_id',
-        'category_id',
         'account_id',
         'description',
         'amount',
@@ -185,9 +184,23 @@ class Transaction extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function category()
+    /**
+     * @param  array<int, array{category_id: int, amount: string}>  $rows  amount com 2 casas decimais
+     */
+    public function syncCategorySplits(array $rows): void
     {
-        return $this->belongsTo(Category::class);
+        $this->categorySplits()->delete();
+        foreach ($rows as $row) {
+            $this->categorySplits()->create([
+                'category_id' => $row['category_id'],
+                'amount' => $row['amount'],
+            ]);
+        }
+    }
+
+    public function categorySplits()
+    {
+        return $this->hasMany(TransactionCategorySplit::class)->orderBy('id');
     }
 
     public function accountModel()

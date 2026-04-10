@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
-use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,10 +39,9 @@ class TransactionIndexFilterTest extends TestCase
             'color' => '#222222',
         ]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $accA->id,
             'description' => 'Lançamento exclusivo conta Alfa',
             'amount' => 10,
@@ -52,12 +50,11 @@ class TransactionIndexFilterTest extends TestCase
             'date' => '2026-04-15',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '10.00']]);
 
-        Transaction::create([
+        $this->createTransactionWithSplits([
             'couple_id' => $couple->id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $accB->id,
             'description' => 'Lançamento exclusivo conta Beta',
             'amount' => 20,
@@ -66,7 +63,7 @@ class TransactionIndexFilterTest extends TestCase
             'date' => '2026-04-16',
             'reference_month' => 4,
             'reference_year' => 2026,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => '20.00']]);
 
         $response = $this->actingAs($user)->get(route('transactions.index', [
             'month' => 4,

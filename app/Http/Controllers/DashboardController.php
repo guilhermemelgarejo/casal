@@ -24,7 +24,7 @@ class DashboardController extends Controller
             ->excludingCreditCardInvoicePayments()
             ->where('reference_month', $month)
             ->where('reference_year', $year)
-            ->with(['category', 'accountModel'])
+            ->with(['accountModel', 'categorySplits.category'])
             ->latest('date')
             ->get();
 
@@ -32,7 +32,7 @@ class DashboardController extends Controller
         $transactions = $couple->transactions()
             ->where('reference_month', $month)
             ->where('reference_year', $year)
-            ->with(['category', 'accountModel'])
+            ->with(['accountModel', 'categorySplits.category'])
             ->latest('date')
             ->get();
 

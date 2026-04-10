@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Support\PaymentMethods;
+use App\Support\TransactionCategorySplitDistribution;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,7 @@ class TransactionController extends Controller
         }
 
         $transactions = $couple->transactions()
-            ->with(['category', 'user', 'accountModel'])
+            ->with(['user', 'accountModel', 'categorySplits.category'])
             ->where('reference_month', $selectedMonth)
             ->where('reference_year', $selectedYear)
             ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
@@ -235,7 +236,9 @@ class TransactionController extends Controller
     {
         $request->validate([
             'funding' => ['required', 'string', Rule::in(['account', 'credit_card'])],
-            'category_id' => 'required|exists:categories,id',
+            'category_allocations' => 'required|array|max:5',
+            'category_allocations.*.category_id' => 'nullable|exists:categories,id',
+            'category_allocations.*.amount' => 'nullable|numeric|min:0.01',
             'account_id' => 'required|exists:accounts,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
@@ -248,19 +251,33 @@ class TransactionController extends Controller
             'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
         ]);
 
+        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $amountCents = (int) round(((float) $amountNormalized) * 100);
+
+        $allocParsed = $this->parseCategoryAllocations(
+            $request,
+            $amountCents,
+            (string) $request->type,
+            (int) Auth::user()->couple_id
+        );
+        if (isset($allocParsed['errors'])) {
+            return back()->withErrors($allocParsed['errors'])->withInput();
+        }
+
         $resolved = $this->resolveNewTransactionContext($request);
         if (isset($resolved['errors'])) {
             return back()->withErrors($resolved['errors'])->withInput();
         }
         $ctx = $resolved;
 
-        $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmed($request, $ctx);
+        $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmed($request, $ctx, $allocParsed['pairs']);
         if ($limitRedirect !== null) {
             return $limitRedirect;
         }
 
         $installmentParentId = null;
-        DB::transaction(function () use ($ctx, &$installmentParentId, $request) {
+        $pairs = $allocParsed['pairs'];
+        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs) {
             $installments = $ctx['installments'];
             $baseCents = $ctx['baseCents'];
             $remainderCents = $ctx['remainderCents'];
@@ -269,16 +286,26 @@ class TransactionController extends Controller
             $baseDescription = $ctx['baseDescription'];
             $paymentMethod = $ctx['paymentMethod'];
 
+            $parcelCentsList = [];
+            for ($j = 0; $j < $installments; $j++) {
+                $parcelCentsList[] = $baseCents + ($j === $installments - 1 ? $remainderCents : 0);
+            }
+
+            $perParcelSplits = TransactionCategorySplitDistribution::perParcel(
+                $ctx['amountCents'],
+                $pairs,
+                $parcelCentsList
+            );
+
             for ($i = 0; $i < $installments; $i++) {
                 $parcelIndex = $i + 1;
-                $cents = $baseCents + ($i === $installments - 1 ? $remainderCents : 0);
+                $cents = $parcelCentsList[$i];
                 $parcelAmount = number_format($cents / 100, 2, '.', '');
 
                 $ref = $referenceBase->copy()->addMonths($i);
                 $data = [
                     'couple_id' => Auth::user()->couple_id,
                     'user_id' => Auth::id(),
-                    'category_id' => $request->category_id,
                     'account_id' => $request->account_id,
                     'description' => $installments > 1
                         ? $baseDescription.' (Parcela '.$parcelIndex.'/'.$installments.')'
@@ -301,6 +328,15 @@ class TransactionController extends Controller
 
                 $created = Transaction::create($data);
 
+                $splitRows = [];
+                foreach ($perParcelSplits[$i] as $line) {
+                    $splitRows[] = [
+                        'category_id' => $line['category_id'],
+                        'amount' => number_format($line['cents'] / 100, 2, '.', ''),
+                    ];
+                }
+                $created->syncCategorySplits($splitRows);
+
                 if ($installments > 1 && $i === 0) {
                     $installmentParentId = $created->id;
                 }
@@ -318,7 +354,9 @@ class TransactionController extends Controller
         try {
             $request->validate([
                 'funding' => ['required', 'string', Rule::in(['account', 'credit_card'])],
-                'category_id' => 'required|exists:categories,id',
+                'category_allocations' => 'required|array|max:5',
+                'category_allocations.*.category_id' => 'nullable|exists:categories,id',
+                'category_allocations.*.amount' => 'nullable|numeric|min:0.01',
                 'account_id' => 'required|exists:accounts,id',
                 'description' => 'required|string|max:255',
                 'amount' => 'required|numeric|min:0.01',
@@ -336,6 +374,22 @@ class TransactionController extends Controller
             ], 422);
         }
 
+        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $amountCents = (int) round(((float) $amountNormalized) * 100);
+
+        $allocParsed = $this->parseCategoryAllocations(
+            $request,
+            $amountCents,
+            (string) $request->type,
+            (int) Auth::user()->couple_id
+        );
+        if (isset($allocParsed['errors'])) {
+            return response()->json([
+                'message' => 'Não foi possível validar o lançamento.',
+                'errors' => $allocParsed['errors'],
+            ], 422);
+        }
+
         $resolved = $this->resolveNewTransactionContext($request);
         if (isset($resolved['errors'])) {
             return response()->json([
@@ -345,7 +399,7 @@ class TransactionController extends Controller
         }
         $ctx = $resolved;
 
-        if (! $ctx['isCredit'] || $ctx['category']->type !== 'expense') {
+        if (! $ctx['isCredit'] || $request->type !== 'expense') {
             return response()->json(['overflow' => false]);
         }
 
@@ -375,7 +429,7 @@ class TransactionController extends Controller
                 'installments' => $ctx['installments'],
                 'reference_month' => $ctx['referenceMonth'],
                 'reference_year' => $ctx['referenceYear'],
-                'category_id' => (int) $request->category_id,
+                'category_allocations_signature' => $this->categoryAllocationsSignatureFromPairs($allocParsed['pairs']),
                 'description' => $ctx['baseDescription'],
                 'date' => $ctx['startDateStr'],
                 'type' => (string) $request->type,
@@ -397,17 +451,6 @@ class TransactionController extends Controller
      */
     private function resolveNewTransactionContext(Request $request): array
     {
-        $category = Category::find($request->category_id);
-        if (! $category || $category->couple_id !== Auth::user()->couple_id) {
-            abort(403);
-        }
-
-        if ($category->isCreditCardInvoicePayment()) {
-            return ['errors' => [
-                'category_id' => ['Esta categoria é reservada para pagamentos de fatura de cartão. Use Faturas de cartão para registar a quitação.'],
-            ]];
-        }
-
         $account = Account::find($request->account_id);
         if (! $account || $account->couple_id !== Auth::user()->couple_id) {
             abort(403);
@@ -446,12 +489,6 @@ class TransactionController extends Controller
             $paymentMethod = $request->payment_method;
         }
 
-        if ($category->type !== $request->type) {
-            return ['errors' => [
-                'category_id' => ['A categoria selecionada não corresponde ao tipo de lançamento (Receita/Despesa).'],
-            ]];
-        }
-
         $isCredit = $funding === 'credit_card';
         $installments = $isCredit ? (int) $request->input('installments', 1) : 1;
         if ($isCredit && $installments < 1) {
@@ -485,7 +522,6 @@ class TransactionController extends Controller
         $referenceBase = Carbon::createFromDate($referenceYear, $referenceMonth, 1);
 
         return [
-            'category' => $category,
             'account' => $account,
             'funding' => $funding,
             'paymentMethod' => $paymentMethod,
@@ -507,7 +543,7 @@ class TransactionController extends Controller
     /**
      * Bloqueia gravação se ultrapassar o limite sem token válido (confirmação via precheck + Swal).
      */
-    private function rejectCreditCardLimitIfUnconfirmed(Request $request, array $ctx): ?RedirectResponse
+    private function rejectCreditCardLimitIfUnconfirmed(Request $request, array $ctx, array $allocationPairs): ?RedirectResponse
     {
         if (! $ctx['isCredit'] || $request->type !== 'expense') {
             return null;
@@ -539,6 +575,7 @@ class TransactionController extends Controller
             $ctx['referenceYear'],
             $ctx['startDateStr'],
             $ctx['baseDescription'],
+            $allocationPairs,
         )) {
             session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING);
 
@@ -633,6 +670,7 @@ class TransactionController extends Controller
         int $referenceYear,
         string $startDateStr,
         string $baseDescription,
+        array $allocationPairs,
     ): bool {
         if (! is_array($pending) || ! isset($pending['token'], $pending['purchase_total'])) {
             return false;
@@ -642,14 +680,97 @@ class TransactionController extends Controller
             return false;
         }
 
+        $sigCurrent = $this->categoryAllocationsSignatureFromPairs($allocationPairs);
+        if (! array_key_exists('category_allocations_signature', $pending)) {
+            return false;
+        }
+        $sigOk = hash_equals((string) $pending['category_allocations_signature'], $sigCurrent);
+
         return (int) $pending['account_id'] === (int) $request->account_id
             && (string) $pending['purchase_total'] === $purchaseTotal
             && (int) $pending['installments'] === $installments
             && (int) $pending['reference_month'] === $referenceMonth
             && (int) $pending['reference_year'] === $referenceYear
-            && (int) $pending['category_id'] === (int) $request->category_id
+            && $sigOk
             && (string) $pending['description'] === $baseDescription
             && (string) $pending['date'] === $startDateStr
             && ($pending['type'] ?? '') === (string) $request->type;
+    }
+
+    /**
+     * @return array{errors: array<string, array<int, string>>}|array{pairs: array<int, array{category_id: int, cents: int}>}
+     */
+    private function parseCategoryAllocations(Request $request, int $amountCents, string $type, int $coupleId): array
+    {
+        if ($amountCents < 1) {
+            return ['errors' => ['amount' => ['Valor inválido.']]];
+        }
+
+        $raw = $request->input('category_allocations', []);
+        if (! is_array($raw)) {
+            return ['errors' => ['category_allocations' => ['Dados de categorias inválidos.']]];
+        }
+
+        $pairs = [];
+        $sum = 0;
+
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                return ['errors' => ['category_allocations' => ['Dados de categorias inválidos.']]];
+            }
+            $cid = isset($row['category_id']) ? (int) $row['category_id'] : 0;
+            $amtStr = isset($row['amount']) ? trim((string) $row['amount']) : '';
+            if ($cid < 1 && $amtStr === '') {
+                continue;
+            }
+            if ($cid < 1 || $amtStr === '') {
+                return ['errors' => ['category_allocations' => ['Cada linha utilizada precisa de categoria e valor maior que zero.']]];
+            }
+            $cRow = (int) round(((float) str_replace(',', '.', $amtStr)) * 100);
+            if ($cRow < 1) {
+                return ['errors' => ['category_allocations' => ['Cada linha utilizada precisa de categoria e valor maior que zero.']]];
+            }
+
+            $category = Category::find($cid);
+            if (! $category || $category->couple_id !== $coupleId) {
+                return ['errors' => ['category_allocations' => ['Categoria inválida.']]];
+            }
+            if ($category->isCreditCardInvoicePayment()) {
+                return ['errors' => ['category_allocations' => ['Não é possível usar a categoria de quitação de fatura neste lançamento.']]];
+            }
+            if ($category->type !== $type) {
+                return ['errors' => ['category_allocations' => ['Todas as categorias devem ser do mesmo tipo (Receita ou Despesa).']]];
+            }
+
+            $pairs[] = ['category_id' => $cid, 'cents' => $cRow];
+            $sum += $cRow;
+        }
+
+        if (count($pairs) < 1) {
+            return ['errors' => ['category_allocations' => ['Indique pelo menos uma categoria com valor.']]];
+        }
+
+        if (count($pairs) > 5) {
+            return ['errors' => ['category_allocations' => ['No máximo 5 categorias por lançamento.']]];
+        }
+
+        if ($sum !== $amountCents) {
+            return ['errors' => ['category_allocations' => ['A soma dos valores por categoria deve ser exatamente igual ao valor total do lançamento.']]];
+        }
+
+        return ['pairs' => $pairs];
+    }
+
+    /**
+     * @param  array<int, array{category_id: int, cents: int}>  $pairs
+     */
+    private function categoryAllocationsSignatureFromPairs(array $pairs): string
+    {
+        $norm = array_map(fn ($p) => [
+            'category_id' => (int) $p['category_id'],
+            'cents' => (int) $p['cents'],
+        ], $pairs);
+
+        return json_encode($norm, JSON_UNESCAPED_UNICODE);
     }
 }

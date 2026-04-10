@@ -54,10 +54,9 @@ class CreditCardStatementTest extends TestCase
 
     private function cardExpense(User $user, Account $card, Category $category, int $month, int $year, string $amount = '100.00'): Transaction
     {
-        return Transaction::create([
+        return $this->createTransactionWithSplits([
             'couple_id' => $user->couple_id,
             'user_id' => $user->id,
-            'category_id' => $category->id,
             'account_id' => $card->id,
             'description' => 'Compra cartão',
             'amount' => $amount,
@@ -66,7 +65,7 @@ class CreditCardStatementTest extends TestCase
             'date' => sprintf('%04d-%02d-10', $year, $month),
             'reference_month' => $month,
             'reference_year' => $year,
-        ]);
+        ], [['category_id' => $category->id, 'amount' => $amount]]);
     }
 
     public function test_index_lista_fatura_a_partir_de_lancamento_no_cartao(): void
@@ -83,6 +82,41 @@ class CreditCardStatementTest extends TestCase
             ->assertOk()
             ->assertSee('R$ 150,50', false)
             ->assertSee('04/2026', false);
+    }
+
+    public function test_index_filtra_por_cartao(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        $card2 = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Master',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#444',
+        ]);
+
+        $this->cardExpense($user, $card, $category, 4, 2026, '100.00');
+        $this->cardExpense($user, $card2, $category, 5, 2026, '200.00');
+
+        $this->actingAs($user)->get(route('credit-card-statements.index'))
+            ->assertOk()
+            ->assertSee('04/2026', false)
+            ->assertSee('05/2026', false);
+
+        $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
+            ->assertOk()
+            ->assertSee('04/2026', false)
+            ->assertDontSee('05/2026', false);
+
+        $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card2->id]))
+            ->assertOk()
+            ->assertSee('05/2026', false)
+            ->assertDontSee('04/2026', false);
+
+        $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => 9_999_999]))
+            ->assertOk()
+            ->assertSee('04/2026', false)
+            ->assertSee('05/2026', false);
     }
 
     public function test_materialize_preserva_vencimento_ja_definido(): void
@@ -243,7 +277,8 @@ class CreditCardStatementTest extends TestCase
         $tx = $meta->paymentTransactions()->first();
         $this->assertNotNull($tx);
         $this->assertSame($checking->id, $tx->account_id);
-        $this->assertSame($invoiceCategory->id, $tx->category_id);
+        $this->assertSame($invoiceCategory->id, (int) $tx->categorySplits()->value('category_id'));
+        $this->assertEquals(300.0, (float) $tx->categorySplits()->value('amount'));
         $this->assertEquals(300.0, (float) $tx->amount);
         $this->assertStringContainsString('Pagamento fatura', $tx->description);
     }
