@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\TransactionCategorySplit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -11,11 +12,33 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $all = Auth::user()->couple->categories;
+        $couple = Auth::user()->couple;
+        $all = $couple->categories;
         $categoriesIncome = $all->where('type', 'income')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $categoriesExpense = $all->where('type', 'expense')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
 
-        return view('categories.index', compact('categoriesIncome', 'categoriesExpense'));
+        $budgets = $couple->budgets()
+            ->where('month', date('m'))
+            ->where('year', date('Y'))
+            ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment())
+            ->get();
+        $spentByCategory = TransactionCategorySplit::query()
+            ->whereHas('transaction', function ($q) use ($couple) {
+                $q->where('couple_id', $couple->id)
+                    ->where('reference_month', (int) date('m'))
+                    ->where('reference_year', (int) date('Y'))
+                    ->excludingCreditCardInvoicePayments();
+            })
+            ->selectRaw('category_id, SUM(amount) as total')
+            ->groupBy('category_id')
+            ->pluck('total', 'category_id');
+
+        return view('categories.index', compact(
+            'categoriesIncome',
+            'categoriesExpense',
+            'budgets',
+            'spentByCategory',
+        ));
     }
 
     public function store(Request $request)

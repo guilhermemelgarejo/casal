@@ -16,7 +16,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_pagamento_de_fatura_nao_entra_em_totais_do_dashboard_e_lancamentos(): void
+    public function test_pagamento_de_fatura_entra_nos_kpis_do_dashboard_e_lista_sem_soma_errada(): void
     {
         $couple = Couple::factory()->create();
         $user = User::factory()->create(['couple_id' => $couple->id]);
@@ -87,7 +87,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
         $dash = $this->actingAs($user)->get(route('dashboard', ['period' => $period]));
         $dash->assertOk();
         $dash->assertSee('R$ 100,00', false);
-        $dash->assertDontSee('R$ 600,00', false);
+        $dash->assertSee('R$ 600,00', false);
         $dash->assertSee('Pagamento fatura Visa', false);
         $dash->assertSee('R$ 500,00', false);
 
@@ -170,7 +170,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'year' => date('Y'),
         ]);
 
-        $page = $this->actingAs($user)->get(route('budgets.index'));
+        $page = $this->actingAs($user)->followingRedirects()->get(route('budgets.index'));
         $page->assertOk();
         $page->assertSee('R$ 40,00', false);
         $page->assertDontSee('R$ 240,00', false);

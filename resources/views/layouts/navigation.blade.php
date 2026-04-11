@@ -48,11 +48,6 @@
                     </x-nav-link>
                 </li>
                 <li class="nav-item">
-                    <x-nav-link :href="route('budgets.index')" :active="request()->routeIs('budgets.*')">
-                        Orçamentos
-                    </x-nav-link>
-                </li>
-                <li class="nav-item">
                     <x-nav-link :href="route('couple.index')" :active="request()->routeIs('couple.*')">
                         Casal
                     </x-nav-link>

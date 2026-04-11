@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Category;
-use App\Models\TransactionCategorySplit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -12,30 +11,9 @@ class BudgetController extends Controller
 {
     public function index()
     {
-        $couple = Auth::user()->couple;
-        $categories = $couple->categories()
-            ->where('type', 'expense')
-            ->excludingCreditCardInvoicePayment()
-            ->orderBy('name')
-            ->get();
-        $budgets = $couple->budgets()
-            ->where('month', date('m'))
-            ->where('year', date('Y'))
-            ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment())
-            ->get();
-
-        $spentByCategory = TransactionCategorySplit::query()
-            ->whereHas('transaction', function ($q) use ($couple) {
-                $q->where('couple_id', $couple->id)
-                    ->where('reference_month', (int) date('m'))
-                    ->where('reference_year', (int) date('Y'))
-                    ->excludingCreditCardInvoicePayments();
-            })
-            ->selectRaw('category_id, SUM(amount) as total')
-            ->groupBy('category_id')
-            ->pluck('total', 'category_id');
-
-        return view('budgets.index', compact('categories', 'budgets', 'spentByCategory'));
+        return redirect()
+            ->route('categories.index')
+            ->withFragment('orcamento');
     }
 
     public function store(Request $request)
@@ -51,9 +29,13 @@ class BudgetController extends Controller
         }
 
         if ($category->isCreditCardInvoicePayment()) {
-            return back()->withErrors([
-                'category_id' => 'Esta categoria é reservada para pagamentos de fatura de cartão. Use outra categoria no orçamento.',
-            ])->withInput();
+            return redirect()
+                ->route('categories.index')
+                ->withFragment('orcamento')
+                ->withErrors([
+                    'category_id' => 'Esta categoria é reservada para pagamentos de fatura de cartão. Use outra categoria no orçamento.',
+                ])
+                ->withInput();
         }
 
         Budget::updateOrCreate(
@@ -66,7 +48,10 @@ class BudgetController extends Controller
             ['amount' => $request->amount]
         );
 
-        return back()->with('success', 'Orçamento atualizado!');
+        return redirect()
+            ->route('categories.index')
+            ->withFragment('orcamento')
+            ->with('success', 'Orçamento atualizado!');
     }
 
     public function updateIncome(Request $request)
@@ -79,6 +64,9 @@ class BudgetController extends Controller
             'monthly_income' => $request->monthly_income,
         ]);
 
-        return back()->with('success', 'Renda mensal atualizada!');
+        return redirect()
+            ->route('categories.index')
+            ->withFragment('orcamento')
+            ->with('success', 'Renda mensal atualizada!');
     }
 }

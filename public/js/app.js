@@ -12,10 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const catForm = document.getElementById('category-form');
-    if (catForm) {
+    const catModal = document.getElementById('modalCategoryForm');
+    if (catForm && catModal && bs?.Modal) {
         const storeUrl = catForm.dataset.storeUrl || '';
         const titleEl = document.getElementById('category-form-title');
         const cancelBtn = document.getElementById('category-cancel-edit');
+        const submitLbl = document.getElementById('category-submit-label');
+        const formModeInput = catForm.querySelector('#category-form-mode');
+        const editingIdInput = catForm.querySelector('#category-editing-id');
         let methodField = catForm.querySelector('input[name="_method"]');
 
         const reset = () => {
@@ -24,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 methodField.remove();
                 methodField = null;
             }
+            if (formModeInput) formModeInput.value = 'category-store';
+            if (editingIdInput) editingIdInput.value = '';
             const nameIn = catForm.querySelector('#name');
             if (nameIn) nameIn.value = '';
             const typeEl = catForm.querySelector('#type');
@@ -32,7 +38,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (colorEl) colorEl.value = '#000000';
             if (titleEl) titleEl.textContent = titleEl.dataset.titleNew || 'Nova categoria';
             if (cancelBtn) cancelBtn.classList.add('d-none');
+            if (submitLbl) submitLbl.textContent = 'Salvar';
         };
+
+        const openCategoryModal = () => {
+            bs.Modal.getOrCreateInstance(catModal).show();
+        };
+
+        document.getElementById('btn-new-category')?.addEventListener('click', () => {
+            reset();
+        });
+
+        catModal.addEventListener('show.bs.modal', (e) => {
+            const trigger = e.relatedTarget;
+            if (trigger && trigger.id === 'btn-new-category') {
+                reset();
+            }
+        });
 
         document.querySelectorAll('[data-edit-category]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -42,9 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     methodField = document.createElement('input');
                     methodField.type = 'hidden';
                     methodField.name = '_method';
-                    methodField.value = 'PUT';
                     catForm.appendChild(methodField);
                 }
+                methodField.value = 'PUT';
+                if (formModeInput) formModeInput.value = 'category-update';
+                if (editingIdInput) editingIdInput.value = String(cat.id);
                 const nameIn = catForm.querySelector('#name');
                 if (nameIn) nameIn.value = cat.name;
                 const typeIn = catForm.querySelector('#type');
@@ -53,13 +77,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (colorIn) colorIn.value = cat.color || '#000000';
                 if (titleEl) titleEl.textContent = titleEl.dataset.titleEdit || 'Editar categoria';
                 if (cancelBtn) cancelBtn.classList.remove('d-none');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                if (submitLbl) submitLbl.textContent = 'Atualizar';
+                openCategoryModal();
             });
         });
 
         cancelBtn?.addEventListener('click', (e) => {
             e.preventDefault();
             reset();
+            bs.Modal.getOrCreateInstance(catModal).hide();
+        });
+
+        if (catModal.dataset.openOnLoad === '1') {
+            bs.Modal.getOrCreateInstance(catModal).show();
+        }
+
+        catModal.addEventListener('shown.bs.modal', () => {
+            catForm.querySelector('#name')?.focus();
         });
     }
 
@@ -187,10 +221,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-income-edit')?.addEventListener('click', () => {
         showIncome?.classList.add('d-none');
         editIncome?.classList.remove('d-none');
+        editIncome?.classList.add('d-flex');
     });
     document.getElementById('btn-income-cancel')?.addEventListener('click', () => {
         showIncome?.classList.remove('d-none');
         editIncome?.classList.add('d-none');
+        editIncome?.classList.remove('d-flex');
     });
 
     const copyBtn = document.getElementById('copy-invite-link');

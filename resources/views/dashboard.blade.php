@@ -10,7 +10,7 @@
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
             <div>
                 <h2 class="h5 mb-0 dashboard-title">Painel</h2>
-                <p class="small text-secondary mb-0 mt-1">Resumo de <span class="text-body fw-medium">{{ $periodLabel }}</span> — receitas, despesas e movimentação por conta.</p>
+                <p class="small text-secondary mb-0 mt-1"><span class="text-body fw-medium">{{ $periodLabel }}</span></p>
             </div>
 
             <form action="{{ route('dashboard') }}" method="GET" class="dashboard-toolbar ms-lg-auto">
@@ -123,80 +123,6 @@
                                 <p class="h4 mb-0 fw-semibold {{ $balance >= 0 ? 'text-primary' : 'text-danger' }}">R$ {{ number_format($balance, 2, ',', '.') }}</p>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            @php
-                $spendingAccountsSum = $spendingByAccount->sum('total');
-            @endphp
-            <div class="card border-0 shadow-sm mb-4 rounded-4 overflow-hidden">
-                <div class="px-4 py-3 dashboard-spending-header">
-                    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-                        <div>
-                            <h3 class="h5 mb-1 fw-semibold">Onde vocês gastaram</h3>
-                            <p class="small text-secondary mb-0">Despesas do período por conta (sem pagamentos de fatura de cartão).</p>
-                        </div>
-                        @if($spendingAccountsSum > 0)
-                            <span class="badge rounded-pill bg-body-secondary text-body border px-3 py-2 fw-semibold">
-                                R$ {{ number_format($spendingAccountsSum, 2, ',', '.') }}
-                                <span class="fw-normal text-secondary ms-1 d-none d-sm-inline">no período</span>
-                            </span>
-                        @endif
-                    </div>
-                </div>
-                <div class="card-body p-3 p-md-4">
-                    <div class="row g-3">
-                    @forelse($spendingByAccount as $item)
-                        @php
-                            $rowPct = $spendingAccountsSum > 0 ? ($item['total'] / $spendingAccountsSum) * 100 : 0;
-                        @endphp
-                        <div class="col-12 col-md-6 col-lg-4">
-                        @if($item['is_credit_card'])
-                            <a
-                                href="{{ route('credit-card-statements.index', ['account_id' => $item['account_id']]) }}"
-                                class="dashboard-spending-item dashboard-spending-item--link rounded-4 p-3 h-100 bg-body-tertiary bg-opacity-25 border border-secondary-subtle d-block text-decoration-none text-body"
-                                aria-label="Abrir faturas do cartão {{ $item['account_name'] }}"
-                            >
-                        @else
-                            <a
-                                href="{{ route('transactions.index', ['month' => $month, 'year' => $year, 'account_id' => $item['account_id']]) }}"
-                                class="dashboard-spending-item dashboard-spending-item--link rounded-4 p-3 h-100 bg-body-tertiary bg-opacity-25 border border-secondary-subtle d-block text-decoration-none text-body"
-                                aria-label="Abrir lançamentos filtrados pela conta {{ $item['account_name'] }}"
-                            >
-                        @endif
-                            <div class="d-flex align-items-stretch gap-3">
-                                <div class="rounded-2 flex-shrink-0 align-self-stretch" style="width: 5px; min-height: 3.25rem; background-color: {{ $item['account_color'] }};" aria-hidden="true"></div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                                        <span class="fw-semibold text-body">{{ $item['account_name'] }}</span>
-                                        @if($item['is_credit_card'])
-                                            <span class="badge rounded-pill px-2 py-1 fw-normal small border-0 bg-primary-subtle text-primary-emphasis">Cartão de crédito</span>
-                                        @else
-                                            <span class="badge rounded-pill px-2 py-1 fw-normal small border-0 bg-secondary-subtle text-secondary-emphasis">Conta</span>
-                                        @endif
-                                    </div>
-                                    <div class="progress rounded-pill bg-body-secondary" style="height: 6px;" role="presentation">
-                                        <div class="progress-bar rounded-pill" style="width: {{ number_format(min($rowPct, 100), 4, '.', '') }}%; background-color: {{ $item['account_color'] }};"></div>
-                                    </div>
-                                </div>
-                                <div class="text-end flex-shrink-0 d-flex flex-column justify-content-center">
-                                    <span class="fw-semibold text-body text-nowrap">R$ {{ number_format($item['total'], 2, ',', '.') }}</span>
-                                    @if($spendingAccountsSum > 0)
-                                        <span class="small text-secondary">{{ number_format($rowPct, 0, ',', '.') }}%</span>
-                                    @endif
-                                </div>
-                            </div>
-                        </a>
-                        </div>
-                    @empty
-                        <div class="col-12">
-                            <div class="dashboard-spending-empty text-center text-secondary py-5 px-3 mb-0">
-                                <p class="fw-semibold text-body mb-1">Nenhuma despesa por conta neste período</p>
-                                <p class="small mb-0 mx-auto" style="max-width: 26rem;">Os totais acima já refletem o mês de referência. Quando houver despesas associadas a contas, elas aparecem aqui com a parte de cada uma.</p>
-                            </div>
-                        </div>
-                    @endforelse
                     </div>
                 </div>
             </div>

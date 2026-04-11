@@ -22,9 +22,7 @@ class DashboardController extends Controller
         $month = intval($parts[1] ?? date('m'));
 
         $statsTransactions = $couple->transactions()
-            ->excludingCreditCardInvoicePayments()
-            ->where('reference_month', $month)
-            ->where('reference_year', $year)
+            ->whereMatchesDashboardKpiPeriod($month, $year)
             ->with(['accountModel', 'categorySplits.category'])
             ->latest('date')
             ->get();
@@ -56,30 +54,6 @@ class DashboardController extends Controller
         $thresholdAmount = ($income * $thresholdPercentage) / 100;
         $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
 
-        $spendingByAccount = $statsTransactions->where('type', 'expense')
-            ->whereNotNull('account_id')
-            ->groupBy('account_id')
-            ->map(function ($accountTransactions) {
-                $account = $accountTransactions->first()->accountModel;
-                if (! $account) {
-                    return null;
-                }
-
-                return [
-                    'account_id' => (int) $account->id,
-                    'account_name' => $account->name,
-                    'account_color' => $account->color,
-                    'is_credit_card' => $account->isCreditCard(),
-                    'account_kind_label' => $account->isCreditCard()
-                        ? 'Cartão de crédito'
-                        : 'Conta',
-                    'total' => (float) $accountTransactions->sum('amount'),
-                ];
-            })
-            ->filter()
-            ->sortByDesc('total')
-            ->values();
-
         return view('dashboard', array_merge(
             compact(
                 'couple',
@@ -87,7 +61,6 @@ class DashboardController extends Controller
                 'totalIncome',
                 'totalExpense',
                 'balance',
-                'spendingByAccount',
                 'period',
                 'month',
                 'year',

@@ -48,6 +48,8 @@ class RegularAccountBalanceDisplayTest extends TestCase
         $response = $this->actingAs($user)->get(route('accounts.index'));
 
         $response->assertOk();
+        $response->assertSee('Nova conta ou cartão', false);
+        $response->assertSee('modalNewAccount', false);
         $response->assertSee('Saldo atual', false);
         $response->assertSee('R$ 250,00', false);
         $response->assertSee('Nubank CC', false);
