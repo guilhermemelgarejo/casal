@@ -1,6 +1,6 @@
 {{--
     Informação pública sobre plano (trial + mensal).
-    @var bool $compact  Bloco curto para formulário estreito (ex.: registo).
+    @var bool $compact  Bloco curto para formulário estreito (ex.: registro).
 --}}
 @php
     $compact = $compact ?? false;
@@ -40,7 +40,7 @@
                                 <div class="card-body p-4">
                                     <div class="feature-icon mb-3">💳</div>
                                     <h3 class="h6 fw-bold">Cartão no checkout</h3>
-                                    <p class="text-secondary small mb-0">Registo do cartão num fluxo seguro (Stripe). Um membro do casal basta para ativar o acesso dos dois.</p>
+                                    <p class="text-secondary small mb-0">Registro do cartão num fluxo seguro (Stripe). Um membro do casal basta para ativar o acesso dos dois.</p>
                                 </div>
                             </div>
                         </div>

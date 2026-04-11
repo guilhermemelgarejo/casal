@@ -26,7 +26,7 @@ class CreditCardStatement extends Model
     }
 
     /**
-     * Atualiza {@see $spent_total} na fatura desse ciclo, se existir registo.
+     * Atualiza {@see $spent_total} na fatura desse ciclo, se existir registro.
      */
     public static function refreshSpentTotalForCycle(int $coupleId, int $accountId, int $referenceMonth, int $referenceYear): void
     {
@@ -41,9 +41,9 @@ class CreditCardStatement extends Model
     }
 
     /**
-     * Garante um registo de metadados para o ciclo (cartão + mês/ano de referência).
+     * Garante um registro de metadados para o ciclo (cartão + mês/ano de referência).
      * Na criação, define due_date com base no dia configurado no cartão (mesmo mês da referência).
-     * Se o registo já existia sem vencimento, preenche com a sugestão atual.
+     * Se o registro já existia sem vencimento, preenche com a sugestão atual.
      * Atualiza sempre o total materializado ({@see $spent_total}) com a soma das despesas no cartão.
      */
     public static function materializeForCycle(Account $account, int $referenceMonth, int $referenceYear): self
@@ -139,6 +139,14 @@ class CreditCardStatement extends Model
     public function hasPartialPayments(): bool
     {
         return $this->paymentTransactions()->exists() && ! $this->isFullyPaidByPayments();
+    }
+
+    /**
+     * Impede editar apenas o valor das despesas desse ciclo: há pagamento vinculado ou fatura quitada.
+     */
+    public function blocksEditingCardExpenses(): bool
+    {
+        return $this->paymentTransactions()->exists() || $this->isPaid();
     }
 
     /**

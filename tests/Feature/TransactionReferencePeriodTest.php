@@ -62,7 +62,7 @@ class TransactionReferencePeriodTest extends TestCase
         $this->assertTrue(Transaction::query()
             ->where('couple_id', $couple->id)
             ->where('description', 'Compra (Parcela 2/2)')
-            ->whereDate('date', '2026-05-20')
+            ->whereDate('date', '2026-04-20')
             ->where('reference_month', 6)
             ->where('reference_year', 2026)
             ->exists());

@@ -39,6 +39,7 @@ class CreditCardStatementController extends Controller
             : $cardAccounts->pluck('id')->all();
 
         $invoiceCycles = collect();
+        $invoiceCycleLinesByKey = [];
         if ($cardIds !== []) {
             $periodRows = Transaction::query()
                 ->where('couple_id', $coupleId)
@@ -50,6 +51,44 @@ class CreditCardStatementController extends Controller
                 ->orderByDesc('reference_month')
                 ->get();
 
+            $linesByKey = collect();
+            if ($periodRows->isNotEmpty()) {
+                $linesQuery = Transaction::query()
+                    ->where('couple_id', $coupleId)
+                    ->where('type', 'expense')
+                    ->whereIn('account_id', $cardIds)
+                    ->where(function ($q) use ($periodRows) {
+                        foreach ($periodRows as $row) {
+                            $q->orWhere(function ($qq) use ($row) {
+                                $qq->where('account_id', (int) $row->account_id)
+                                    ->where('reference_month', (int) $row->reference_month)
+                                    ->where('reference_year', (int) $row->reference_year);
+                            });
+                        }
+                    });
+
+                $linesByKey = $linesQuery
+                    ->orderBy('date')
+                    ->orderBy('id')
+                    ->get()
+                    ->groupBy(fn (Transaction $t) => $this->cycleKey((int) $t->account_id, (int) $t->reference_year, (int) $t->reference_month))
+                    ->map(fn ($items) => $items->map(fn (Transaction $t) => [
+                        'date' => $t->date->format('d/m/Y'),
+                        'description' => $t->description,
+                        'parcel_label' => self::parcelLabelFromDescription((string) $t->description),
+                        'ref_label' => sprintf('%02d/%d', (int) $t->reference_month, (int) $t->reference_year),
+                        'amount' => (float) $t->amount,
+                        'amount_str' => number_format((float) $t->amount, 2, ',', '.'),
+                        'transactions_url' => route('transactions.index', [
+                            'month' => (int) $t->date->month,
+                            'year' => (int) $t->date->year,
+                            'account_id' => (int) $t->account_id,
+                        ]),
+                    ])->values()->all());
+
+                $invoiceCycleLinesByKey = $linesByKey->all();
+            }
+
             $metaByKey = CreditCardStatement::query()
                 ->where('couple_id', $coupleId)
                 ->when($filterCardId !== null, fn ($q) => $q->where('account_id', $filterCardId))
@@ -59,17 +98,19 @@ class CreditCardStatementController extends Controller
 
             $accountsById = $cardAccounts->keyBy('id');
 
-            $invoiceCycles = $periodRows->map(function ($row) use ($metaByKey, $accountsById) {
-                $key = $this->cycleKey($row->account_id, $row->reference_year, $row->reference_month);
+            $invoiceCycles = $periodRows->map(function ($row) use ($metaByKey, $accountsById, $linesByKey) {
+                $key = $this->cycleKey((int) $row->account_id, (int) $row->reference_year, (int) $row->reference_month);
                 $meta = $metaByKey->get($key);
                 $liveTotal = (float) $row->spent_total;
 
                 return (object) [
+                    'cycle_key' => $key,
                     'account' => $accountsById[$row->account_id],
                     'reference_month' => (int) $row->reference_month,
                     'reference_year' => (int) $row->reference_year,
                     'spent_total' => $meta !== null ? (float) $meta->spent_total : $liveTotal,
                     'meta' => $meta,
+                    'cycle_lines' => $linesByKey->get($key, []),
                 ];
             });
         }
@@ -82,6 +123,7 @@ class CreditCardStatementController extends Controller
         return view('credit-card-statements.index', compact(
             'cardAccounts',
             'invoiceCycles',
+            'invoiceCycleLinesByKey',
             'regularAccounts',
             'filterCardId'
         ));
@@ -271,6 +313,15 @@ class CreditCardStatementController extends Controller
     private function cycleKey(int $accountId, int $referenceYear, int $referenceMonth): string
     {
         return $accountId.'-'.$referenceYear.'-'.$referenceMonth;
+    }
+
+    private static function parcelLabelFromDescription(string $description): string
+    {
+        if (preg_match('/\(Parcela\s+(\d+)\/(\d+)\)\s*$/u', $description, $m)) {
+            return $m[1].'/'.$m[2];
+        }
+
+        return 'Única';
     }
 
     private function cycleHasCardExpense(Account $account, int $referenceMonth, int $referenceYear): bool

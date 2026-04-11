@@ -47,7 +47,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="7" class="text-center text-secondary py-5">
-                                            Nenhuma subscrição registada na base de dados.
+                                            Nenhuma subscrição registrada na base de dados.
                                         </td>
                                     </tr>
                                 @endforelse

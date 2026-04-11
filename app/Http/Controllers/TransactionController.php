@@ -20,6 +20,8 @@ class TransactionController extends Controller
 {
     private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING = 'credit_limit_overflow_pending';
 
+    private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE = 'credit_limit_overflow_pending_tx_update';
+
     public function index(Request $request)
     {
         $now = Carbon::now();
@@ -51,17 +53,21 @@ class TransactionController extends Controller
         }
 
         $transactions = $couple->transactions()
-            ->with(['user', 'accountModel', 'categorySplits.category'])
-            ->where('reference_month', $selectedMonth)
-            ->where('reference_year', $selectedYear)
+            ->with(['user', 'accountModel', 'categorySplits.category', 'creditCardStatementsPaidFor'])
+            ->whereMatchesTransactionsListingPeriod($selectedMonth, $selectedYear)
+            ->whereCreditCardInstallmentVisibleInList()
             ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
             ->latest()
             ->paginate(20);
 
         $installmentGroups = $this->installmentGroupsForTransactionPage($couple->id, $transactions->getCollection());
+        $installmentGroupsModalPayload = $this->installmentGroupsModalPayload($installmentGroups);
+        $creditCardPurchaseRowMeta = $this->creditCardPurchaseRowMetaForPage($transactions->getCollection(), $installmentGroups);
         $transactionDeleteMeta = [];
+        $transactionAmountEditMeta = [];
         foreach ($transactions as $txRow) {
             $transactionDeleteMeta[$txRow->id] = $this->transactionDeleteMeta($txRow, $installmentGroups);
+            $transactionAmountEditMeta[$txRow->id] = $this->transactionAmountEditMeta($txRow);
         }
 
         $appendQuery = [
@@ -88,34 +94,6 @@ class TransactionController extends Controller
 
         $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->values();
         $cardAccounts = $accounts->where('kind', Account::KIND_CREDIT_CARD)->values();
-
-        $monthTransactionsAll = $couple->transactions()
-            ->excludingCreditCardInvoicePayments()
-            ->with(['accountModel'])
-            ->where('reference_month', $selectedMonth)
-            ->where('reference_year', $selectedYear)
-            ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
-            ->get();
-
-        $expenseMonthTransactions = $monthTransactionsAll->where('type', 'expense');
-
-        $byPaymentMethod = $expenseMonthTransactions->groupBy(function (Transaction $tx) {
-            if ($tx->accountModel?->isCreditCard()) {
-                return 'Cartão: '.$tx->accountModel->name;
-            }
-
-            return $tx->payment_method ?: '—';
-        })
-            ->map(fn ($items) => $items->sum('amount'))
-            ->forget('');
-
-        $byAccount = $expenseMonthTransactions->whereNotNull('account_id')->groupBy('account_id')
-            ->mapWithKeys(function ($items, $accountId) {
-                $account = Account::find($accountId);
-                $accountName = $account?->name ?? 'Conta não encontrada';
-
-                return [$accountName => $items->sum('amount')];
-            });
 
         $fundingOld = old('funding');
         if (! in_array($fundingOld, ['account', 'credit_card'], true)) {
@@ -157,19 +135,33 @@ class TransactionController extends Controller
         $refDefaultMonth = (int) $referenceDefaultNext->month;
         $refDefaultYear = (int) $referenceDefaultNext->year;
 
-        $selectedMonthYearLabel = Carbon::createFromDate($selectedYear, $selectedMonth, 1)->format('m/Y');
         $years = range($now->year - 5, $now->year + 5);
+
+        $editTransactionModalMeta = null;
+        $editTransactionIdSession = session('edit_transaction_id');
+        if ($editTransactionIdSession !== null) {
+            $editTx = Transaction::query()
+                ->where('couple_id', $couple->id)
+                ->whereKey((int) $editTransactionIdSession)
+                ->with(['accountModel', 'categorySplits', 'creditCardStatementsPaidFor'])
+                ->first();
+            if ($editTx) {
+                $editTransactionModalMeta = [
+                    'id' => $editTx->id,
+                    'action' => route('transactions.update', $editTx),
+                    'amount' => old('amount', $editTx->amount),
+                    'edit' => $this->transactionAmountEditMeta($editTx),
+                ];
+            }
+        }
 
         return view('transactions.index', compact(
             'transactions',
-            'monthTransactionsAll',
             'categories',
             'accounts',
             'accountsSortedForFilter',
             'regularAccounts',
             'cardAccounts',
-            'byPaymentMethod',
-            'byAccount',
             'fundingOld',
             'paymentFlowOld',
             'txFormMode',
@@ -178,12 +170,48 @@ class TransactionController extends Controller
             'refDefaultYear',
             'selectedMonth',
             'selectedYear',
-            'selectedMonthYearLabel',
             'years',
             'filterAccountId',
             'filteredRegularAccountBalance',
-            'transactionDeleteMeta'
+            'transactionDeleteMeta',
+            'transactionAmountEditMeta',
+            'editTransactionModalMeta',
+            'installmentGroupsModalPayload',
+            'creditCardPurchaseRowMeta'
         ));
+    }
+
+    /**
+     * Totais da compra no cartão e quantidade de parcelas para cada linha visível da listagem.
+     *
+     * @param  Collection<int, Transaction>  $pageTransactions
+     * @param  Collection<string, Collection<int, Transaction>>  $installmentGroups
+     * @return array<int, array{purchase_total: float, purchase_total_str: string, installment_count: int, base_description: string}>
+     */
+    private function creditCardPurchaseRowMetaForPage(Collection $pageTransactions, Collection $installmentGroups): array
+    {
+        $out = [];
+
+        foreach ($pageTransactions as $t) {
+            $t->loadMissing('accountModel');
+            if ($t->type !== 'expense' || ! $t->accountModel?->isCreditCard()) {
+                continue;
+            }
+
+            $rootKey = (string) $t->installmentRootId();
+            $group = $installmentGroups->get($rootKey) ?? collect([$t]);
+            $purchaseTotal = (float) $group->sum(fn (Transaction $x) => (float) $x->amount);
+            $count = $group->count();
+
+            $out[$t->id] = [
+                'purchase_total' => $purchaseTotal,
+                'purchase_total_str' => number_format($purchaseTotal, 2, ',', '.'),
+                'installment_count' => $count,
+                'base_description' => $t->baseDescriptionWithoutInstallmentSuffix(),
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -211,6 +239,75 @@ class TransactionController extends Controller
     }
 
     /**
+     * Dados para modais de parcelamento (cartão) na página de lançamentos.
+     *
+     * @param  Collection<string, Collection<int, Transaction>>  $installmentGroups
+     * @return array<string, array{rootId: int, baseDescription: string, total_amount: float, total_amount_str: string, rows: list<array<string, mixed>>}>
+     */
+    private function installmentGroupsModalPayload(Collection $installmentGroups): array
+    {
+        $out = [];
+
+        foreach ($installmentGroups as $rootKey => $group) {
+            if ($group->count() <= 1) {
+                continue;
+            }
+
+            $sorted = $group->sortBy(fn (Transaction $t) => [$t->date->timestamp, $t->id])->values();
+            $first = $sorted->first();
+            $first->loadMissing('accountModel');
+            if (! $first->accountModel?->isCreditCard()) {
+                continue;
+            }
+
+            $total = $sorted->count();
+            $baseDescription = $first->baseDescriptionWithoutInstallmentSuffix();
+
+            $rows = [];
+            foreach ($sorted as $idx => $t) {
+                $t->loadMissing(['accountModel', 'categorySplits', 'creditCardStatementsPaidFor']);
+                $refMonth = (int) ($t->reference_month ?? $t->date->month);
+                $refYear = (int) ($t->reference_year ?? $t->date->year);
+                $refLabel = str_pad((string) $refMonth, 2, '0', STR_PAD_LEFT).'/'.$refYear;
+                $cardAccountId = (int) $t->account_id;
+                $statementUrl = route('credit-card-statements.index', [
+                    'account_id' => $cardAccountId,
+                    'reference_month' => $refMonth,
+                    'reference_year' => $refYear,
+                ]).'#statement-cycle-'.$cardAccountId.'-'.$refYear.'-'.$refMonth;
+
+                $rows[] = [
+                    'id' => $t->id,
+                    'parcel_label' => ($idx + 1).'/'.$total,
+                    'description' => $t->description,
+                    'date' => $t->date->format('d/m/Y'),
+                    'ref_label' => $refLabel,
+                    'statement_url' => $statementUrl,
+                    'amount' => (float) $t->amount,
+                    'amount_form' => number_format((float) $t->amount, 2, '.', ''),
+                    'amount_str' => number_format((float) $t->amount, 2, ',', '.'),
+                    'update_url' => route('transactions.update', $t),
+                    'destroy_url' => route('transactions.destroy', $t),
+                    'edit' => $this->transactionAmountEditMeta($t),
+                    'delete' => $this->transactionDeleteMeta($t, $installmentGroups),
+                ];
+            }
+
+            $purchaseTotal = (float) $sorted->sum(fn (Transaction $t) => (float) $t->amount);
+
+            $out[(string) $rootKey] = [
+                'rootId' => (int) $rootKey,
+                'baseDescription' => $baseDescription,
+                'total_amount' => $purchaseTotal,
+                'total_amount_str' => number_format($purchaseTotal, 2, ',', '.'),
+                'rows' => $rows,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  Collection<string, Collection<int, Transaction>>  $installmentGroups
      * @return array{paidInvoice: bool, peerCount: int, singleAllowed: bool}
      */
@@ -230,6 +327,353 @@ class TransactionController extends Controller
             'peerCount' => $group->count(),
             'singleAllowed' => ! $isParentWithSiblings,
         ];
+    }
+
+    /**
+     * @return array{
+     *     canEditAmount: bool,
+     *     blockedMessage: string|null,
+     *     needsCreditLimitPrecheck: bool,
+     *     precheckUrl: string|null
+     * }
+     */
+    private function transactionAmountEditMeta(Transaction $t): array
+    {
+        if ($t->isCreditCardInvoicePaymentTransaction()) {
+            return [
+                'canEditAmount' => false,
+                'blockedMessage' => 'Não é possível alterar o valor de um pagamento de fatura. Exclua o lançamento em Faturas de cartão se precisar corrigir.',
+                'needsCreditLimitPrecheck' => false,
+                'precheckUrl' => null,
+            ];
+        }
+
+        if ($t->blocksAmountEditDueToCreditCardStatement()) {
+            return [
+                'canEditAmount' => false,
+                'blockedMessage' => 'Não é possível alterar o valor: esta fatura de cartão já tem pagamento registrado ou está quitada.',
+                'needsCreditLimitPrecheck' => false,
+                'precheckUrl' => null,
+            ];
+        }
+
+        $t->loadMissing('categorySplits');
+        if ($t->categorySplits->isEmpty()) {
+            return [
+                'canEditAmount' => false,
+                'blockedMessage' => 'Este lançamento não tem repartição por categoria; não é possível ajustar só o valor por aqui.',
+                'needsCreditLimitPrecheck' => false,
+                'precheckUrl' => null,
+            ];
+        }
+
+        $t->loadMissing('accountModel');
+        $needsPrecheck = $t->type === 'expense'
+            && $t->accountModel?->isCreditCard()
+            && $t->accountModel->tracksCreditCardLimit();
+
+        return [
+            'canEditAmount' => true,
+            'blockedMessage' => null,
+            'needsCreditLimitPrecheck' => $needsPrecheck,
+            'precheckUrl' => $needsPrecheck ? route('transactions.credit-limit-precheck-update', $t) : null,
+        ];
+    }
+
+    public function creditLimitPrecheckUpdate(Request $request, Transaction $transaction)
+    {
+        if ($transaction->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        if ($this->transactionAmountEditBlockedReason($transaction) !== null) {
+            return response()->json([
+                'message' => 'Não é possível alterar este lançamento.',
+            ], 422);
+        }
+
+        try {
+            $request->validate([
+                'amount' => ['required', 'numeric', 'min:0.01'],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Valor inválido.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        $transaction->loadMissing('accountModel');
+        $account = $transaction->accountModel;
+        if ($transaction->type !== 'expense' || ! $account?->isCreditCard() || ! $account->tracksCreditCardLimit()) {
+            return response()->json(['overflow' => false]);
+        }
+
+        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $newFormatted = number_format((float) $amountNormalized, 2, '.', '');
+        $oldFormatted = number_format((float) $transaction->amount, 2, '.', '');
+        $delta = bcsub($newFormatted, $oldFormatted, 2);
+        if (bccomp($delta, '0', 2) <= 0) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+
+            return response()->json(['overflow' => false]);
+        }
+
+        $account->refresh();
+        $outstanding = Account::outstandingCreditCardUtilizationAmount($account);
+        $after = bcadd($outstanding, $delta, 2);
+        $limit = number_format((float) $account->credit_card_limit_total, 2, '.', '');
+
+        if (bccomp($after, $limit, 2) <= 0) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+
+            return response()->json(['overflow' => false]);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        session([
+            self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE => [
+                'token' => $token,
+                'transaction_id' => $transaction->id,
+                'new_amount' => $newFormatted,
+            ],
+        ]);
+
+        return response()->json([
+            'overflow' => true,
+            'token' => $token,
+            'limit_total' => $limit,
+            'outstanding_before' => $outstanding,
+            'purchase_total' => $newFormatted,
+            'projected_available' => bcsub($limit, $after, 2),
+        ]);
+    }
+
+    public function update(Request $request, Transaction $transaction)
+    {
+        if ($transaction->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        $blockReason = $this->transactionAmountEditBlockedReason($transaction);
+        if ($blockReason !== null) {
+            return back()->with('error', $blockReason);
+        }
+
+        try {
+            $request->validate([
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
+            ]);
+        } catch (ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->withInput()
+                ->with('edit_transaction_id', $transaction->id);
+        }
+
+        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $newAmountCents = (int) round(((float) $amountNormalized) * 100);
+        if ($newAmountCents < 1) {
+            return back()
+                ->withErrors(['amount' => 'Valor inválido.'])
+                ->withInput()
+                ->with('edit_transaction_id', $transaction->id);
+        }
+
+        $newAmountFormatted = number_format($newAmountCents / 100, 2, '.', '');
+
+        $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmedForUpdate(
+            $request,
+            $transaction,
+            $newAmountFormatted
+        );
+        if ($limitRedirect !== null) {
+            return $limitRedirect->with('edit_transaction_id', $transaction->id);
+        }
+
+        try {
+            $splitRows = $this->categorySplitRowsScaledToAmount($transaction, $newAmountCents);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput()->with('edit_transaction_id', $transaction->id);
+        }
+
+        $oldAmountFormatted = number_format((float) $transaction->amount, 2, '.', '');
+        if ($oldAmountFormatted === $newAmountFormatted) {
+            session()->forget('edit_transaction_id');
+            $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
+
+            return back()->with('success', 'Valor inalterado.');
+        }
+
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows) {
+            $transaction->amount = $newAmountFormatted;
+            $transaction->save();
+            $transaction->syncCategorySplits($splitRows);
+        });
+
+        session()->forget('edit_transaction_id');
+        $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
+
+        return back()->with('success', 'Valor do lançamento atualizado.');
+    }
+
+    /**
+     * Após salvar o valor a partir da modal de parcelas, reabrir essa modal na próxima carga.
+     */
+    private function flashOpenInstallmentModalRootIfRequested(Request $request, Transaction $transaction): void
+    {
+        if (! $request->boolean('return_from_installment_modal')) {
+            return;
+        }
+
+        $rootId = $transaction->installmentRootId();
+        $peerCount = Transaction::query()
+            ->where('couple_id', $transaction->couple_id)
+            ->where(function ($q) use ($rootId) {
+                $q->where('id', $rootId)
+                    ->orWhere('installment_parent_id', $rootId);
+            })
+            ->count();
+
+        if ($peerCount > 1) {
+            session()->flash('open_installment_modal_root', $rootId);
+        }
+    }
+
+    private function transactionAmountEditBlockedReason(Transaction $transaction): ?string
+    {
+        if ($transaction->isCreditCardInvoicePaymentTransaction()) {
+            return 'Não é possível alterar o valor de um pagamento de fatura. Exclua o lançamento em Faturas de cartão se precisar corrigir.';
+        }
+
+        if ($transaction->blocksAmountEditDueToCreditCardStatement()) {
+            return 'Não é possível alterar o valor: esta fatura de cartão já tem pagamento registrado ou está quitada.';
+        }
+
+        $transaction->loadMissing('categorySplits');
+        if ($transaction->categorySplits->isEmpty()) {
+            return 'Este lançamento não tem repartição por categoria; não é possível ajustar só o valor por aqui.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, array{category_id: int, amount: string}>
+     */
+    private function categorySplitRowsScaledToAmount(Transaction $transaction, int $newAmountCents): array
+    {
+        $splits = $transaction->categorySplits()->orderBy('id')->get();
+        if ($splits->isEmpty()) {
+            throw ValidationException::withMessages([
+                'amount' => ['Repartição por categoria em falta.'],
+            ]);
+        }
+
+        $oldSplitCents = [];
+        foreach ($splits as $sp) {
+            $oldSplitCents[] = (int) round(((float) $sp->amount) * 100);
+        }
+
+        $oldSum = array_sum($oldSplitCents);
+        if ($oldSum < 1) {
+            throw ValidationException::withMessages([
+                'amount' => ['Repartição por categoria inválida.'],
+            ]);
+        }
+
+        $rows = [];
+        $allocated = 0;
+        $lastIdx = $splits->count() - 1;
+        for ($i = 0; $i < $lastIdx; $i++) {
+            $c = (int) intdiv($newAmountCents * $oldSplitCents[$i], $oldSum);
+            $rows[] = [
+                'category_id' => (int) $splits[$i]->category_id,
+                'amount' => number_format($c / 100, 2, '.', ''),
+            ];
+            $allocated += $c;
+        }
+
+        $lastCents = $newAmountCents - $allocated;
+        $rows[] = [
+            'category_id' => (int) $splits[$lastIdx]->category_id,
+            'amount' => number_format($lastCents / 100, 2, '.', ''),
+        ];
+
+        return $rows;
+    }
+
+    private function rejectCreditCardLimitIfUnconfirmedForUpdate(
+        Request $request,
+        Transaction $transaction,
+        string $newAmountFormatted,
+    ): ?RedirectResponse {
+        $transaction->loadMissing('accountModel');
+        $account = $transaction->accountModel;
+        if ($transaction->type !== 'expense' || ! $account?->isCreditCard() || ! $account->tracksCreditCardLimit()) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+
+            return null;
+        }
+
+        $oldFormatted = number_format((float) $transaction->amount, 2, '.', '');
+        $delta = bcsub($newAmountFormatted, $oldFormatted, 2);
+        if (bccomp($delta, '0', 2) <= 0) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+
+            return null;
+        }
+
+        $account->refresh();
+        $outstanding = Account::outstandingCreditCardUtilizationAmount($account);
+        $after = bcadd($outstanding, $delta, 2);
+        $limit = number_format((float) $account->credit_card_limit_total, 2, '.', '');
+
+        if (bccomp($after, $limit, 2) <= 0) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+
+            return null;
+        }
+
+        $pending = session(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+        $token = $request->input('credit_limit_confirm_token');
+
+        if ($this->creditLimitOverflowUpdateMatches($pending, (int) $transaction->id, $newAmountFormatted, $token)) {
+            session()->forget(self::SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE);
+
+            return null;
+        }
+
+        return back()->withErrors([
+            'amount' => 'O limite do cartão exige confirmação no aviso antes de guardar. Confirme e tente de novo.',
+        ])->withInput();
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $pending
+     */
+    private function creditLimitOverflowUpdateMatches(
+        ?array $pending,
+        int $transactionId,
+        string $newAmountFormatted,
+        mixed $token,
+    ): bool {
+        if (! is_array($pending) || ! isset($pending['token'], $pending['transaction_id'], $pending['new_amount'])) {
+            return false;
+        }
+
+        if ((int) $pending['transaction_id'] !== $transactionId) {
+            return false;
+        }
+
+        if (! hash_equals((string) $pending['token'], (string) ($token ?? ''))) {
+            return false;
+        }
+
+        $pendingAmt = number_format((float) $pending['new_amount'], 2, '.', '');
+
+        return hash_equals($pendingAmt, $newAmountFormatted);
     }
 
     public function store(Request $request)
@@ -313,7 +757,7 @@ class TransactionController extends Controller
                     'amount' => $parcelAmount,
                     'payment_method' => $paymentMethod,
                     'type' => $request->type,
-                    'date' => $startDate->copy()->addMonths($i)->toDateString(),
+                    'date' => $startDate->toDateString(),
                     'reference_month' => (int) $ref->month,
                     'reference_year' => (int) $ref->year,
                 ];

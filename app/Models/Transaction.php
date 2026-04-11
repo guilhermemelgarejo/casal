@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -233,6 +234,20 @@ class Transaction extends Model
     }
 
     /**
+     * Descrição sem o sufixo "(Parcela x/y)" usado nas parcelas do cartão.
+     */
+    public function baseDescriptionWithoutInstallmentSuffix(): string
+    {
+        $d = (string) $this->description;
+        $base = preg_replace('/\s*\(Parcela\s+\d+\/\d+\)\s*$/u', '', $d);
+        if ($base === '' || trim($base) === '') {
+            return $d;
+        }
+
+        return $base;
+    }
+
+    /**
      * Despesa no cartão cujo mês/ano de referência corresponde a uma fatura já marcada como paga (metadados).
      */
     public function isInPaidCreditCardInvoiceCycle(): bool
@@ -252,6 +267,46 @@ class Transaction extends Model
     }
 
     /**
+     * Lançamento em conta corrente vinculado como pagamento de fatura de cartão.
+     */
+    public function isCreditCardInvoicePaymentTransaction(): bool
+    {
+        if ($this->relationLoaded('creditCardStatementsPaidFor')) {
+            return $this->creditCardStatementsPaidFor->isNotEmpty();
+        }
+
+        return $this->creditCardStatementsPaidFor()->exists();
+    }
+
+    /**
+     * Despesa no cartão cujo ciclo já tem pagamento ou está quitada — não permite alterar só o valor.
+     */
+    public function blocksAmountEditDueToCreditCardStatement(): bool
+    {
+        if ($this->type !== 'expense') {
+            return false;
+        }
+
+        $this->loadMissing('accountModel');
+        if (! $this->accountModel?->isCreditCard()) {
+            return false;
+        }
+
+        if ($this->account_id === null || $this->reference_month === null || $this->reference_year === null) {
+            return false;
+        }
+
+        $stmt = CreditCardStatement::query()
+            ->where('couple_id', $this->couple_id)
+            ->where('account_id', $this->account_id)
+            ->where('reference_month', $this->reference_month)
+            ->where('reference_year', $this->reference_year)
+            ->first();
+
+        return $stmt !== null && $stmt->blocksEditingCardExpenses();
+    }
+
+    /**
      * Faturas de cartão às quais este lançamento (conta corrente) está vinculado como pagamento.
      */
     public function creditCardStatementsPaidFor(): BelongsToMany
@@ -266,5 +321,44 @@ class Transaction extends Model
     public function scopeExcludingCreditCardInvoicePayments(Builder $query): Builder
     {
         return $query->whereDoesntHave('creditCardStatementsPaidFor');
+    }
+
+    /**
+     * Período do filtro da página de lançamentos: conta corrente (e demais) por mês de referência;
+     * despesas em cartão de crédito pela data da compra (campo date) no mês civil.
+     */
+    public function scopeWhereMatchesTransactionsListingPeriod(Builder $query, int $month, int $year): Builder
+    {
+        $start = Carbon::createFromDate($year, $month, 1)->startOfMonth()->toDateString();
+        $end = Carbon::createFromDate($year, $month, 1)->endOfMonth()->toDateString();
+
+        return $query->where(function (Builder $q) use ($month, $year, $start, $end) {
+            $q->where(function (Builder $q2) use ($month, $year) {
+                $q2->whereNot(function (Builder $q3) {
+                    $q3->where('type', 'expense')
+                        ->whereHas('accountModel', fn (Builder $a) => $a->where('kind', Account::KIND_CREDIT_CARD));
+                })
+                    ->where('reference_month', $month)
+                    ->where('reference_year', $year);
+            })->orWhere(function (Builder $q2) use ($start, $end) {
+                $q2->where('type', 'expense')
+                    ->whereHas('accountModel', fn (Builder $a) => $a->where('kind', Account::KIND_CREDIT_CARD))
+                    ->whereBetween('date', [$start, $end]);
+            });
+        });
+    }
+
+    /**
+     * Na listagem, esconde parcelas “filhas” do cartão (a linha da compra é a primeira parcela / raiz).
+     */
+    public function scopeWhereCreditCardInstallmentVisibleInList(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereNull('installment_parent_id')
+                ->orWhereNot(function (Builder $q2) {
+                    $q2->where('type', 'expense')
+                        ->whereHas('accountModel', fn (Builder $a) => $a->where('kind', Account::KIND_CREDIT_CARD));
+                });
+        });
     }
 }

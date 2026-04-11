@@ -9,11 +9,11 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class TransactionInstallmentDeleteMetaTest extends TestCase
+class TransactionCreditCardListingPurchaseDateTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_index_exibe_metadado_peer_count_para_parcelamento_em_outro_mes(): void
+    public function test_despesa_cartao_listada_pelo_mes_da_data_da_compra_nao_pela_referencia(): void
     {
         $couple = Couple::factory()->create();
         $user = User::factory()->create(['couple_id' => $couple->id]);
@@ -36,12 +36,12 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'couple_id' => $couple->id,
             'user_id' => $user->id,
             'account_id' => $card->id,
-            'description' => 'Compra (Parcela 1/2)',
+            'description' => 'TV (Parcela 1/2)',
             'amount' => '50.00',
             'payment_method' => null,
             'type' => 'expense',
             'date' => '2026-04-10',
-            'reference_month' => 4,
+            'reference_month' => 5,
             'reference_year' => 2026,
             'installment_parent_id' => null,
         ], [['category_id' => $category->id, 'amount' => '50.00']]);
@@ -50,27 +50,24 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'couple_id' => $couple->id,
             'user_id' => $user->id,
             'account_id' => $card->id,
-            'description' => 'Compra (Parcela 2/2)',
+            'description' => 'TV (Parcela 2/2)',
             'amount' => '50.00',
             'payment_method' => null,
             'type' => 'expense',
-            'date' => '2026-05-10',
-            'reference_month' => 5,
+            'date' => '2026-04-10',
+            'reference_month' => 6,
             'reference_year' => 2026,
             'installment_parent_id' => $parent->id,
         ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        $response = $this->actingAs($user)->get(route('transactions.index', [
-            'month' => 4,
-            'year' => 2026,
-        ]));
+        $apr = $this->actingAs($user)->get(route('transactions.index', ['month' => 4, 'year' => 2026]));
+        $apr->assertOk();
+        $apr->assertSee('TV', false);
+        $apr->assertSee('100,00', false);
+        $apr->assertSee('em 2x', false);
 
-        $response->assertOk();
-        $this->assertStringContainsString('&quot;peerCount&quot;:2', $response->getContent());
-        $this->assertStringContainsString('&quot;singleAllowed&quot;:false', $response->getContent());
-        $html = $response->getContent();
-        $this->assertStringContainsString('"statement_url"', $html);
-        $this->assertStringContainsString('faturas-cartao', $html);
-        $this->assertStringContainsString('statement-cycle-'.(int) $card->id.'-2026-4', $html);
+        $may = $this->actingAs($user)->get(route('transactions.index', ['month' => 5, 'year' => 2026]));
+        $may->assertOk();
+        $may->assertDontSee('TV', false);
     }
 }

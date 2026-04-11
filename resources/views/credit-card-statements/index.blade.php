@@ -16,7 +16,7 @@
                     @endif
 
                     <p class="text-secondary small mb-4">
-                        Fatura = <strong>mês de referência</strong> do cartão; o total reflete os lançamentos desse ciclo (incluindo exclusões). Vencimento padrão no cartão (<a href="{{ route('accounts.index') }}">Contas</a>); ao primeiro lançamento do mês a fatura nasce com esse vencimento e pode ajustar-se em Editar.
+                        Fatura = <strong>mês de referência</strong> do cartão; o total é a soma do que entra nesse ciclo (cada parcela com o valor que compõe aquela fatura). Em <a href="{{ route('transactions.index') }}">Lançamentos</a>, compras no cartão aparecem pelo mês da <strong>data da compra</strong>. Vencimento padrão no cartão (<a href="{{ route('accounts.index') }}">Contas</a>); ao primeiro lançamento do mês a fatura nasce com esse vencimento e pode ajustar-se em Editar.
                     </p>
 
                     @if ($cardAccounts->isEmpty())
@@ -65,6 +65,9 @@
                                 <tbody>
                                     @foreach ($invoiceCycles as $cycle)
                                         @php
+                                            $cycleSubtitle = $cycle->account->name.' — '.sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year);
+                                        @endphp
+                                        @php
                                             $meta = $cycle->meta;
                                             $isPaid = $meta?->isPaid() ?? false;
                                             $hasPayments = $meta && $meta->paymentTransactions->isNotEmpty();
@@ -92,7 +95,7 @@
                                             $payDefaultAmount = $hasPayments && ! $isFullyPaidByTx ? $remaining : (float) $cycle->spent_total;
                                             $payAmtPlaceholder = 'Padrão: R$ '.number_format($payDefaultAmount, 2, ',', '.');
                                         @endphp
-                                        <tr>
+                                        <tr id="statement-cycle-{{ $cycle->account->id }}-{{ $cycle->reference_year }}-{{ $cycle->reference_month }}">
                                             <td class="fw-medium">{{ $cycle->account->name }}</td>
                                             <td>{{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}</td>
                                             <td class="text-end fw-medium">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</td>
@@ -140,19 +143,10 @@
                                                 @endif
                                             </td>
                                             <td class="text-end text-nowrap">
-                                                <button
-                                                    type="button"
-                                                    class="btn btn-sm btn-outline-primary"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#editStatementModal"
-                                                    data-edit-action="{{ route('credit-card-statements.update', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
-                                                    data-edit-subtitle="{{ $cycle->account->name }} — {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}"
-                                                    data-edit-due="{{ $editDueValue }}"
-                                                >Editar</button>
                                                 @if ($showPaymentForms)
                                                     <button
                                                         type="button"
-                                                        class="btn btn-sm btn-outline-secondary"
+                                                        class="btn btn-sm btn-outline-secondary me-1"
                                                         data-bs-toggle="modal"
                                                         data-bs-target="#payStatementModal"
                                                         data-pay-action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
@@ -162,11 +156,58 @@
                                                         data-pay-date-default="{{ now()->format('Y-m-d') }}"
                                                     >Pagamento</button>
                                                 @endif
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-primary me-1"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#editStatementModal"
+                                                    data-edit-action="{{ route('credit-card-statements.update', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
+                                                    data-edit-subtitle="{{ $cycle->account->name }} — {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}"
+                                                    data-edit-due="{{ $editDueValue }}"
+                                                >Editar</button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#statementItemsModal"
+                                                    data-statement-subtitle="{{ $cycleSubtitle }}"
+                                                    data-statement-cycle-key="{{ $cycle->cycle_key }}"
+                                                >Itens da fatura</button>
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div class="modal fade" id="statementItemsModal" tabindex="-1" aria-labelledby="statementItemsModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h2 class="modal-title h5 mb-0" id="statementItemsModalLabel">Itens desta fatura</h2>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="small text-secondary mb-3 fw-medium" id="statementItemsSubtitle"></p>
+                                        <p class="small text-muted mb-3">Cada linha é o valor que entra <strong>só nesta fatura</strong> (uma parcela = um lançamento). A data é a da compra; a coluna Ref. é o mês de faturamento. O botão <strong>Abrir</strong> leva a Lançamentos com o mesmo filtro da lista de cartão: <strong>mês civil da data da compra</strong> e cartão selecionado.</p>
+                                        <div class="table-responsive border rounded">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Data compra</th>
+                                                        <th>Descrição</th>
+                                                        <th>Parcela</th>
+                                                        <th>Ref.</th>
+                                                        <th class="text-end">Valor nesta fatura</th>
+                                                        <th class="text-end">Lançamentos</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="statementItemsTbody"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="modal fade" id="payStatementModal" tabindex="-1" aria-labelledby="payStatementModalLabel" aria-hidden="true">
@@ -298,7 +339,81 @@
                         @endphp
                         @push('scripts')
                             <script>
+                                window.__invoiceCycleLinesByKey = @json($invoiceCycleLinesByKey ?? []);
+                            </script>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    const h = window.location.hash;
+                                    if (!h || h.indexOf('statement-cycle-') !== 1) {
+                                        return;
+                                    }
+                                    const id = h.slice(1);
+                                    const el = document.getElementById(id);
+                                    if (!el) {
+                                        return;
+                                    }
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    el.classList.add('table-warning');
+                                    window.setTimeout(function () {
+                                        el.classList.remove('table-warning');
+                                    }, 2400);
+                                });
+                            </script>
+                            <script>
                                 (function () {
+                                    const itemsModalEl = document.getElementById('statementItemsModal');
+                                    const itemsSubtitleEl = document.getElementById('statementItemsSubtitle');
+                                    const itemsTbody = document.getElementById('statementItemsTbody');
+                                    const linesPayload = window.__invoiceCycleLinesByKey || {};
+                                    if (itemsModalEl && itemsSubtitleEl && itemsTbody) {
+                                        itemsModalEl.addEventListener('show.bs.modal', function (e) {
+                                            const btn = e.relatedTarget;
+                                            if (!btn || !btn.getAttribute('data-statement-cycle-key')) return;
+                                            itemsSubtitleEl.textContent = btn.getAttribute('data-statement-subtitle') || '';
+                                            const cycleKey = btn.getAttribute('data-statement-cycle-key');
+                                            const lines = Array.isArray(linesPayload[cycleKey]) ? linesPayload[cycleKey] : [];
+                                            itemsTbody.innerHTML = '';
+                                            if (!lines.length) {
+                                                const tr = document.createElement('tr');
+                                                tr.innerHTML = '<td colspan="6" class="text-center text-secondary py-4">Nenhum lançamento.</td>';
+                                                itemsTbody.appendChild(tr);
+                                                return;
+                                            }
+                                            lines.forEach(function (row) {
+                                                const tr = document.createElement('tr');
+                                                const url = row.transactions_url || '#';
+
+                                                function td(className, text) {
+                                                    const cell = document.createElement('td');
+                                                    if (className) cell.className = className;
+                                                    cell.textContent = text == null || text === '' ? '—' : String(text);
+                                                    return cell;
+                                                }
+
+                                                tr.appendChild(td('text-nowrap small', row.date));
+                                                tr.appendChild(td('small', row.description));
+                                                tr.appendChild(td('small text-nowrap', row.parcel_label));
+                                                tr.appendChild(td('small text-nowrap', row.ref_label));
+
+                                                const tdAmt = document.createElement('td');
+                                                tdAmt.className = 'text-end small fw-semibold text-nowrap';
+                                                tdAmt.textContent = 'R$ ' + (row.amount_str || '');
+                                                tr.appendChild(tdAmt);
+
+                                                const tdLink = document.createElement('td');
+                                                tdLink.className = 'text-end';
+                                                const a = document.createElement('a');
+                                                a.className = 'btn btn-sm btn-link py-0';
+                                                a.href = url;
+                                                a.textContent = 'Abrir';
+                                                tdLink.appendChild(a);
+                                                tr.appendChild(tdLink);
+
+                                                itemsTbody.appendChild(tr);
+                                            });
+                                        });
+                                    }
+
                                     const editModalEl = document.getElementById('editStatementModal');
                                     const editForm = document.getElementById('editStatementForm');
                                     const editSubtitleEl = document.getElementById('editStatementSubtitle');

@@ -107,3 +107,50 @@ body {
     margin: 0 !important;
     width: 100% !important;
 }
+
+/* Categorias: cor com mesma altura que .form-control-sm / .form-select-sm (Bootstrap 5) */
+#category-form .category-form-color-input {
+    width: 6.5rem;
+    height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.125rem;
+}
+
+/*
+ * Lançamentos: grelha com larguras só em rem/fr — sem max-content/min-content nas colunas,
+ * para cada linha (cada .tx-list-row-grid) calcular as mesmas larguras e alinhar entre linhas.
+ */
+.tx-list-row-grid {
+    display: grid;
+    width: 100%;
+    grid-template-columns:
+        4.75rem
+        5.5rem
+        minmax(0, 1.35fr)
+        minmax(0, 1fr)
+        minmax(0, 11rem)
+        9.5rem
+        5.5rem;
+    column-gap: 0.65rem;
+    align-items: center;
+}
+
+.tx-list-row-grid .tx-cell-truncate {
+    min-width: 0;
+}
+
+.tx-list-row-grid .tx-cell-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 991.98px) {
+    .tx-list-row-grid {
+        grid-template-columns: 1fr;
+        row-gap: 0.35rem;
+        align-items: start;
+    }
+}

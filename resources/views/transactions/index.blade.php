@@ -20,16 +20,14 @@
                     </div>
                 @endif
 
-                <div class="row g-4">
-                    {{-- Lista principal: maior peso visual --}}
-                    <div class="col-lg-8">
-                        <div class="card border shadow-sm h-100">
+                <div class="vstack gap-4">
+                    <div class="card border shadow-sm">
                             <div class="card-header bg-white py-3 border-bottom">
                                 <div class="vstack gap-0">
                                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
                                         <div class="min-w-0">
                                             <h3 class="h5 mb-0">Lançamentos</h3>
-                                            <p class="small text-secondary mb-0 mt-1">Histórico e movimentações do período</p>
+                                            <p class="small text-secondary mb-0 mt-1">Histórico do período: cartão por data da compra (compras parceladas em uma linha com total); demais lançamentos por mês de referência.</p>
                                         </div>
                                         <button
                                             type="button"
@@ -119,19 +117,20 @@
                                 </div>
                             </div>
                             <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Data</th>
-                                                <th>Descrição</th>
-                                                <th>Categoria</th>
-                                                <th>Pagamento/Conta</th>
-                                                <th class="text-end">Valor</th>
-                                                <th class="text-center">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
+                                <div class="list-group list-group-flush rounded-0" role="list">
+                                            @if ($transactions->isNotEmpty())
+                                                <div class="list-group-item px-3 py-2 border-start-0 border-end-0 bg-light d-none d-lg-block" role="presentation">
+                                                    <div class="tx-list-row-grid small text-secondary fw-semibold">
+                                                        <div>Data</div>
+                                                        <div>Ref.</div>
+                                                        <div>Descrição</div>
+                                                        <div>Categorias</div>
+                                                        <div>Pagamento / conta</div>
+                                                        <div>Valor</div>
+                                                        <div class="text-end text-nowrap">Ações</div>
+                                                    </div>
+                                                </div>
+                                            @endif
                                             @forelse ($transactions as $transaction)
                                                 @php
                                                     $delMeta = $transactionDeleteMeta[$transaction->id] ?? [
@@ -139,175 +138,229 @@
                                                         'peerCount' => 1,
                                                         'singleAllowed' => true,
                                                     ];
+                                                    $editMeta = $transactionAmountEditMeta[$transaction->id] ?? [
+                                                        'canEditAmount' => false,
+                                                        'blockedMessage' => null,
+                                                        'needsCreditLimitPrecheck' => false,
+                                                        'precheckUrl' => null,
+                                                    ];
+                                                    $ccRowMeta = $creditCardPurchaseRowMeta[$transaction->id] ?? null;
+                                                    $hideListEditForCcInstallments = $delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard();
                                                     $blockedMsg = 'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
+                                                    $refMonth = (int) ($transaction->reference_month ?? $transaction->date->month);
+                                                    $refYear = (int) ($transaction->reference_year ?? $transaction->date->year);
+                                                    $refLabel = str_pad((string) $refMonth, 2, '0', STR_PAD_LEFT) . '/' . $refYear;
+                                                    $dateMonthYear = $transaction->date->format('m/Y');
+                                                    $accRow = $transaction->accountModel;
                                                 @endphp
-                                                <tr>
-                                                    <td class="text-secondary small text-nowrap">
-                                                        <div>{{ $transaction->date->format('d/m/Y') }}</div>
-                                                        @php
-                                                            $refMonth = (int) ($transaction->reference_month ?? $transaction->date->month);
-                                                            $refYear = (int) ($transaction->reference_year ?? $transaction->date->year);
-                                                            $refLabel = str_pad((string) $refMonth, 2, '0', STR_PAD_LEFT) . '/' . $refYear;
-                                                            $dateMonthYear = $transaction->date->format('m/Y');
-                                                        @endphp
-                                                        @if($refLabel !== $dateMonthYear)
-                                                            <div class="text-muted">Ref: {{ $refLabel }}</div>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        <div class="fw-medium">{{ $transaction->description }}</div>
-                                                        <div class="small text-muted">{{ $transaction->user->name }}</div>
-                                                    </td>
-                                                    <td>
-                                                        <div class="d-flex flex-column gap-1 align-items-start">
+                                                <div class="list-group-item px-3 py-2 border-start-0 border-end-0" role="listitem">
+                                                    <div class="tx-list-row-grid">
+                                                        <div class="text-secondary small text-nowrap">{{ $transaction->date->format('d/m/Y') }}</div>
+                                                        <div class="small text-muted text-nowrap">
+                                                            @if($refLabel !== $dateMonthYear)
+                                                                Ref. {{ $refLabel }}
+                                                            @else
+                                                                <span class="text-muted opacity-50">—</span>
+                                                            @endif
+                                                        </div>
+                                                        <div class="tx-cell-truncate">
+                                                            <div class="text-truncate" title="{{ $ccRowMeta['base_description'] ?? $transaction->description }} — {{ $transaction->user->name }}">
+                                                                <span class="fw-medium">{{ $ccRowMeta['base_description'] ?? $transaction->description }}</span><span class="text-muted small"> · {{ $transaction->user->name }}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex flex-wrap gap-1 align-items-center">
                                                             @forelse($transaction->categorySplits as $sp)
-                                                                <span class="badge rounded-pill text-white" style="background-color: {{ $sp->category->color ?? '#ccc' }}">{{ $sp->category->name }} · R$ {{ number_format((float) $sp->amount, 2, ',', '.') }}</span>
+                                                                @if($sp->category)
+                                                                    <span class="badge rounded-pill text-white" style="background-color: {{ $sp->category->color ?? '#ccc' }}">{{ $sp->category->name }}</span>
+                                                                @endif
                                                             @empty
                                                                 <span class="text-secondary small">—</span>
                                                             @endforelse
                                                         </div>
-                                                    </td>
-                                                    <td class="small">
-                                                        @php $accRow = $transaction->accountModel; @endphp
-                                                        @if($accRow?->isCreditCard())
-                                                            <div class="fw-medium">Cartão de crédito</div>
-                                                            <div class="text-muted">{{ $accRow->name }}</div>
-                                                        @elseif($transaction->payment_method || $accRow)
-                                                            <div class="fw-medium">{{ $transaction->payment_method ?: '—' }}</div>
-                                                            <div class="text-muted">{{ $accRow?->name ?? '—' }}</div>
-                                                        @else
-                                                            <span class="text-muted">-</span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-end fw-bold text-nowrap {{ $transaction->type === 'income' ? 'text-success' : 'text-danger' }}">
-                                                        {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ number_format($transaction->amount, 2, ',', '.') }}
-                                                    </td>
-                                                    <td class="text-center">
-                                                        @if ($delMeta['paidInvoice'])
-                                                            <button
-                                                                type="button"
-                                                                class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked"
-                                                                title="Exclusão bloqueada: fatura deste período já paga"
-                                                                aria-label="Exclusão bloqueada: lançamento em ciclo de fatura de cartão já pago"
-                                                                data-tx-blocked-msg="{{ $blockedMsg }}"
-                                                            >
-                                                                <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
-                                                            </button>
-                                                        @else
-                                                            <form
-                                                                action="{{ route('transactions.destroy', $transaction) }}"
-                                                                method="POST"
-                                                                class="d-inline js-tx-delete-form"
-                                                                data-tx-delete-meta="{!! htmlspecialchars(json_encode($delMeta, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') !!}"
-                                                            >
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope">
-                                                                <button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                                        <div class="small text-body-secondary tx-cell-truncate">
+                                                            @if($accRow?->isCreditCard())
+                                                                <div class="text-truncate" title="Cartão · {{ $accRow->name }}"><span class="fw-medium text-body">Cartão</span><span class="text-muted"> · {{ $accRow->name }}</span></div>
+                                                            @elseif($transaction->payment_method || $accRow)
+                                                                <div class="text-truncate" title="{{ $transaction->payment_method ?: '—' }} · {{ $accRow?->name ?? '—' }}"><span class="fw-medium text-body">{{ $transaction->payment_method ?: '—' }}</span><span class="text-muted"> · {{ $accRow?->name ?? '—' }}</span></div>
+                                                            @else
+                                                                <span class="text-muted">—</span>
+                                                            @endif
+                                                        </div>
+                                                        <div class="fw-bold text-nowrap {{ $transaction->type === 'income' ? 'text-success' : 'text-danger' }}">
+                                                            @if($ccRowMeta !== null)
+                                                                {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ $ccRowMeta['purchase_total_str'] }}@if($ccRowMeta['installment_count'] > 1)<span class="small fw-normal text-muted"> em {{ $ccRowMeta['installment_count'] }}x</span>@endif
+                                                            @else
+                                                                {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ number_format($transaction->amount, 2, ',', '.') }}
+                                                            @endif
+                                                        </div>
+                                                        <div class="tx-cell-actions">
+                                                            @if ($delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard())
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-link btn-sm p-0 text-secondary js-tx-open-installment-summary"
+                                                                    title="Parcelas da compra"
+                                                                    aria-label="Parcelas da compra"
+                                                                    data-tx-root-id="{{ $transaction->installmentRootId() }}"
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="3.75" cy="5.5" r="1.35"/><circle cx="3.75" cy="10" r="1.35"/><circle cx="3.75" cy="14.5" r="1.35"/><path d="M7 4.75h10.25a.75.75 0 010 1.5H7a.75.75 0 010-1.5zm0 4.5h10.25a.75.75 0 010 1.5H7a.75.75 0 010-1.5zm0 4.5h10.25a.75.75 0 010 1.5H7a.75.75 0 010-1.5z"/></svg>
                                                                 </button>
-                                                            </form>
-                                                        @endif
-                                                    </td>
-                                                </tr>
+                                                            @endif
+                                                            @if (! $hideListEditForCcInstallments)
+                                                                @if (! $editMeta['canEditAmount'])
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-link text-secondary btn-sm p-0 js-tx-edit-blocked"
+                                                                        title="Edição do valor não permitida"
+                                                                        aria-label="Edição do valor não permitida"
+                                                                        data-tx-blocked-msg="{{ $editMeta['blockedMessage'] ?? 'Não é possível editar o valor deste lançamento.' }}"
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                                                                    </button>
+                                                                @else
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open"
+                                                                        title="Alterar valor"
+                                                                        aria-label="Alterar valor do lançamento"
+                                                                        data-bs-toggle="modal"
+                                                                        data-bs-target="#modalEditTransactionAmount"
+                                                                        data-tx-action="{{ route('transactions.update', $transaction) }}"
+                                                                        data-tx-amount="{{ $transaction->amount }}"
+                                                                        data-tx-precheck="{{ $editMeta['needsCreditLimitPrecheck'] ? $editMeta['precheckUrl'] : '' }}"
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                                                                    </button>
+                                                                @endif
+                                                            @endif
+                                                            @if ($delMeta['paidInvoice'])
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked"
+                                                                    title="Exclusão bloqueada: fatura deste período já paga"
+                                                                    aria-label="Exclusão bloqueada: lançamento em ciclo de fatura de cartão já pago"
+                                                                    data-tx-blocked-msg="{{ $blockedMsg }}"
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+                                                                </button>
+                                                            @else
+                                                                <form
+                                                                    action="{{ route('transactions.destroy', $transaction) }}"
+                                                                    method="POST"
+                                                                    class="d-inline js-tx-delete-form"
+                                                                    data-tx-delete-meta="{!! htmlspecialchars(json_encode($delMeta, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') !!}"
+                                                                >
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope">
+                                                                    <button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                                                    </button>
+                                                                </form>
+                                                            @endif
+                                                            </div>
+                                                    </div>
+                                                </div>
                                             @empty
-                                                <tr>
-                                                    <td colspan="6" class="text-center text-secondary py-5">Nenhum lançamento encontrado.</td>
-                                                </tr>
+                                                <div class="list-group-item border-0 text-center text-secondary py-5" role="listitem">
+                                                    Nenhum lançamento encontrado.
+                                                </div>
                                             @endforelse
-                                        </tbody>
-                                    </table>
                                 </div>
                                 <div class="px-3 py-3">
                                     {{ $transactions->links() }}
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    {{-- Resumo lateral --}}
-                    <div class="col-lg-4">
-                        <div class="vstack gap-4">
-                            <div class="card border shadow-sm">
-                                <div class="card-header bg-white py-3 border-bottom">
-                                    <h3 class="h5 mb-0">Resumo</h3>
-                                    <p class="small text-secondary mb-0 mt-1">
-                                        Totais de {{ $selectedMonthYearLabel }}
-                                        @if($filterAccountId !== null)
-                                            @php $fAcc = $accounts->firstWhere('id', $filterAccountId); @endphp
-                                            @if($fAcc)
-                                                — só {{ $fAcc->name }}{{ $fAcc->isCreditCard() ? ' (cartão)' : '' }}
-                                            @endif
-                                        @endif
-                                    </p>
-                                </div>
-                                <div class="card-body p-3">
-                                    <div class="rounded bg-body-secondary bg-opacity-50 p-2">
-                                        <div class="d-flex justify-content-between small mb-1">
-                                            <span class="text-secondary">Receitas</span>
-                                            <span class="text-success fw-semibold">R$ {{ number_format($monthTransactionsAll->where('type', 'income')->sum('amount'), 2, ',', '.') }}</span>
-                                        </div>
-                                        <div class="d-flex justify-content-between small mb-2">
-                                            <span class="text-secondary">Despesas</span>
-                                            <span class="text-danger fw-semibold">R$ {{ number_format($monthTransactionsAll->where('type', 'expense')->sum('amount'), 2, ',', '.') }}</span>
-                                        </div>
-                                        <hr class="my-2">
-                                        @php $balance = $monthTransactionsAll->where('type', 'income')->sum('amount') - $monthTransactionsAll->where('type', 'expense')->sum('amount'); @endphp
-                                        <div class="d-flex justify-content-between align-items-baseline">
-                                            <span class="small fw-semibold">Saldo</span>
-                                            <span class="fw-bold {{ $balance >= 0 ? 'text-success' : 'text-danger' }}">
-                                                R$ {{ number_format($balance, 2, ',', '.') }}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    @if($byPaymentMethod->count() > 0)
-                                        <h4 class="small text-secondary text-uppercase mb-1 mt-3">Por pagamento</h4>
-                                        <div class="table-responsive border rounded">
-                                            <table class="table table-sm table-borderless mb-0 small">
-                                                <tbody>
-                                                    @foreach($byPaymentMethod as $method => $total)
-                                                        <tr>
-                                                            <td class="py-1">{{ $method }}</td>
-                                                            <td class="text-end text-danger py-1 text-nowrap">R$ {{ number_format($total, 2, ',', '.') }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    @endif
-
-                                    @if($byAccount->count() > 0)
-                                        <h4 class="small text-secondary text-uppercase mb-1 mt-2">Por conta</h4>
-                                        <div class="table-responsive border rounded">
-                                            <table class="table table-sm table-borderless mb-0 small">
-                                                <tbody>
-                                                    @foreach($byAccount as $account => $total)
-                                                        <tr>
-                                                            <td class="py-1">{{ $account }}</td>
-                                                            <td class="text-end text-danger py-1 text-nowrap">R$ {{ number_format($total, 2, ',', '.') }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <div class="modal fade" id="modalInstallmentGroupSummary" tabindex="-1" aria-labelledby="modalInstallmentGroupSummaryLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="modalInstallmentGroupSummaryLabel">Parcelas da compra</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-secondary mb-2 fw-medium js-tx-inst-summary-desc"></p>
+                    <div class="rounded-3 border border-danger border-opacity-25 bg-danger bg-opacity-10 px-4 py-3 mb-3 text-center">
+                        <div class="small text-secondary fw-semibold text-uppercase mb-1">Total da compra</div>
+                        <div class="h4 mb-1 fw-bold text-danger text-nowrap js-tx-inst-total-value" aria-live="polite">—</div>
+                        <div class="small text-muted js-tx-inst-purchase-date" aria-live="polite"></div>
+                    </div>
+                    <p class="small text-muted mb-3">Todas as parcelas deste parcelamento no cartão. Em <strong>Fatura</strong>, abra o ciclo correspondente em Faturas cartão. Use as ações para alterar o valor ou excluir cada lançamento.</p>
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parcela</th>
+                                    <th>Descrição</th>
+                                    <th>Ref. fatura</th>
+                                    <th>Fatura</th>
+                                    <th class="text-end">Valor</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-installment-summary"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditTransactionAmount" tabindex="-1" aria-labelledby="modalEditTransactionAmountLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="modalEditTransactionAmountLabel">Alterar valor</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <form
+                    id="form-edit-transaction-amount"
+                    method="POST"
+                    action="{{ ($editTransactionModalMeta ?? [])['action'] ?? '' }}"
+                    data-tx-edit-precheck-url="{{ (($editTransactionModalMeta ?? [])['edit']['needsCreditLimitPrecheck'] ?? false) ? (($editTransactionModalMeta ?? [])['edit']['precheckUrl'] ?? '') : '' }}"
+                >
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="return_from_installment_modal" id="input-return-from-installment-modal" value="0">
+                    <div class="modal-body">
+                        <p class="small text-secondary mb-3">Só o valor é alterado; as categorias são ajustadas na mesma proporção. Em cartão de crédito, o total da fatura é recalculado. Parcelas podem ficar com valores diferentes entre si.</p>
+                        <div>
+                            <x-input-label for="edit-tx-amount" value="Novo valor (R$)" />
+                            <x-text-input
+                                id="edit-tx-amount"
+                                name="amount"
+                                type="number"
+                                step="0.01"
+                                class="mt-1"
+                                required
+                                value="{{ ($editTransactionModalMeta ?? [])['amount'] ?? '' }}"
+                                placeholder="0,00"
+                            />
+                            <x-input-error :messages="$errors->get('amount')" class="mt-2" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <x-primary-button>Salvar</x-primary-button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     @php
-        $openNewTransactionModal = $errors->hasAny([
+        $openNewTransactionModal = ! session('edit_transaction_id') && $errors->hasAny([
             'funding', 'account_id', 'description', 'amount', 'payment_method',
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
             'category_allocations',
         ]);
+        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('credit_limit_confirm_token'));
         $txAllocVisibleRows = 1;
         for ($r = 0; $r < 5; $r++) {
             $ov = old('category_allocations.'.$r.'.category_id');
@@ -568,5 +621,24 @@
             </script>
         @endpush
     @endif
+
+    @if ($openEditTransactionAmountModal)
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    var el = document.getElementById('modalEditTransactionAmount');
+                    if (!el || typeof bootstrap === 'undefined') return;
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                });
+            </script>
+        @endpush
+    @endif
+
+    @push('scripts')
+        <script>
+            window.__txInstallmentGroups = @json($installmentGroupsModalPayload ?? []);
+            window.__txOpenInstallmentModalRoot = @json(session('open_installment_modal_root'));
+        </script>
+    @endpush
 
 </x-app-layout>

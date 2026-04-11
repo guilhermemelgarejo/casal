@@ -78,10 +78,17 @@ class CreditCardStatementTest extends TestCase
 
         $this->cardExpense($user, $card, $category, 4, 2026, '150.50');
 
-        $this->actingAs($user)->get(route('credit-card-statements.index'))
+        $html = $this->actingAs($user)->get(route('credit-card-statements.index'))
             ->assertOk()
             ->assertSee('R$ 150,50', false)
-            ->assertSee('04/2026', false);
+            ->assertSee('04/2026', false)
+            ->assertSee('Itens da fatura', false)
+            ->assertSee('id="statement-cycle-', false)
+            ->assertSee('data-statement-cycle-key=', false)
+            ->assertSee('window.__invoiceCycleLinesByKey', false)
+            ->getContent();
+
+        $this->assertStringContainsString($card->id.'-2026-4', $html);
     }
 
     public function test_index_filtra_por_cartao(): void

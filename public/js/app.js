@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeEl) typeEl.value = 'expense';
             const colorEl = catForm.querySelector('#color');
             if (colorEl) colorEl.value = '#000000';
-            if (titleEl) titleEl.textContent = titleEl.dataset.titleNew || 'Nova Categoria';
+            if (titleEl) titleEl.textContent = titleEl.dataset.titleNew || 'Nova categoria';
             if (cancelBtn) cancelBtn.classList.add('d-none');
         };
 
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeIn) typeIn.value = cat.type;
                 const colorIn = catForm.querySelector('#color');
                 if (colorIn) colorIn.value = cat.color || '#000000';
-                if (titleEl) titleEl.textContent = titleEl.dataset.titleEdit || 'Editar Categoria';
+                if (titleEl) titleEl.textContent = titleEl.dataset.titleEdit || 'Editar categoria';
                 if (cancelBtn) cancelBtn.classList.remove('d-none');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
@@ -152,10 +152,12 @@ document.addEventListener('DOMContentLoaded', () => {
         bs.Modal.getOrCreateInstance(delModal).show();
     }
 
-    document.querySelectorAll('.js-tx-delete-blocked').forEach((btn) => {
-        btn.addEventListener('click', () => {
+    document.addEventListener('click', (e) => {
+        const delBlocked = e.target.closest('.js-tx-delete-blocked');
+        if (delBlocked) {
+            e.preventDefault();
             const text =
-                btn.getAttribute('data-tx-blocked-msg') ||
+                delBlocked.getAttribute('data-tx-blocked-msg') ||
                 'Este lançamento não pode ser excluído.';
             if (typeof Swal === 'undefined') {
                 window.alert(text);
@@ -170,132 +172,233 @@ document.addEventListener('DOMContentLoaded', () => {
                 customClass: { confirmButton: 'btn btn-primary px-4' },
                 buttonsStyling: false,
             });
-        });
+            return;
+        }
+        const editBlocked = e.target.closest('.js-tx-edit-blocked');
+        if (editBlocked) {
+            e.preventDefault();
+            const text =
+                editBlocked.getAttribute('data-tx-blocked-msg') ||
+                'Não é possível editar o valor deste lançamento.';
+            if (typeof Swal === 'undefined') {
+                window.alert(text);
+                return;
+            }
+            Swal.fire({
+                icon: 'error',
+                title: 'Edição não permitida',
+                text,
+                confirmButtonText: 'Entendi',
+                confirmButtonColor: '#0d6efd',
+                customClass: { confirmButton: 'btn btn-primary px-4' },
+                buttonsStyling: false,
+            });
+        }
     });
 
-    document.querySelectorAll('form.js-tx-delete-form').forEach((form) => {
-        form.addEventListener('submit', (e) => {
+    const txEditForm = document.getElementById('form-edit-transaction-amount');
+    const txEditModal = document.getElementById('modalEditTransactionAmount');
+    const installmentModalForEditReturn = document.getElementById('modalInstallmentGroupSummary');
+    if (txEditForm && txEditModal) {
+        txEditModal.addEventListener('show.bs.modal', (ev) => {
+            const btn = ev.relatedTarget;
+            txEditModal.dataset.txReopenInstallmentModal = '';
+            const returnInstInput = txEditForm.querySelector('#input-return-from-installment-modal');
+            if (returnInstInput) {
+                if (
+                    btn?.classList.contains('js-tx-edit-amount-open') &&
+                    btn.getAttribute('data-tx-from-installment-modal') === '1'
+                ) {
+                    returnInstInput.value = '1';
+                } else {
+                    returnInstInput.value = '0';
+                }
+            }
+            if (!btn || !btn.classList.contains('js-tx-edit-amount-open')) {
+                return;
+            }
+            if (btn.getAttribute('data-tx-from-installment-modal') === '1') {
+                txEditModal.dataset.txReopenInstallmentModal = '1';
+            }
+            const action = btn.getAttribute('data-tx-action') || '';
+            const amt = btn.getAttribute('data-tx-amount') || '';
+            const precheck = btn.getAttribute('data-tx-precheck') || '';
+            txEditForm.setAttribute('action', action);
+            txEditForm.dataset.txEditPrecheckUrl = precheck;
+            const amtInput = txEditForm.querySelector('[name="amount"]');
+            if (amtInput) {
+                amtInput.value = amt;
+            }
+            const prevTok = txEditForm.querySelector('input[name="credit_limit_confirm_token"]');
+            if (prevTok) {
+                prevTok.remove();
+            }
+            txEditForm.dataset.txCreditLimitSubmitting = '0';
+        });
+
+        txEditModal.addEventListener('hidden.bs.modal', () => {
+            if (
+                txEditModal.dataset.txReopenInstallmentModal !== '1' ||
+                !installmentModalForEditReturn ||
+                !bs?.Modal
+            ) {
+                return;
+            }
+            txEditModal.dataset.txReopenInstallmentModal = '';
+            bs.Modal.getOrCreateInstance(installmentModalForEditReturn).show();
+        });
+
+        txEditForm.addEventListener('submit', async (e) => {
+            if (txEditForm.dataset.txCreditLimitSubmitting === '1') {
+                txEditForm.dataset.txCreditLimitSubmitting = '0';
+                return;
+            }
+            if (txEditForm.querySelector('input[name="credit_limit_confirm_token"]')?.value) {
+                return;
+            }
+            const precheckUrl = txEditForm.dataset.txEditPrecheckUrl || '';
+            if (!precheckUrl) {
+                return;
+            }
             e.preventDefault();
-            const scopeInput = form.querySelector('.js-tx-installment-scope');
-            if (!scopeInput) {
-                form.submit();
-                return;
-            }
-            scopeInput.value = 'single';
-            let meta = {};
+            const fd = new FormData();
+            const amtVal = txEditForm.querySelector('[name="amount"]')?.value || '';
+            fd.append('amount', amtVal);
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            fd.append('_token', csrf);
+            let res;
             try {
-                meta = JSON.parse(form.getAttribute('data-tx-delete-meta') || '{}');
+                res = await fetch(precheckUrl, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: fd,
+                });
             } catch {
-                meta = {};
-            }
-            const peerCount = Number(meta.peerCount) || 1;
-            const singleAllowed = meta.singleAllowed !== false;
-
-            const proceedSingle = () => {
-                scopeInput.value = 'single';
-                form.submit();
-            };
-            const proceedAll = () => {
-                scopeInput.value = 'all';
-                form.submit();
-            };
-
-            const simpleConfirm = (title, html, confirmText) => {
-                if (typeof Swal === 'undefined') {
-                    if (window.confirm(html.replace(/<[^>]+>/g, ''))) {
-                        proceedSingle();
-                    }
-                    return;
-                }
-                Swal.fire({
-                    title,
-                    html,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    focusCancel: true,
-                    confirmButtonText: confirmText,
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#0d6efd',
-                    cancelButtonColor: '#6c757d',
-                    customClass: {
-                        confirmButton: 'btn btn-danger px-4',
-                        cancelButton: 'btn btn-outline-secondary px-4',
-                    },
-                    buttonsStyling: false,
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        proceedSingle();
-                    }
-                });
-            };
-
-            if (peerCount <= 1) {
-                simpleConfirm(
-                    'Excluir lançamento?',
-                    '<p class="mb-0">Deseja excluir este lançamento? Esta ação não pode ser desfeita.</p>',
-                    'Sim, excluir',
-                );
+                window.alert('Não foi possível verificar o limite do cartão. Tente de novo.');
                 return;
             }
-
-            if (!singleAllowed) {
-                if (typeof Swal === 'undefined') {
-                    if (
-                        window.confirm(
-                            `Este parcelamento tem ${peerCount} parcelas. Só é possível excluir todas de uma vez. Confirmar?`,
-                        )
-                    ) {
-                        proceedAll();
-                    }
-                    return;
-                }
-                Swal.fire({
-                    title: 'Primeira parcela de um parcelamento',
-                    html: `<p class="mb-2">Este parcelamento tem <strong>${peerCount}</strong> parcelas. Não é possível excluir só esta enquanto existirem as demais.</p><p class="mb-0">Deseja excluir <strong>todas as ${peerCount} parcelas</strong>?</p>`,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    focusCancel: true,
-                    confirmButtonText: `Excluir todas as ${peerCount} parcelas`,
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
-                    customClass: {
-                        confirmButton: 'btn btn-danger px-3',
-                        cancelButton: 'btn btn-outline-secondary px-4',
-                    },
-                    buttonsStyling: false,
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        proceedAll();
-                    }
-                });
+            let data = {};
+            try {
+                data = await res.json();
+            } catch {
+                data = {};
+            }
+            if (!res.ok) {
+                const errs = data.errors || {};
+                const first = Object.values(errs).flat()[0] || data.message || 'Verifique o valor.';
+                window.alert(first);
                 return;
             }
-
+            if (!data.overflow) {
+                txEditForm.dataset.txCreditLimitSubmitting = '1';
+                txEditForm.submit();
+                return;
+            }
+            const fmtMoney = (n) => {
+                const x = Number.parseFloat(String(n).replace(',', '.'));
+                if (Number.isNaN(x)) {
+                    return String(n);
+                }
+                return x.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+            const listHtml = `<ul class="text-start small mb-0 ps-3"><li>Limite total: R$ ${fmtMoney(data.limit_total)}</li><li>Em aberto nas faturas: R$ ${fmtMoney(data.outstanding_before)}</li><li>Novo valor do lançamento: R$ ${fmtMoney(data.purchase_total)}</li><li>Limite disponível passaria a: <strong class="text-danger">R$ ${fmtMoney(data.projected_available)}</strong></li></ul>`;
+            const bodyHtml = `<p class="mb-2 text-start">Este valor faz ultrapassar o limite total do cartão.</p>${listHtml}`;
+            const attachTokenAndSubmit = () => {
+                let input = txEditForm.querySelector('input[name="credit_limit_confirm_token"]');
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'credit_limit_confirm_token';
+                    txEditForm.appendChild(input);
+                }
+                input.value = data.token || '';
+                txEditForm.dataset.txCreditLimitSubmitting = '1';
+                txEditForm.submit();
+            };
             if (typeof Swal === 'undefined') {
-                if (window.confirm('Excluir só esta parcela?')) {
+                if (window.confirm(`${bodyHtml.replace(/<[^>]+>/g, ' ')}\n\nAtualizar mesmo assim?`)) {
+                    attachTokenAndSubmit();
+                }
+                return;
+            }
+            const result = await Swal.fire({
+                icon: 'warning',
+                title: 'Limite do cartão',
+                html: bodyHtml,
+                showCancelButton: true,
+                focusCancel: true,
+                confirmButtonText: 'Atualizar mesmo assim',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#0d6efd',
+                cancelButtonColor: '#6c757d',
+                customClass: {
+                    confirmButton: 'btn btn-primary px-3',
+                    cancelButton: 'btn btn-outline-secondary px-4',
+                },
+                buttonsStyling: false,
+            });
+            if (result.isConfirmed) {
+                attachTokenAndSubmit();
+            }
+        });
+    }
+
+    const parseTxDeleteMeta = (form) => {
+        const raw = form.getAttribute('data-tx-delete-meta') || '{}';
+        try {
+            if (raw.includes('%')) {
+                return JSON.parse(decodeURIComponent(raw));
+            }
+            return JSON.parse(raw);
+        } catch {
+            return {};
+        }
+    };
+
+    const handleTxDeleteFormSubmit = (e, form) => {
+        e.preventDefault();
+        const scopeInput = form.querySelector('.js-tx-installment-scope');
+        if (!scopeInput) {
+            form.submit();
+            return;
+        }
+        scopeInput.value = 'single';
+        const meta = parseTxDeleteMeta(form);
+        const peerCount = Number(meta.peerCount) || 1;
+        const singleAllowed = meta.singleAllowed !== false;
+
+        const proceedSingle = () => {
+            scopeInput.value = 'single';
+            form.submit();
+        };
+        const proceedAll = () => {
+            scopeInput.value = 'all';
+            form.submit();
+        };
+
+        const simpleConfirm = (title, html, confirmText) => {
+            if (typeof Swal === 'undefined') {
+                if (window.confirm(html.replace(/<[^>]+>/g, ''))) {
                     proceedSingle();
-                } else if (window.confirm('Excluir todas as parcelas?')) {
-                    proceedAll();
                 }
                 return;
             }
             Swal.fire({
-                title: 'Parcelamento no cartão',
-                html: `<p class="mb-2">Este parcelamento tem <strong>${peerCount}</strong> parcelas no total.</p><p class="mb-0">O que deseja excluir?</p>`,
+                title,
+                html,
                 icon: 'warning',
-                showDenyButton: true,
                 showCancelButton: true,
                 focusCancel: true,
-                confirmButtonText: 'Só esta parcela',
-                denyButtonText: `Excluir todas as ${peerCount} parcelas`,
+                confirmButtonText: confirmText,
                 cancelButtonText: 'Cancelar',
                 confirmButtonColor: '#0d6efd',
-                denyButtonColor: '#dc3545',
                 cancelButtonColor: '#6c757d',
                 customClass: {
-                    confirmButton: 'btn btn-primary px-3',
-                    denyButton: 'btn btn-danger px-3',
+                    confirmButton: 'btn btn-danger px-4',
                     cancelButton: 'btn btn-outline-secondary px-4',
                 },
                 buttonsStyling: false,
@@ -303,11 +406,201 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.isConfirmed) {
                     proceedSingle();
                 }
-                if (result.isDenied) {
+            });
+        };
+
+        if (peerCount <= 1) {
+            simpleConfirm(
+                'Excluir lançamento?',
+                '<p class="mb-0">Deseja excluir este lançamento? Esta ação não pode ser desfeita.</p>',
+                'Sim, excluir',
+            );
+            return;
+        }
+
+        if (!singleAllowed) {
+            if (typeof Swal === 'undefined') {
+                if (
+                    window.confirm(
+                        `Este parcelamento tem ${peerCount} parcelas. Só é possível excluir todas de uma vez. Confirmar?`,
+                    )
+                ) {
+                    proceedAll();
+                }
+                return;
+            }
+            Swal.fire({
+                title: 'Primeira parcela de um parcelamento',
+                html: `<p class="mb-2">Este parcelamento tem <strong>${peerCount}</strong> parcelas. Não é possível excluir só esta enquanto existirem as demais.</p><p class="mb-0">Deseja excluir <strong>todas as ${peerCount} parcelas</strong>?</p>`,
+                icon: 'warning',
+                showCancelButton: true,
+                focusCancel: true,
+                confirmButtonText: `Excluir todas as ${peerCount} parcelas`,
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                customClass: {
+                    confirmButton: 'btn btn-danger px-3',
+                    cancelButton: 'btn btn-outline-secondary px-4',
+                },
+                buttonsStyling: false,
+            }).then((result) => {
+                if (result.isConfirmed) {
                     proceedAll();
                 }
             });
+            return;
+        }
+
+        if (typeof Swal === 'undefined') {
+            if (window.confirm('Excluir só esta parcela?')) {
+                proceedSingle();
+            } else if (window.confirm('Excluir todas as parcelas?')) {
+                proceedAll();
+            }
+            return;
+        }
+        Swal.fire({
+            title: 'Parcelamento no cartão',
+            html: `<p class="mb-2">Este parcelamento tem <strong>${peerCount}</strong> parcelas no total.</p><p class="mb-0">O que deseja excluir?</p>`,
+            icon: 'warning',
+            showDenyButton: true,
+            showCancelButton: true,
+            focusCancel: true,
+            confirmButtonText: 'Só esta parcela',
+            denyButtonText: `Excluir todas as ${peerCount} parcelas`,
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0d6efd',
+            denyButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            customClass: {
+                confirmButton: 'btn btn-primary px-3',
+                denyButton: 'btn btn-danger px-3',
+                cancelButton: 'btn btn-outline-secondary px-4',
+            },
+            buttonsStyling: false,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                proceedSingle();
+            }
+            if (result.isDenied) {
+                proceedAll();
+            }
         });
+    };
+
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('form.js-tx-delete-form');
+        if (!form) {
+            return;
+        }
+        handleTxDeleteFormSubmit(e, form);
+    });
+
+    const escapeHtmlTx = (s) =>
+        String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+    const svgTxPencil =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>';
+    const svgTxTrash =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>';
+    const svgTxLock =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>';
+
+    const fillInstallmentGroupModal = (rootId) => {
+        const payload = window.__txInstallmentGroups || {};
+        const group = payload[String(rootId)];
+        const tbody = document.getElementById('tbody-installment-summary');
+        const descEl = document.querySelector('.js-tx-inst-summary-desc');
+        const totalValueEl = document.querySelector('.js-tx-inst-total-value');
+        const purchaseDateEl = document.querySelector('.js-tx-inst-purchase-date');
+        if (!tbody || !group || !descEl) {
+            return;
+        }
+        descEl.textContent = group.baseDescription || '';
+        if (totalValueEl) {
+            let totalStr = group.total_amount_str;
+            if (!totalStr && Array.isArray(group.rows)) {
+                const sum = group.rows.reduce((acc, row) => acc + Number(row.amount), 0);
+                totalStr = sum.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            totalValueEl.textContent = totalStr ? `R$ ${totalStr}` : '—';
+        }
+        if (purchaseDateEl) {
+            const firstRow = Array.isArray(group.rows) && group.rows.length ? group.rows[0] : null;
+            const d = firstRow && firstRow.date ? String(firstRow.date).trim() : '';
+            purchaseDateEl.textContent = d ? `Data da compra · ${d}` : '';
+        }
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const paidMsg =
+            'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
+
+        tbody.innerHTML = group.rows
+            .map((row) => {
+                const del = row.delete || {};
+                const edit = row.edit || {};
+                const delMetaEnc = encodeURIComponent(JSON.stringify(del));
+                const amtForm = escapeHtmlTx(row.amount_form != null ? String(row.amount_form) : String(row.amount));
+                const updateUrl = escapeHtmlTx(row.update_url || '');
+                const destroyUrl = escapeHtmlTx(row.destroy_url || '');
+                const statementUrl = escapeHtmlTx(row.statement_url || '');
+                const editBlockedMsg = escapeHtmlTx(
+                    edit.blockedMessage || 'Não é possível editar o valor deste lançamento.',
+                );
+                const precheck = edit.needsCreditLimitPrecheck ? escapeHtmlTx(edit.precheckUrl || '') : '';
+
+                let actions = '';
+                if (!edit.canEditAmount) {
+                    actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-edit-blocked" data-tx-blocked-msg="${editBlockedMsg}" title="Edição não permitida" aria-label="Edição não permitida">${svgTxPencil}</button>`;
+                } else {
+                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-precheck="${precheck}" title="Alterar valor" aria-label="Alterar valor">${svgTxPencil}</button>`;
+                }
+                if (del.paidInvoice) {
+                    actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked ms-1" data-tx-blocked-msg="${escapeHtmlTx(paidMsg)}" title="Exclusão bloqueada" aria-label="Exclusão bloqueada">${svgTxLock}</button>`;
+                } else {
+                    actions += `<form action="${destroyUrl}" method="POST" class="d-inline js-tx-delete-form ms-1" data-tx-delete-meta="${delMetaEnc}"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><input type="hidden" name="_method" value="DELETE"><input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope"><button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir" aria-label="Excluir">${svgTxTrash}</button></form>`;
+                }
+
+                const faturaCell =
+                    statementUrl !== ''
+                        ? `<td><a href="${statementUrl}" class="btn btn-sm btn-link py-0 px-1">Ver fatura</a></td>`
+                        : '<td class="small text-secondary">—</td>';
+
+                return `<tr>
+                    <td>${escapeHtmlTx(row.parcel_label)}</td>
+                    <td><div class="small text-body">${escapeHtmlTx(row.description)}</div></td>
+                    <td>${escapeHtmlTx(row.ref_label)}</td>
+                    ${faturaCell}
+                    <td class="text-end text-nowrap fw-semibold text-danger">- R$ ${escapeHtmlTx(row.amount_str)}</td>
+                    <td class="text-end"><div class="d-inline-flex gap-1 align-items-center justify-content-end flex-wrap">${actions}</div></td>
+                </tr>`;
+            })
+            .join('');
+    };
+
+    const installmentGroupModalEl = document.getElementById('modalInstallmentGroupSummary');
+
+    const dzOpenInstallmentGroupModal = (rootId) => {
+        if (rootId === null || rootId === undefined || rootId === '') {
+            return;
+        }
+        fillInstallmentGroupModal(String(rootId));
+        if (installmentGroupModalEl && bs?.Modal) {
+            bs.Modal.getOrCreateInstance(installmentGroupModalEl).show();
+        }
+    };
+    window.dzOpenInstallmentGroupModal = dzOpenInstallmentGroupModal;
+
+    document.addEventListener('click', (e) => {
+        const openSum = e.target.closest('.js-tx-open-installment-summary');
+        if (openSum && installmentGroupModalEl && bs?.Modal) {
+            const rootId = openSum.getAttribute('data-tx-root-id');
+            dzOpenInstallmentGroupModal(rootId);
+        }
     });
 
     /** Formulários com data-confirm: diálogo SweetAlert2 em vez de window.confirm */
@@ -598,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (typeof Swal === 'undefined') {
-                if (window.confirm(`${bodyHtml.replace(/<[^>]+>/g, ' ')}\n\nRegistar mesmo assim?`)) {
+                if (window.confirm(`${bodyHtml.replace(/<[^>]+>/g, ' ')}\n\nRegistrar mesmo assim?`)) {
                     attachTokenAndSubmit();
                 }
                 return;
@@ -610,7 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 html: bodyHtml,
                 showCancelButton: true,
                 focusCancel: true,
-                confirmButtonText: 'Registar mesmo assim',
+                confirmButtonText: 'Registrar mesmo assim',
                 cancelButtonText: 'Cancelar',
                 confirmButtonColor: '#0d6efd',
                 cancelButtonColor: '#6c757d',
@@ -625,5 +918,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 attachTokenAndSubmit();
             }
         });
+    }
+
+    const pendingInstRoot = window.__txOpenInstallmentModalRoot;
+    if (pendingInstRoot != null && Number(pendingInstRoot) > 0) {
+        dzOpenInstallmentGroupModal(Number(pendingInstRoot));
+    }
+    try {
+        delete window.__txOpenInstallmentModalRoot;
+    } catch {
+        window.__txOpenInstallmentModalRoot = undefined;
     }
 });

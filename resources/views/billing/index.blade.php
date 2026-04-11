@@ -40,7 +40,7 @@
                                 @if (! empty($billingOwner?->name))
                                     (<strong>{{ $billingOwner->name }}</strong>)
                                 @endif
-                                . Não é necessário registar cartão novamente.
+                                . Não é necessário registrar cartão novamente.
                             </p>
                         @endif
                     @else
@@ -52,7 +52,7 @@
                         <form action="{{ route('billing.checkout') }}" method="POST">
                             @csrf
                             <x-primary-button type="submit">
-                                Registar cartão e ativar teste
+                                Registrar cartão e ativar teste
                             </x-primary-button>
                         </form>
                     @endif

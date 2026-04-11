@@ -43,7 +43,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Período de teste (dias), com cartão no registo via Stripe Checkout
+    | Período de teste (dias), com cartão no registro via Stripe Checkout
     |--------------------------------------------------------------------------
     |
     | Stripe exige janela mínima ~48h para Checkout com trial; use pelo menos 3.

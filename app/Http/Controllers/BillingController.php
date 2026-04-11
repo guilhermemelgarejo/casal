@@ -65,7 +65,7 @@ class BillingController extends Controller
     {
         if (! Billing::isEnforced()) {
             return redirect()->route('dashboard')
-                ->with('success', 'Assinatura registada. Bem-vindo ao período de teste.');
+                ->with('success', 'Assinatura registrada. Bem-vindo ao período de teste.');
         }
 
         $sessionId = $request->query('session_id');
@@ -110,6 +110,6 @@ class BillingController extends Controller
         }
 
         return redirect()->route('dashboard')
-            ->with('success', 'Assinatura registada. Bem-vindo ao período de teste.');
+            ->with('success', 'Assinatura registrada. Bem-vindo ao período de teste.');
     }
 }

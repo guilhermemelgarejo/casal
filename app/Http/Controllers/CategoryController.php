@@ -11,9 +11,11 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Auth::user()->couple->categories;
+        $all = Auth::user()->couple->categories;
+        $categoriesIncome = $all->where('type', 'income')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $categoriesExpense = $all->where('type', 'expense')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
 
-        return view('categories.index', compact('categories'));
+        return view('categories.index', compact('categoriesIncome', 'categoriesExpense'));
     }
 
     public function store(Request $request)
