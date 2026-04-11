@@ -31,6 +31,22 @@
 
     <div class="py-4 dashboard-page">
         <div class="container-xxl px-3 px-lg-4">
+            @if (session('success'))
+                <div class="alert alert-success border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                    <span class="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                    </span>
+                    <span class="pt-1">{{ session('success') }}</span>
+                </div>
+            @endif
+            @if (session('error'))
+                <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                    <span class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    </span>
+                    <span class="pt-1">{{ session('error') }}</span>
+                </div>
+            @endif
             @if($showAlert)
                 <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
                     <div class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
@@ -136,7 +152,19 @@
                             $rowPct = $spendingAccountsSum > 0 ? ($item['total'] / $spendingAccountsSum) * 100 : 0;
                         @endphp
                         <div class="col-12 col-md-6 col-lg-4">
-                        <div class="dashboard-spending-item rounded-4 p-3 h-100 bg-body-tertiary bg-opacity-25 border border-secondary-subtle">
+                        @if($item['is_credit_card'])
+                            <a
+                                href="{{ route('credit-card-statements.index', ['account_id' => $item['account_id']]) }}"
+                                class="dashboard-spending-item dashboard-spending-item--link rounded-4 p-3 h-100 bg-body-tertiary bg-opacity-25 border border-secondary-subtle d-block text-decoration-none text-body"
+                                aria-label="Abrir faturas do cartão {{ $item['account_name'] }}"
+                            >
+                        @else
+                            <a
+                                href="{{ route('transactions.index', ['month' => $month, 'year' => $year, 'account_id' => $item['account_id']]) }}"
+                                class="dashboard-spending-item dashboard-spending-item--link rounded-4 p-3 h-100 bg-body-tertiary bg-opacity-25 border border-secondary-subtle d-block text-decoration-none text-body"
+                                aria-label="Abrir lançamentos filtrados pela conta {{ $item['account_name'] }}"
+                            >
+                        @endif
                             <div class="d-flex align-items-stretch gap-3">
                                 <div class="rounded-2 flex-shrink-0 align-self-stretch" style="width: 5px; min-height: 3.25rem; background-color: {{ $item['account_color'] }};" aria-hidden="true"></div>
                                 <div class="flex-grow-1 min-w-0">
@@ -159,7 +187,7 @@
                                     @endif
                                 </div>
                             </div>
-                        </div>
+                        </a>
                         </div>
                     @empty
                         <div class="col-12">
@@ -173,55 +201,49 @@
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-                <div class="px-4 py-3 dashboard-section-head">
-                    <h3 class="h5 mb-1 fw-semibold">Lançamentos do período</h3>
-                    <p class="small text-secondary mb-0">Todas as movimentações do mês de referência, <strong class="fw-medium text-body">incluindo</strong> quitações de fatura de cartão.</p>
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden dashboard-tx-list-card">
+                <div class="dashboard-tx-list-head px-4 py-3">
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="h5 mb-1 fw-semibold">Lançamentos do período</h3>
+                            <p class="small text-secondary mb-2 mb-lg-1">Mesma regra que em <strong class="fw-medium text-body">Lançamentos</strong>: no cartão, o mês do painel filtra pela <strong class="fw-medium text-body">data da compra</strong>; parcelas aparecem numa linha com o total.</p>
+                            <a href="{{ route('transactions.index', ['month' => $month, 'year' => $year]) }}" class="small fw-semibold text-decoration-none">Lista completa em Lançamentos →</a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 justify-content-end flex-shrink-0" role="group" aria-label="Novo lançamento">
+                            <button
+                                type="button"
+                                class="btn btn-outline-success rounded-pill px-3"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalNewTransaction"
+                                data-tx-open-preset="income"
+                            >
+                                + Receita
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-outline-danger rounded-pill px-3"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalNewTransaction"
+                                data-tx-open-preset="expense"
+                            >
+                                + Despesa
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 dashboard-table">
-                        <thead>
-                            <tr>
-                                <th class="ps-4">Data</th>
-                                <th>Descrição</th>
-                                <th>Categoria</th>
-                                <th>Conta</th>
-                                <th class="text-end pe-4">Valor</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($transactions as $transaction)
-                                <tr>
-                                    <td class="text-secondary small text-nowrap ps-4">{{ $transaction->date->format('d/m/Y') }}</td>
-                                    <td class="fw-medium">{{ $transaction->description }}</td>
-                                    <td>
-                                        <div class="d-flex flex-column gap-1 align-items-start">
-                                            @forelse($transaction->categorySplits as $sp)
-                                                <span class="badge rounded-pill text-white" style="background-color: {{ $sp->category->color ?? '#ccc' }}">{{ $sp->category->name }} · R$ {{ number_format((float) $sp->amount, 2, ',', '.') }}</span>
-                                            @empty
-                                                <span class="text-secondary small">—</span>
-                                            @endforelse
-                                        </div>
-                                    </td>
-                                    <td class="small">{{ $transaction->accountModel->name ?? '-' }}</td>
-                                    <td class="text-end fw-bold text-nowrap pe-4 {{ $transaction->type === 'income' ? 'text-success' : 'text-danger' }}">
-                                        {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ number_format($transaction->amount, 2, ',', '.') }}
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="p-0">
-                                        <div class="dashboard-transactions-empty text-center py-5 px-3 m-3">
-                                            <p class="fw-semibold text-body mb-1">Nenhum lançamento neste período</p>
-                                            <p class="small text-secondary mb-0">Altere o mês no filtro ou registre movimentações em Lançamentos.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+
+                <div class="list-group list-group-flush" role="list">
+                    @include('transactions.partials.transaction-list-rows', [
+                        'emptyTitle' => 'Nenhum lançamento neste período',
+                        'emptyHint' => 'Altere o mês no filtro do painel ou registe com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.',
+                    ])
+                </div>
+                <div class="tx-pagination-wrap px-3 py-3 border-top border-light-subtle">
+                    {{ $transactions->links() }}
                 </div>
             </div>
         </div>
     </div>
+
+    @include('transactions.partials.transaction-modals')
 </x-app-layout>

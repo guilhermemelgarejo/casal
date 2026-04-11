@@ -92,7 +92,7 @@ class RegularAccountBalanceDisplayTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Saldo atual desta conta', false);
+        $response->assertSee('Saldo da conta', false);
         $response->assertSee('R$ -40,00', false);
     }
 }
