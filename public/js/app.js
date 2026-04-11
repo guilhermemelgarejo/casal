@@ -680,9 +680,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? `<td><a href="${statementUrl}" class="btn btn-sm btn-link py-0 px-1">Ver fatura</a></td>`
                         : '<td class="small text-secondary">—</td>';
 
+                const regBy =
+                    row.registered_by_name != null && String(row.registered_by_name).trim() !== ''
+                        ? `<td class="small text-body">${escapeHtmlTx(String(row.registered_by_name))}</td>`
+                        : '<td class="small text-secondary">—</td>';
+
                 return `<tr>
                     <td>${escapeHtmlTx(row.parcel_label)}</td>
                     <td><div class="small text-body">${escapeHtmlTx(row.description)}</div></td>
+                    ${regBy}
                     <td>${escapeHtmlTx(row.ref_label)}</td>
                     ${faturaCell}
                     <td class="text-end text-nowrap fw-semibold text-danger">- R$ ${escapeHtmlTx(row.amount_str)}</td>
@@ -949,6 +955,233 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+        }
+
+        const syncTxAllocRemoveButtons = () => {
+            const wrap = document.getElementById('tx-category-allocations-wrap');
+            if (!wrap) {
+                return;
+            }
+            const rows = Array.from(wrap.querySelectorAll('.tx-cat-alloc-row'));
+            const vis = rows.filter((row) => !row.classList.contains('d-none'));
+            const hideAll = vis.length <= 1;
+            rows.forEach((row) => {
+                const btn = row.querySelector('.js-tx-remove-alloc-row');
+                if (!btn) {
+                    return;
+                }
+                const rowHidden = row.classList.contains('d-none');
+                if (rowHidden || hideAll) {
+                    btn.classList.add('d-none');
+                    btn.setAttribute('disabled', 'disabled');
+                } else {
+                    btn.classList.remove('d-none');
+                    btn.removeAttribute('disabled');
+                }
+            });
+        };
+
+        const resetNewTransactionModalForm = () => {
+            txForm.reset();
+
+            if (mode === 'both' && fundingInput && pmInput) {
+                fundingInput.value = '';
+                pmInput.removeAttribute('disabled');
+                pmInput.setAttribute('name', 'payment_method');
+                pmInput.value = '';
+            }
+
+            const titleEl = document.getElementById('modalNewTransactionLabel');
+            if (titleEl) {
+                titleEl.textContent = 'Novo lançamento';
+            }
+
+            const desc = document.getElementById('description');
+            const amt = document.getElementById('amount');
+            const dateIn = document.getElementById('date');
+            const tmplInput = document.getElementById('tx-recurring-template-id');
+            if (desc) {
+                desc.value = '';
+            }
+            if (amt) {
+                amt.value = '';
+            }
+            if (dateIn) {
+                const d = txForm.dataset.txDefaultDate;
+                dateIn.value =
+                    (d && String(d).trim()) || new Date().toISOString().slice(0, 10);
+            }
+            if (tmplInput) {
+                tmplInput.value = '';
+            }
+
+            const limitToken = txForm.querySelector('input[name="credit_limit_confirm_token"]');
+            if (limitToken) {
+                limitToken.remove();
+            }
+            delete txForm.dataset.txCreditLimitSubmitting;
+            delete txForm.dataset.txRecurringPrefill;
+
+            if (installmentsSelect) {
+                installmentsSelect.value = '1';
+            }
+
+            if (typeSelect) {
+                typeSelect.value = 'expense';
+                typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            if (mode === 'cards_only' && accountSel) {
+                accountSel.value = '';
+            } else if (paymentFlow) {
+                paymentFlow.value = '';
+                paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            const allocWrap = document.getElementById('tx-category-allocations-wrap');
+            if (allocWrap) {
+                const rows = allocWrap.querySelectorAll('.tx-cat-alloc-row');
+                rows.forEach((row, idx) => {
+                    const cat = row.querySelector('.js-tx-split-cat');
+                    const am = row.querySelector('.js-tx-split-amount');
+                    if (cat) {
+                        cat.value = '';
+                    }
+                    if (am) {
+                        am.value = '';
+                    }
+                    if (idx === 0) {
+                        row.classList.remove('d-none');
+                    } else {
+                        row.classList.add('d-none');
+                    }
+                });
+            }
+
+            if (typeof txFilterSplitCats === 'function') {
+                txFilterSplitCats(false);
+            }
+            syncTxAllocRemoveButtons();
+
+            if (mode === 'cards_only') {
+                syncInstallments(true);
+                syncCreditReferencePlusOneMonth();
+            }
+        };
+
+        if (modalNewTx) {
+            modalNewTx.addEventListener('hidden.bs.modal', () => {
+                resetNewTransactionModalForm();
+            });
+        }
+
+        const applyRecurringPrefill = (prefill) => {
+            if (!prefill || typeof prefill !== 'object') {
+                return;
+            }
+            const desc = document.getElementById('description');
+            const amt = document.getElementById('amount');
+            const dateIn = document.getElementById('date');
+            const tmplInput = document.getElementById('tx-recurring-template-id');
+            if (desc && prefill.description != null) {
+                desc.value = prefill.description;
+            }
+            if (amt && prefill.amount != null) {
+                amt.value = prefill.amount;
+            }
+            if (dateIn && prefill.date) {
+                dateIn.value = prefill.date;
+            }
+            if (tmplInput) {
+                tmplInput.value =
+                    prefill.recurring_template_id != null ? String(prefill.recurring_template_id) : '';
+            }
+            if (installmentsSelect) {
+                installmentsSelect.value = '1';
+            }
+            if (typeSelect && prefill.type) {
+                typeSelect.value = prefill.type;
+                typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            const fund = prefill.funding;
+            if (mode === 'cards_only') {
+                if (accountSel && prefill.account_id != null) {
+                    accountSel.value = String(prefill.account_id);
+                }
+                syncInstallments(true);
+            } else if (paymentFlow) {
+                if (fund === 'credit_card') {
+                    paymentFlow.value = '__credit__';
+                    paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+                } else if (prefill.payment_method) {
+                    paymentFlow.value = prefill.payment_method;
+                    paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (accountSel && prefill.account_id != null) {
+                    accountSel.value = String(prefill.account_id);
+                }
+                syncInstallments(fund === 'credit_card' || paymentFlow.value === '__credit__');
+            }
+            if (referenceMonth && referenceYear && prefill.date && isCreditUi()) {
+                const d = new Date(`${prefill.date}T12:00:00`);
+                if (!Number.isNaN(d.getTime())) {
+                    referenceMonth.value = String(d.getMonth() + 1);
+                    referenceYear.value = String(d.getFullYear());
+                }
+            }
+            const wrap = document.getElementById('tx-category-allocations-wrap');
+            if (wrap && Array.isArray(prefill.splits)) {
+                const rows = wrap.querySelectorAll('.tx-cat-alloc-row');
+                rows.forEach((row) => row.classList.add('d-none'));
+                if (prefill.splits.length === 0) {
+                    const first = rows[0];
+                    if (first) {
+                        first.classList.remove('d-none');
+                        const cat = first.querySelector('.js-tx-split-cat');
+                        const am = first.querySelector('.js-tx-split-amount');
+                        if (cat) {
+                            cat.value = '';
+                        }
+                        if (am) {
+                            am.value = '';
+                        }
+                    }
+                } else {
+                    prefill.splits.slice(0, rows.length).forEach((sp, idx) => {
+                        const row = rows[idx];
+                        if (!row) {
+                            return;
+                        }
+                        row.classList.remove('d-none');
+                        const cat = row.querySelector('.js-tx-split-cat');
+                        const am = row.querySelector('.js-tx-split-amount');
+                        if (cat) {
+                            cat.value = String(sp.category_id || '');
+                        }
+                        if (am) {
+                            am.value = sp.amount || '';
+                        }
+                    });
+                }
+                if (typeof txFilterSplitCats === 'function') {
+                    txFilterSplitCats(false);
+                }
+                syncTxAllocRemoveButtons();
+            }
+        };
+
+        let recurringPrefillParsed = null;
+        try {
+            const rawPrefill = txForm.dataset.txRecurringPrefill || '';
+            if (rawPrefill) {
+                recurringPrefillParsed = JSON.parse(rawPrefill);
+            }
+        } catch {
+            /* ignore */
+        }
+        if (recurringPrefillParsed && modalNewTx && bs?.Modal) {
+            applyRecurringPrefill(recurringPrefillParsed);
+            bs.Modal.getOrCreateInstance(modalNewTx).show();
         }
 
         const precheckUrl = txForm.dataset.creditLimitPrecheckUrl || '';

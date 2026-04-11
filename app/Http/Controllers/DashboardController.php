@@ -3,7 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
+use App\Models\Account;
+use App\Models\RecurringTransaction;
+use App\Support\CreditCardInvoiceReminders;
 use App\Support\TransactionListingPresentation;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -54,6 +58,27 @@ class DashboardController extends Controller
         $thresholdAmount = ($income * $thresholdPercentage) / 100;
         $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
 
+        $now = Carbon::now();
+        $recurringReminders = $couple->recurringTransactions()
+            ->where('is_active', true)
+            ->with('account')
+            ->get()
+            ->filter(fn (RecurringTransaction $r) => $r->shouldShowReminder($now))
+            ->values();
+
+        $cardAccounts = $couple->accounts()
+            ->where('kind', Account::KIND_CREDIT_CARD)
+            ->orderBy('name')
+            ->get();
+        $creditCardInvoiceReminders = CreditCardInvoiceReminders::openStatementsForCouple(
+            (int) $couple->id,
+            $cardAccounts,
+            $now
+        );
+
+        $txRecurringPrefill = null;
+        $txRecurringPrefillBlockedReason = null;
+
         return view('dashboard', array_merge(
             compact(
                 'couple',
@@ -70,7 +95,11 @@ class DashboardController extends Controller
                 'transactionDeleteMeta',
                 'transactionAmountEditMeta',
                 'installmentGroupsModalPayload',
-                'creditCardPurchaseRowMeta'
+                'creditCardPurchaseRowMeta',
+                'recurringReminders',
+                'creditCardInvoiceReminders',
+                'txRecurringPrefill',
+                'txRecurringPrefillBlockedReason'
             ),
             $this->transactionModalPayload()
         ));

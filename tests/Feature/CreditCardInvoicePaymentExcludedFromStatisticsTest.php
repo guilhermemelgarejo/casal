@@ -172,7 +172,8 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
 
         $page = $this->actingAs($user)->followingRedirects()->get(route('budgets.index'));
         $page->assertOk();
-        $page->assertSee('R$ 40,00', false);
-        $page->assertDontSee('R$ 240,00', false);
+        $page->assertSee('40,00', false);
+        $page->assertDontSee('240,00', false);
+        $page->assertSee('300,00', false);
     }
 }

@@ -33,6 +33,11 @@
                     </x-nav-link>
                 </li>
                 <li class="nav-item">
+                    <x-nav-link :href="route('recurring-transactions.index')" :active="request()->routeIs('recurring-transactions.*')">
+                        Recorrentes
+                    </x-nav-link>
+                </li>
+                <li class="nav-item">
                     <x-nav-link :href="route('categories.index')" :active="request()->routeIs('categories.*')">
                         Categorias
                     </x-nav-link>

@@ -4,6 +4,7 @@
             <div>Data</div>
             <div>Descrição</div>
             <div>Categorias</div>
+            <div>Registado por</div>
             <div>Pagamento / conta</div>
             <div>Valor</div>
             <div class="text-end text-nowrap">Ações</div>
@@ -27,13 +28,15 @@
         $hideListEditForCcInstallments = $delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard();
         $blockedMsg = 'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
         $accRow = $transaction->accountModel;
+        $registeredByLabel = $transaction->user?->firstGivenName() ?? '';
+        $registeredByTitle = $transaction->user ? 'Registado por '.$transaction->user->name : '';
     @endphp
     <div class="list-group-item px-3 py-2 border-start-0 border-end-0 tx-list-row-item" role="listitem">
         <div class="tx-list-row-grid">
             <div class="text-secondary small text-nowrap">{{ $transaction->date->format('d/m/Y') }}</div>
             <div class="tx-cell-truncate">
-                <div class="text-truncate" title="{{ $ccRowMeta['base_description'] ?? $transaction->description }} — {{ $transaction->user->name }}">
-                    <span class="fw-medium">{{ $ccRowMeta['base_description'] ?? $transaction->description }}</span><span class="text-muted small"> · {{ $transaction->user->name }}</span>
+                <div class="text-truncate" title="{{ $ccRowMeta['base_description'] ?? $transaction->description }}">
+                    <span class="fw-medium">{{ $ccRowMeta['base_description'] ?? $transaction->description }}</span>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-1 align-items-center">
@@ -44,6 +47,11 @@
                 @empty
                     <span class="text-secondary small">—</span>
                 @endforelse
+            </div>
+            <div class="tx-cell-truncate small">
+                <div class="text-truncate" title="{{ $registeredByTitle }}">
+                    <span class="d-lg-none text-secondary">Registado por </span><span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
+                </div>
             </div>
             <div class="small text-body-secondary tx-cell-truncate">
                 @if($accRow?->isCreditCard())

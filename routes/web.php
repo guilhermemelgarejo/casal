@@ -10,6 +10,7 @@ use App\Http\Controllers\CreditCardStatementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +36,10 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::put('/transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
     Route::delete('/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
 
+    Route::get('/recorrentes', [RecurringTransactionController::class, 'index'])->name('recurring-transactions.index');
+    Route::post('/recorrentes', [RecurringTransactionController::class, 'store'])->name('recurring-transactions.store');
+    Route::put('/recorrentes/{recurringTransaction}', [RecurringTransactionController::class, 'update'])->name('recurring-transactions.update');
+    Route::delete('/recorrentes/{recurringTransaction}', [RecurringTransactionController::class, 'destroy'])->name('recurring-transactions.destroy');
     Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
     Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
     Route::put('/accounts/{account}', [AccountController::class, 'update'])->name('accounts.update');
@@ -76,6 +81,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/couple/join', [CoupleController::class, 'join'])->name('couple.join');
     Route::post('/couple/invite', [CoupleController::class, 'sendInvite'])->name('couple.invite');
     Route::put('/couple/update', [CoupleController::class, 'update'])->name('couple.update');
+    Route::post('/couple/transfer-billing-owner', [CoupleController::class, 'transferBillingOwner'])->name('couple.transfer-billing-owner');
     Route::post('/couple/leave', [CoupleController::class, 'leave'])->name('couple.leave');
 });
 

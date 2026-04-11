@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InvitationMail;
 use App\Models\Category;
 use App\Models\Couple;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
-
 use Illuminate\Support\Facades\Mail;
-use App\Mail\InvitationMail;
+use Illuminate\Support\Str;
 
 class CoupleController extends Controller
 {
@@ -69,7 +68,7 @@ class CoupleController extends Controller
 
         $couple = Couple::where('invite_code', $request->invite_code)->first();
 
-        if (!$couple) {
+        if (! $couple) {
             return back()->withErrors(['invite_code' => 'Código de convite inválido.']);
         }
 
@@ -93,13 +92,13 @@ class CoupleController extends Controller
         $user = Auth::user();
         $couple = $user->couple;
 
-        if (!$couple) {
+        if (! $couple) {
             return back()->withErrors(['email' => 'Você não faz parte de um casal.']);
         }
 
         Mail::to($request->email)->send(new InvitationMail($user, $couple));
 
-        return back()->with('success', 'Convite enviado com sucesso para ' . $request->email . '!');
+        return back()->with('success', 'Convite enviado com sucesso para '.$request->email.'!');
     }
 
     public function update(Request $request)
@@ -113,7 +112,7 @@ class CoupleController extends Controller
         $user = Auth::user();
         $couple = $user->couple;
 
-        if (!$couple) {
+        if (! $couple) {
             return back()->withErrors(['name' => 'Você não faz parte de um casal.']);
         }
 
@@ -126,22 +125,65 @@ class CoupleController extends Controller
         return back()->with('success', 'Configurações do casal atualizadas!');
     }
 
+    public function transferBillingOwner(Request $request)
+    {
+        $request->validate([
+            'billing_owner_user_id' => 'required|integer|exists:users,id',
+        ]);
+
+        $user = Auth::user();
+        $couple = $user->couple;
+
+        if (! $couple) {
+            return back()->with('error', 'Você não faz parte de um casal.');
+        }
+
+        if ((int) $couple->billing_owner_user_id !== (int) $user->id) {
+            return back()->with('error', 'Apenas quem é responsável pela assinatura pode transferir esse papel.');
+        }
+
+        $newOwnerId = (int) $request->input('billing_owner_user_id');
+        if ($newOwnerId === (int) $user->id) {
+            return back()->with('error', 'Escolha outro membro do casal.');
+        }
+
+        $newOwner = $couple->users()->whereKey($newOwnerId)->first();
+        if (! $newOwner) {
+            return back()->with('error', 'O membro escolhido não pertence a este casal.');
+        }
+
+        $couple->forceFill(['billing_owner_user_id' => $newOwnerId])->save();
+
+        return back()->with('success', 'A responsabilidade pela assinatura foi transferida para '.$newOwner->name.'.');
+    }
+
     public function leave()
     {
         $user = Auth::user();
         $couple = $user->couple;
 
-        if (!$couple) {
+        if (! $couple) {
             return back()->withErrors(['error' => 'Você não faz parte de um casal.']);
+        }
+
+        $otherMembersCount = $couple->users()->where('id', '!=', $user->id)->count();
+        if (
+            $couple->billing_owner_user_id !== null
+            && (int) $couple->billing_owner_user_id === (int) $user->id
+            && $otherMembersCount >= 1
+        ) {
+            return redirect()->route('couple.index')->with(
+                'error',
+                'Transfira primeiro a responsabilidade pela assinatura para o outro membro do casal antes de sair.'
+            );
         }
 
         $user->couple_id = null;
         $user->save();
 
-        // Se o casal ficar sem membros, podemos opcionalmente deletar, 
-        // mas por enquanto vamos apenas deixar o registro lá.
+        $couple->refresh();
         if ($couple->users()->count() === 0) {
-            // $couple->delete();
+            $couple->forceFill(['billing_owner_user_id' => null])->save();
         }
 
         return redirect()->route('couple.index')->with('success', 'Você saiu do casal.');

@@ -61,6 +61,7 @@ class TransactionListingPresentation
                 $q->whereIn('id', $roots)
                     ->orWhereIn('installment_parent_id', $roots);
             })
+            ->with('user')
             ->get();
 
         return $groupMembers->groupBy(fn (Transaction $t) => (string) $t->installmentRootId());
@@ -93,7 +94,7 @@ class TransactionListingPresentation
 
             $rows = [];
             foreach ($sorted as $idx => $t) {
-                $t->loadMissing(['accountModel', 'categorySplits', 'creditCardStatementsPaidFor']);
+                $t->loadMissing(['accountModel', 'categorySplits', 'creditCardStatementsPaidFor', 'user']);
                 $refMonth = (int) ($t->reference_month ?? $t->date->month);
                 $refYear = (int) ($t->reference_year ?? $t->date->year);
                 $refLabel = str_pad((string) $refMonth, 2, '0', STR_PAD_LEFT).'/'.$refYear;
@@ -106,6 +107,7 @@ class TransactionListingPresentation
 
                 $rows[] = [
                     'id' => $t->id,
+                    'registered_by_name' => $t->user?->firstGivenName(),
                     'parcel_label' => ($idx + 1).'/'.$total,
                     'description' => $t->description,
                     'description_edit_base' => $t->baseDescriptionWithoutInstallmentSuffix(),

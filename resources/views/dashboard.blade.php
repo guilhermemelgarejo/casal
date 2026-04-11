@@ -47,6 +47,12 @@
                     <span class="pt-1">{{ session('error') }}</span>
                 </div>
             @endif
+            @include('partials.rt-reminder-panel', [
+                'reminders' => $recurringReminders ?? collect(),
+                'invoiceReminders' => $creditCardInvoiceReminders ?? collect(),
+                'month' => $month,
+                'year' => $year,
+            ])
             @if($showAlert)
                 <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
                     <div class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">

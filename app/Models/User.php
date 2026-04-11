@@ -31,6 +31,21 @@ class User extends Authenticatable
         return $this->belongsTo(Couple::class);
     }
 
+    /**
+     * Primeiro token do nome (espaços), para exibição compacta (ex.: coluna «Registado por»).
+     */
+    public function firstGivenName(): string
+    {
+        $n = trim((string) $this->name);
+        if ($n === '') {
+            return '';
+        }
+
+        $parts = preg_split('/\s+/u', $n, -1, PREG_SPLIT_NO_EMPTY);
+
+        return $parts[0] ?? '';
+    }
+
     public function isCasalAdmin(): bool
     {
         $adminCoupleId = config('duozen.subscription_admin_couple_id');

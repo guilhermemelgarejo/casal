@@ -24,6 +24,18 @@
                     <span class="pt-1">{{ session('error') }}</span>
                 </div>
             @endif
+            @if (! empty($txRecurringPrefillBlockedReason ?? null))
+                <div class="alert alert-warning border-0 shadow-sm mb-4" role="status">
+                    <p class="small mb-0">{{ $txRecurringPrefillBlockedReason }}</p>
+                </div>
+            @endif
+
+            @include('partials.rt-reminder-panel', [
+                'reminders' => $recurringReminders ?? collect(),
+                'invoiceReminders' => $creditCardInvoiceReminders ?? collect(),
+                'month' => $selectedMonth,
+                'year' => $selectedYear,
+            ])
 
             <div class="card border-0 shadow-sm overflow-hidden tx-index-card">
                 <div class="tx-index-head px-4 py-3">

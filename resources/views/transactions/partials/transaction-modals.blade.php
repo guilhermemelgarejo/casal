@@ -19,6 +19,7 @@
                                 <tr>
                                     <th>Parcela</th>
                                     <th>Descrição</th>
+                                    <th>Registado por</th>
                                     <th>Ref. fatura</th>
                                     <th>Fatura</th>
                                     <th class="text-end">Valor</th>
@@ -94,7 +95,7 @@
         $openNewTransactionModal = ! session('edit_transaction_id') && $errors->hasAny([
             'funding', 'account_id', 'description', 'amount', 'payment_method',
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
-            'category_allocations',
+            'category_allocations', 'recurring_template_id',
         ]);
         $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token'));
         $txAllocVisibleRows = 1;
@@ -134,9 +135,12 @@
                         data-tx-old-account-id="{{ old('account_id', '') }}"
                         data-tx-default-ref-month="{{ $refDefaultMonth }}"
                         data-tx-default-ref-year="{{ $refDefaultYear }}"
+                        data-tx-default-date="{{ date('Y-m-d') }}"
                         data-credit-limit-precheck-url="{{ route('transactions.credit-limit-precheck') }}"
+                        data-tx-recurring-prefill="{{ ($txRecurringPrefill ?? null) ? json_encode($txRecurringPrefill, JSON_UNESCAPED_UNICODE) : '' }}"
                     >
                         @csrf
+                        <input type="hidden" name="recurring_template_id" id="tx-recurring-template-id" value="{{ old('recurring_template_id', '') }}">
                         <div class="modal-body overflow-auto" style="max-height: calc(100vh - 12rem);">
                             @php
                                 $isCreditRender = $txFormMode === 'cards_only' || $fundingOld === 'credit_card' || $paymentFlowOld === '__credit__';

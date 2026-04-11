@@ -54,7 +54,7 @@
                 </div>
             @endif
 
-            <div id="orcamento" class="budgets-page mb-4 mb-lg-5">
+            <div id="orcamento" class="budgets-page mb-3">
                 @include('budgets.partials.embedded')
             </div>
 

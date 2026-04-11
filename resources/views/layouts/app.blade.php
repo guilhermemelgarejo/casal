@@ -28,7 +28,6 @@
                 {{ $slot }}
             </main>
         </div>
-        @stack('scripts')
         @if (!empty($showOnboardingTour))
             @php
                 $onboardingTourJs = public_path('js/onboarding-tour.js');
@@ -78,5 +77,7 @@
             <script src="{{ asset('js/onboarding-tour.js') }}?v={{ file_exists($onboardingTourJs) ? filemtime($onboardingTourJs) : 1 }}" defer></script>
         @endif
         @include('layouts.partials.scripts')
+        {{-- Depois do Bootstrap: scripts empilhados usam bootstrap.Modal ou eventos show.bs.modal --}}
+        @stack('scripts')
     </body>
 </html>

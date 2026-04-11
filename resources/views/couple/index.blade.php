@@ -215,6 +215,36 @@
                         </div>
                     @endif
 
+                    @if ($couple->users->count() > 1 && (int) $couple->billing_owner_user_id === (int) $user->id)
+                        <div class="card border-0 shadow-sm overflow-hidden couple-invite-card">
+                            <div class="couple-invite-head px-4 py-3">
+                                <h3 class="h5 mb-1 fw-semibold">Responsável pela assinatura</h3>
+                                <p class="small text-secondary mb-0">Quem sai do casal enquanto ainda é responsável pela assinatura precisa transferir esse papel ao parceiro(a). Isto atualiza quem aparece como titular no DuoZen; o cartão e a subscrição no Stripe continuam na conta de quem ativou o plano até cancelar ou alterar no portal.</p>
+                            </div>
+                            <div class="card-body p-4">
+                                <form action="{{ route('couple.transfer-billing-owner') }}" method="POST" class="row g-3 align-items-end">
+                                    @csrf
+                                    <div class="col-md-8">
+                                        <label for="billing_owner_user_id" class="form-label small fw-semibold text-secondary text-uppercase mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Transferir para</label>
+                                        <select name="billing_owner_user_id" id="billing_owner_user_id" class="form-select rounded-3" required>
+                                            @foreach ($couple->users as $member)
+                                                @if ((int) $member->id !== (int) $user->id)
+                                                    <option value="{{ $member->id }}">{{ $member->name }} ({{ $member->email }})</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                        <x-input-error :messages="$errors->get('billing_owner_user_id')" class="mt-2" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="submit" class="btn btn-primary rounded-pill px-4 w-100 w-md-auto">
+                                            Transferir responsabilidade
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    @endif
+
                     <div>
                         <h3 class="h5 fw-semibold mb-3">Membros</h3>
                         <div class="row g-3">
@@ -227,6 +257,9 @@
                                         <div class="ms-3 min-w-0">
                                             <p class="mb-0 fw-semibold text-truncate" title="{{ $member->name }}">{{ $member->name }}</p>
                                             <p class="mb-0 text-secondary small text-truncate" style="font-size: 0.8rem;">{{ $member->email }}</p>
+                                            @if ($couple->billing_owner_user_id !== null && (int) $couple->billing_owner_user_id === (int) $member->id)
+                                                <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle mt-1">Responsável pela assinatura</span>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>

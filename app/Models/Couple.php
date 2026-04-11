@@ -42,6 +42,11 @@ class Couple extends Model
         return $this->hasMany(Account::class);
     }
 
+    public function recurringTransactions()
+    {
+        return $this->hasMany(RecurringTransaction::class);
+    }
+
     public function creditCardStatements()
     {
         return $this->hasMany(CreditCardStatement::class);

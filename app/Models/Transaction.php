@@ -167,6 +167,7 @@ class Transaction extends Model
         'reference_month',
         'reference_year',
         'installment_parent_id',
+        'recurring_transaction_id',
     ];
 
     protected $casts = [
@@ -207,6 +208,11 @@ class Transaction extends Model
     public function accountModel()
     {
         return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    public function recurringTransaction()
+    {
+        return $this->belongsTo(RecurringTransaction::class);
     }
 
     /**

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\RecurringTransaction;
 use App\Models\Transaction;
+use App\Support\CreditCardInvoiceReminders;
 use App\Support\PaymentMethods;
 use App\Support\TransactionCategorySplitDistribution;
 use App\Support\TransactionListingPresentation;
@@ -37,6 +39,11 @@ class TransactionController extends Controller
                 'nullable',
                 'integer',
                 Rule::exists('accounts', 'id')->where('couple_id', $couple->id),
+            ],
+            'prefill_recurring' => [
+                'nullable',
+                'integer',
+                Rule::exists('recurring_transactions', 'id')->where('couple_id', $couple->id),
             ],
         ]);
 
@@ -80,7 +87,51 @@ class TransactionController extends Controller
         if ($filterAccountId !== null) {
             $appendQuery['account_id'] = $filterAccountId;
         }
+        $prefillRecurringId = isset($validated['prefill_recurring']) ? (int) $validated['prefill_recurring'] : null;
+        if ($prefillRecurringId !== null) {
+            $appendQuery['prefill_recurring'] = $prefillRecurringId;
+        }
         $transactions->appends($appendQuery);
+
+        $modalPayload = $this->transactionModalPayload();
+        $txRecurringPrefill = null;
+        $txRecurringPrefillBlockedReason = null;
+        if ($prefillRecurringId !== null) {
+            $rt = RecurringTransaction::query()
+                ->where('couple_id', $couple->id)
+                ->whereKey($prefillRecurringId)
+                ->with('categorySplits')
+                ->first();
+            if ($rt !== null) {
+                $anchor = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
+                $payload = $rt->toTransactionPrefillPayload($anchor);
+                $txFormMode = $modalPayload['txFormMode'] ?? 'regular_only';
+                if ($txFormMode === 'regular_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_CREDIT_CARD) {
+                    $txRecurringPrefillBlockedReason = 'Este modelo usa cartão de crédito. Cadastre um cartão em Gerenciar contas para abrir o formulário já pré-preenchido.';
+                } elseif ($txFormMode === 'cards_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_ACCOUNT) {
+                    $txRecurringPrefillBlockedReason = 'Este modelo usa conta à ordem. Cadastre uma conta em Gerenciar contas para abrir o formulário já pré-preenchido.';
+                } else {
+                    $txRecurringPrefill = $payload;
+                }
+            }
+        }
+
+        $recurringReminders = $couple->recurringTransactions()
+            ->where('is_active', true)
+            ->with('account')
+            ->get()
+            ->filter(fn (RecurringTransaction $r) => $r->shouldShowReminder($now))
+            ->values();
+
+        $cardAccounts = $couple->accounts()
+            ->where('kind', Account::KIND_CREDIT_CARD)
+            ->orderBy('name')
+            ->get();
+        $creditCardInvoiceReminders = CreditCardInvoiceReminders::openStatementsForCouple(
+            (int) $couple->id,
+            $cardAccounts,
+            $now
+        );
 
         return view('transactions.index', array_merge(
             compact(
@@ -92,9 +143,13 @@ class TransactionController extends Controller
                 'transactionDeleteMeta',
                 'transactionAmountEditMeta',
                 'installmentGroupsModalPayload',
-                'creditCardPurchaseRowMeta'
+                'creditCardPurchaseRowMeta',
+                'txRecurringPrefill',
+                'txRecurringPrefillBlockedReason',
+                'recurringReminders',
+                'creditCardInvoiceReminders'
             ),
-            $this->transactionModalPayload()
+            $modalPayload
         ));
     }
 
@@ -445,6 +500,11 @@ class TransactionController extends Controller
             'reference_month' => 'nullable|integer|min:1|max:12',
             'reference_year' => 'nullable|integer|min:2000|max:2100',
             'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
+            'recurring_template_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('recurring_transactions', 'id')->where('couple_id', Auth::user()->couple_id),
+            ],
         ]);
 
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
@@ -473,7 +533,10 @@ class TransactionController extends Controller
 
         $installmentParentId = null;
         $pairs = $allocParsed['pairs'];
-        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs) {
+        $recurringTemplateId = $request->filled('recurring_template_id')
+            ? (int) $request->input('recurring_template_id')
+            : null;
+        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs, $recurringTemplateId) {
             $installments = $ctx['installments'];
             $baseCents = $ctx['baseCents'];
             $remainderCents = $ctx['remainderCents'];
@@ -514,6 +577,10 @@ class TransactionController extends Controller
                     'reference_year' => (int) $ref->year,
                 ];
 
+                if ($installments === 1 && $recurringTemplateId !== null && $parcelIndex === 1) {
+                    $data['recurring_transaction_id'] = $recurringTemplateId;
+                }
+
                 if ($installments > 1) {
                     if ($i === 0) {
                         $data['installment_parent_id'] = null;
@@ -539,7 +606,86 @@ class TransactionController extends Controller
             }
         });
 
-        return back()->with('success', 'Lançamento realizado!');
+        return $this->redirectAfterSuccessfulTransactionStore($request);
+    }
+
+    /**
+     * Redireciona sem `prefill_recurring` na query, para a modal de novo lançamento não reabrir após gravar.
+     */
+    private function redirectAfterSuccessfulTransactionStore(Request $request): RedirectResponse
+    {
+        $flash = ['success' => 'Lançamento realizado!'];
+
+        $month = null;
+        $year = null;
+        $accountId = null;
+
+        $referer = $request->headers->get('referer');
+        if (is_string($referer)) {
+            $path = (string) (parse_url($referer, PHP_URL_PATH) ?? '');
+            $queryString = parse_url($referer, PHP_URL_QUERY);
+            if (is_string($queryString) && $queryString !== '') {
+                parse_str($queryString, $q);
+                unset($q['prefill_recurring']);
+                if (isset($q['month'])) {
+                    $m = (int) $q['month'];
+                    if ($m >= 1 && $m <= 12) {
+                        $month = $m;
+                    }
+                }
+                if (isset($q['year'])) {
+                    $y = (int) $q['year'];
+                    if ($y >= 2000 && $y <= 2100) {
+                        $year = $y;
+                    }
+                }
+                if (isset($q['account_id']) && $q['account_id'] !== '') {
+                    $accountId = (int) $q['account_id'];
+                }
+                if (($month === null || $year === null) && isset($q['period']) && is_string($q['period'])) {
+                    $periodParts = explode('-', $q['period']);
+                    if (count($periodParts) >= 2) {
+                        $py = (int) ($periodParts[0] ?? 0);
+                        $pm = (int) ($periodParts[1] ?? 0);
+                        if ($pm >= 1 && $pm <= 12 && $py >= 2000 && $py <= 2100) {
+                            $month = $pm;
+                            $year = $py;
+                        }
+                    }
+                }
+            }
+
+            $trimPath = rtrim($path, '/') ?: '/';
+            $isDashboard = $trimPath === '/dashboard' || str_ends_with($trimPath, '/dashboard');
+
+            if ($isDashboard && $month !== null && $year !== null) {
+                return redirect()->route('dashboard', [
+                    'period' => sprintf('%04d-%02d', $year, $month),
+                ])->with($flash);
+            }
+
+            $isTransactions = str_contains($path, 'transactions');
+
+            if ($isTransactions && $month !== null && $year !== null) {
+                $params = array_filter(
+                    [
+                        'month' => $month,
+                        'year' => $year,
+                        'account_id' => $accountId,
+                    ],
+                    fn ($v) => $v !== null && $v !== ''
+                );
+
+                return redirect()->route('transactions.index', $params)->with($flash);
+            }
+        }
+
+        $d = Carbon::parse((string) $request->input('date'));
+
+        return redirect()->route('transactions.index', [
+            'month' => (int) $d->month,
+            'year' => (int) $d->year,
+        ])->with($flash);
     }
 
     /**
@@ -562,6 +708,11 @@ class TransactionController extends Controller
                 'date' => 'required|date',
                 'reference_month' => 'nullable|integer|min:1|max:12',
                 'reference_year' => 'nullable|integer|min:2000|max:2100',
+                'recurring_template_id' => [
+                    'nullable',
+                    'integer',
+                    Rule::exists('recurring_transactions', 'id')->where('couple_id', Auth::user()->couple_id),
+                ],
             ]);
         } catch (ValidationException $e) {
             return response()->json([
