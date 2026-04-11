@@ -40,10 +40,6 @@
                             <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4">Ir para Contas</a>
                         </div>
                     @else
-                        <div class="cc-statements-help small text-secondary mb-4">
-                            Fatura = <strong>mês de referência</strong> do cartão; o total é a soma do que entra nesse ciclo (cada parcela com o valor que compõe aquela fatura). Em <a href="{{ route('transactions.index') }}" class="fw-semibold">Lançamentos</a>, compras no cartão aparecem pelo mês da <strong>data da compra</strong>. Vencimento padrão no cartão (<a href="{{ route('accounts.index') }}" class="fw-semibold">Contas</a>); ao primeiro lançamento do mês a fatura nasce com esse vencimento e pode ajustar-se em Editar.
-                        </div>
-
                         @if ($filterCardId === null)
                             <div class="card border-0 shadow-sm cc-picker-hero mb-4 overflow-hidden">
                                 <div class="cc-picker-hero-head">
@@ -248,9 +244,6 @@
                                         <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <div class="cc-statement-items-intro mb-3">
-                                            Cada linha é o valor que entra <strong>só nesta fatura</strong> (uma parcela = um lançamento). A <strong>data</strong> é a da compra; <strong>Ref.</strong> é o mês de faturamento. <strong>Abrir</strong> leva a Lançamentos com o filtro do cartão e o <strong>mês civil da data da compra</strong>.
-                                        </div>
                                         <div class="table-responsive cc-statement-items-table-wrap">
                                             <table class="table table-hover align-middle mb-0 cc-statement-items-table">
                                                 <thead>

@@ -583,7 +583,7 @@
 
                                 <section class="tx-form-section" aria-labelledby="tx-section-categories-heading">
                                     <h3 class="tx-form-section-title" id="tx-section-categories-heading">Categorias e valores</h3>
-                                    <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total. A quitação de fatura de cartão continua só em <a href="{{ route('credit-card-statements.index') }}">Faturas cartão</a>.</p>
+                                    <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total.</p>
                                     <div id="tx-category-allocations-wrap">
                                         @for($si = 0; $si < 5; $si++)
                                             <div class="tx-cat-alloc-row row g-2 mb-2 align-items-end {{ $si < $txAllocVisibleRows ? '' : 'd-none' }}" data-tx-alloc-row="{{ $si }}">

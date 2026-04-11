@@ -67,8 +67,8 @@ class CreditCardStatementController extends Controller
                     });
 
                 $linesByKey = $linesQuery
-                    ->orderBy('date')
-                    ->orderBy('id')
+                    ->orderByDesc('date')
+                    ->orderByDesc('id')
                     ->get()
                     ->groupBy(fn (Transaction $t) => $this->cycleKey((int) $t->account_id, (int) $t->reference_year, (int) $t->reference_month))
                     ->map(fn ($items) => $items->map(fn (Transaction $t) => [
