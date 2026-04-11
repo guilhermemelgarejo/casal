@@ -17,7 +17,7 @@ Documento de referência do repositório **casal** (produto **DuoZen**). Use com
 | Backend | PHP **8.2+**, **Laravel 11** |
 | Auth / scaffolding | **Laravel Breeze** (Blade), sessões web |
 | Views | **Blade**, componentes em `resources/views/components` |
-| CSS/JS | **Bootstrap 5.3.3** em `public/vendor/bootstrap` (sem CDN); `public/css/app.css` (inclui **modais** unificados: `body .modal .modal-content` / cabeçalho em gradiente, rodapé com separador; `.tx-modal-head--danger` para exclusão de conta; `.tx-modal-table-wrap`, `.tx-modal-installment-total`; formulário novo lançamento em secções `#form-new-transaction .tx-form-section` / `.tx-form-section-title`); `public/js/app.js` |
+| CSS/JS | **Bootstrap 5.3.3** em `public/vendor/bootstrap` (sem CDN); `public/css/app.css` (inclui **modais** unificados: `body .modal .modal-content` / cabeçalho em gradiente, rodapé com separador; `.tx-modal-head--danger` para exclusão de conta; `.tx-modal-table-wrap`, `.tx-modal-installment-total`; formulário novo lançamento em secções `#form-new-transaction .tx-form-section` / `.tx-form-section-title`; tour de onboarding `.duozen-onboarding-*`); `public/js/app.js`; `public/js/onboarding-tour.js` (tour curto **só** quando a sessão tem `duozen_onboarding_tour` e `User::passesCoupleBillingGate()`) |
 | Fonte | Figtree via Bunny Fonts (layouts) |
 | Opcional | **SweetAlert2** em `public/vendor/sweetalert2` (se o ficheiro existir) — ver `resources/views/layouts/partials/assets.blade.php` |
 | Build | **Sem pipeline npm** para o app; `package.json` só documenta o arranjo de assets |
@@ -60,7 +60,7 @@ public/vendor/bootstrap, public/css, public/js, `public/favicon.png` (marca; fal
 - **`/`** — `welcome` (landing), com secção pública sobre assinatura (`resources/views/partials/subscription-public-info.blade.php`).
 - **`auth`** sem `has-couple` — perfil (`profile.*`), casal (`couple.*`): criar, entrar, convidar, atualizar, sair.
 - **`auth` + `has-couple`** — assinatura (`billing.*`): página do plano, Checkout Stripe, sucesso, portal de faturamento.
-- **`auth` + `has-couple` + `couple-billing`** — dashboard, categorias (inclui planejamento mensal / orçamento na mesma página), lançamentos, contas (exige plano ativo quando o faturamento está aplicado).
+- **`auth` + `has-couple` + `couple-billing`** — dashboard, categorias (inclui planejamento mensal / orçamento na mesma página), lançamentos, contas (exige plano ativo quando o faturamento está aplicado); `POST /onboarding/dismiss` (`onboarding.dismiss`) remove da sessão a flag do tour; `POST /onboarding/restart` (`onboarding.restart`) volta a ativar o tour e redireciona ao painel (atalho na página **Casal** quando `passesCoupleBillingGate()`).
 - **`auth` + `duozen-admin`** — `admin/assinaturas`: listagem gerencial de subscrições (Cashier). Acesso: utilizadores com `couple_id` = `config('duozen.subscription_admin_couple_id')` (por omissão casal **id 1**, via `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID`) **ou** e-mail em `DUOZEN_ADMIN_EMAILS`.
 
 Ficheiro principal: `routes/web.php`.
@@ -79,7 +79,7 @@ Comportamento:
 
 | Modelo | Notas |
 |--------|--------|
-| `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`) |
+| `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`); `passesCoupleBillingGate()` alinha ao middleware `couple-billing` |
 | `Couple` | `name`, `invite_code` (único), `billing_owner_user_id` (nullable, Cashier), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts |
 | `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon`, `system_key` (nullable), índice único (`couple_id`, `system_key`). Categoria de quitação de fatura: `system_key` = `Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT` (nome por omissão `NAME_CREDIT_CARD_INVOICE_PAYMENT`). **Não** editável nem excluível em `CategoryController`; **não** aparece em orçamento nem no select de Lançamentos (`scopeExcludingCreditCardInvoicePayment`). `transactionCategorySplits()` — linhas em `transaction_category_splits` que usam esta categoria (não há mais `transactions.category_id`). |
 | `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `credit_card_invoice_due_day` (nullable, 1–31, só cartão), **`balance`** (decimal, default 0): em contas **`regular`**, saldo persistido; **não** está em `$fillable` (não editável por formulários). Atualizado **apenas** pelos eventos Eloquent de `Transaction` (`Account::applyLedgerEffectToStoredBalance()` em `created` / `updated` / `deleted` — receitas somam, despesas subtraem; só `kind=regular` e `couple_id` coincidente). Cartões ignoram `balance` na prática (coluna pode ficar 0). **`credit_card_limit_total`** e **`credit_card_limit_available`** (decimais nullable, só cartão): limite total opcional no cadastro e limite disponível **materializado**; **fora de `$fillable`** — gravados via `forceFill` no `AccountController`. **`tracksCreditCardLimit()`** quando há limite total &gt; 0. **Utilização em aberto** (para o disponível): soma dos `remainingToPay()` apenas nas faturas (`CreditCardStatement`) **em aberto** (`!isPaid()`), ou seja, valores já materializados nas faturas (`Account::outstandingCreditCardUtilizationAmount()`). **`recalculateCreditCardLimitAvailable()`** faz `limite total − utilização em aberto` (o disponível **pode ser negativo**). Chamado após lançamentos em cartão (`Transaction` `created`/`updated`/`deleted`), após `CreditCardStatement::syncPaidMetadata()` e ao salvar limite no `AccountController`. **Conta `regular`:** formas de pagamento = `PaymentMethods::forRegularAccounts()` (`Account::getEffectivePaymentMethods()`). **Cartão:** só crédito no fluxo de lançamentos (sem `payment_method` na transação). **`Account::balancesFromTransactionsByAccountId()`** para conferência / `accounts:sync-balances`. |
@@ -101,12 +101,12 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 
 ### `CoupleController`
 
-- **create:** cria casal + `invite_code` aleatório + categorias padrão (Alimentação, Moradia, Transporte, Lazer, quitação de fatura com `system_key`, Salário).
+- **create:** cria casal + `invite_code` aleatório + categorias padrão (Alimentação, Moradia, Transporte, Lazer, quitação de fatura com `system_key`, Salário); grava **`duozen_onboarding_tour`** na sessão para o tour guiado (painel → contas → categorias → lançamentos) quando `passesCoupleBillingGate()`.
 - **join:** código válido, máximo **2** membros.
 - **update:** nome, `monthly_income`, `spending_alert_threshold`.
 - **sendInvite:** e-mail com `InvitationMail` (markdown `resources/views/emails/invitation.blade.php` ou equivalente).
 - **leave:** `couple_id` null; casal sem membros **não** é apagado automaticamente.
-- **UI** (`resources/views/couple/index.blade.php`): wrapper `.couple-page`; cabeçalho com `.couple-page-title` e subtítulo; alertas de sucesso / `session('error')` (ex.: middleware sem casal) estilizados; sem casal — dois cartões `.couple-choice-card` com cabeçalhos `.couple-choice-head--create` / `--join`; com casal — resumo `.couple-summary-card` / `.couple-summary-head`, pills `.couple-stat-pill`, ações em pill; modal **`#modal-edit-couple`** (`x-modal` `edit-couple`), rodapé com botões pill; convite `.couple-invite-card` / `.couple-invite-head`; membros `.couple-member-card` e placeholder `.couple-member-placeholder`; **`#copy-invite-link`** inalterado para `public/js/app.js`.
+- **UI** (`resources/views/couple/index.blade.php`): wrapper `.couple-page`; cabeçalho com `.couple-page-title` e subtítulo; alertas de sucesso / `session('error')` (ex.: middleware sem casal) estilizados; sem casal — dois cartões `.couple-choice-card` com cabeçalhos `.couple-choice-head--create` / `--join`; com casal — resumo `.couple-summary-card` / `.couple-summary-head`, pills `.couple-stat-pill`, ações em pill (inclui **Ver tour novamente** → `POST onboarding.restart` quando `passesCoupleBillingGate()`); modal **`#modal-edit-couple`** (`x-modal` `edit-couple`), rodapé com botões pill; convite `.couple-invite-card` / `.couple-invite-head`; membros `.couple-member-card` e placeholder `.couple-member-placeholder`; **`#copy-invite-link`** inalterado para `public/js/app.js`.
 
 ### `DashboardController`
 
@@ -147,6 +147,11 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 - Gasto real por categoria na UI vem de `CategoryController@index` (`spentByCategory`): agrega **`transaction_category_splits`** (soma `amount` por `category_id`) em lançamentos do mês com `excludingCreditCardInvoicePayments()` no `whereHas` da transação.
 - `updateIncome` atualiza `monthly_income` do casal.
 - **UI:** `income-toolbar.blade.php` — **renda** (`.budget-income-toolbar`, IDs em `public/js/app.js`); `embedded.blade.php` — cartão **resumo** (`.budget-summary-card` / `.budget-summary-head` / `.budget-summary-stat`). Metas por categoria: formulários em cada cartão de despesa (`categories/partials/category-card.blade.php`, inputs `id="budget_amount_{id}"`). Estilos em `public/css/app.css` (`.budgets-page`, blocos da meta no cartão).
+
+### `OnboardingController`
+
+- **dismiss:** `POST onboarding.dismiss` — `session()->forget('duozen_onboarding_tour')`; JSON `{ "ok": true }`; cliente `public/js/onboarding-tour.js`.
+- **restart:** `POST onboarding.restart` — `session()->put('duozen_onboarding_tour', true)` e redirect ao **dashboard** com flash de sucesso.
 
 ### `ProfileController`
 

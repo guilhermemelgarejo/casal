@@ -62,7 +62,7 @@
                 </div>
             @endif
 
-            <div class="row g-4 mb-4">
+            <div class="row g-4 mb-4" id="onboarding-anchor-welcome">
                 <div class="col-md-4">
                     <div class="card border-0 shadow-sm h-100 dashboard-kpi-card dashboard-kpi-card--income">
                         <div class="card-body p-4 d-flex align-items-center gap-3">

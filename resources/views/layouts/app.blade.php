@@ -29,6 +29,54 @@
             </main>
         </div>
         @stack('scripts')
+        @if (!empty($showOnboardingTour))
+            @php
+                $onboardingTourJs = public_path('js/onboarding-tour.js');
+                $onboardingTourConfig = [
+                    'dismissUrl' => route('onboarding.dismiss'),
+                    'csrf' => csrf_token(),
+                    'route' => optional(request()->route())->getName(),
+                    'steps' => [
+                        [
+                            'route' => 'dashboard',
+                            'selector' => '#onboarding-anchor-welcome',
+                            'title' => 'Bem-vindos ao DuoZen',
+                            'body' => 'Este é o painel. Nos próximos passos vamos indicar onde cadastrar a primeira conta, criar uma categoria à vossa medida e registar o primeiro lançamento.',
+                            'prevUrl' => null,
+                            'nextUrl' => route('accounts.index'),
+                        ],
+                        [
+                            'route' => 'accounts.index',
+                            'selector' => '#btn-new-account',
+                            'title' => 'Primeira conta ou cartão',
+                            'body' => 'Cadastrem aqui uma conta corrente (Pix, débito, etc.) ou um cartão de crédito. É preciso pelo menos uma conta para lançar movimentos em caixa.',
+                            'prevUrl' => route('dashboard'),
+                            'nextUrl' => route('categories.index'),
+                        ],
+                        [
+                            'route' => 'categories.index',
+                            'selector' => '#btn-new-category',
+                            'title' => 'Categorias',
+                            'body' => 'Já criámos categorias iniciais (Alimentação, Moradia, …). Podem acrescentar as vossas em Nova categoria ou usar as existentes nos lançamentos.',
+                            'prevUrl' => route('accounts.index'),
+                            'nextUrl' => route('transactions.index'),
+                        ],
+                        [
+                            'route' => 'transactions.index',
+                            'selector' => '#onboarding-tx-actions',
+                            'title' => 'Primeiro lançamento',
+                            'body' => 'Use + Receita ou + Despesa para registar valores. Escolham conta, categorias e valores — o painel e o orçamento atualizam a partir daqui.',
+                            'prevUrl' => route('categories.index'),
+                            'nextUrl' => null,
+                        ],
+                    ],
+                ];
+            @endphp
+            <script>
+                window.__DUOZEN_ONBOARDING__ = @json($onboardingTourConfig);
+            </script>
+            <script src="{{ asset('js/onboarding-tour.js') }}?v={{ file_exists($onboardingTourJs) ? filemtime($onboardingTourJs) : 1 }}" defer></script>
+        @endif
         @include('layouts.partials.scripts')
     </body>
 </html>

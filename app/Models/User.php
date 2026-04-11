@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\Billing;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -62,6 +63,22 @@ class User extends Authenticatable
         $this->loadMissing('couple.users');
 
         return $this->couple->users->contains(fn (User $member) => $member->subscribed('default'));
+    }
+
+    /**
+     * Alinhado ao middleware couple-billing: pode usar rotas do app (painel, lançamentos, etc.).
+     */
+    public function passesCoupleBillingGate(): bool
+    {
+        if (! Billing::isEnforced()) {
+            return true;
+        }
+
+        if ($this->isBillingExempt()) {
+            return true;
+        }
+
+        return $this->coupleHasBillingAccess();
     }
 
     /**

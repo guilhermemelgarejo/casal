@@ -16,9 +16,10 @@ class CoupleController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $couple = $user->couple;
+        $couple = $user->couple?->loadMissing('users');
+        $canReplayOnboardingTour = $couple !== null && $user->passesCoupleBillingGate();
 
-        return view('couple.index', compact('user', 'couple'));
+        return view('couple.index', compact('user', 'couple', 'canReplayOnboardingTour'));
     }
 
     public function create(Request $request)
@@ -54,6 +55,8 @@ class CoupleController extends Controller
         $user = Auth::user();
         $user->couple_id = $couple->id;
         $user->save();
+
+        $request->session()->put('duozen_onboarding_tour', true);
 
         return redirect()->route('couple.index')->with('success', 'Casal criado com sucesso!');
     }

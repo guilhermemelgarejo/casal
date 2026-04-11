@@ -1992,3 +1992,35 @@ form.dashboard-toolbar .dashboard-toolbar-month {
     );
 }
 
+/* Tour de onboarding (pós criar casal) */
+.duozen-onboarding-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1070;
+    background: rgba(15, 23, 42, 0.52);
+    pointer-events: auto;
+}
+
+.duozen-onboarding-ring {
+    position: fixed;
+    z-index: 1071;
+    border-radius: 0.75rem;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    box-shadow:
+        0 0 0 1px rgba(124, 58, 237, 0.35),
+        0 0.35rem 1.25rem rgba(15, 23, 42, 0.25);
+    pointer-events: none;
+    transition: top 0.12s ease, left 0.12s ease, width 0.12s ease, height 0.12s ease;
+}
+
+.duozen-onboarding-panel {
+    position: fixed;
+    z-index: 1072;
+    pointer-events: auto;
+    border-radius: var(--bs-border-radius-xl);
+}
+
+body.duozen-onboarding-active {
+    overflow-x: hidden;
+}
+

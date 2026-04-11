@@ -101,6 +101,14 @@
                                     <a href="{{ route('dashboard') }}" class="btn btn-primary rounded-pill px-3">
                                         Ir para o painel
                                     </a>
+                                    @if (!empty($canReplayOnboardingTour))
+                                        <form action="{{ route('onboarding.restart') }}" method="POST" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-primary rounded-pill px-3">
+                                                Ver tour novamente
+                                            </button>
+                                        </form>
+                                    @endif
                                     <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
                                         Configurações
                                     </button>

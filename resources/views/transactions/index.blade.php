@@ -32,7 +32,7 @@
                             <h3 class="h5 mb-1 fw-semibold">Lista do período</h3>
                             <p class="small text-secondary mb-0">Demais lançamentos usam o <strong class="fw-medium text-body">mês de referência</strong> escolhido abaixo.</p>
                         </div>
-                        <div class="d-flex flex-wrap gap-2 justify-content-end flex-shrink-0" role="group" aria-label="Novo lançamento">
+                        <div class="d-flex flex-wrap gap-2 justify-content-end flex-shrink-0" id="onboarding-tx-actions" role="group" aria-label="Novo lançamento">
                             <button
                                 type="button"
                                 class="btn btn-outline-success rounded-pill px-3"

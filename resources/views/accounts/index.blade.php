@@ -13,7 +13,7 @@
                 <h2 class="h5 mb-0 accounts-hero-title">Gerenciar contas e cartões</h2>
                 <p class="small text-secondary mb-0 mt-1">Cadastre contas correntes e cartões para lançamentos e faturas.</p>
             </div>
-            <button type="button" class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
+            <button type="button" class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0" id="btn-new-account" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
                 Nova conta ou cartão
             </button>
         </div>
