@@ -8,6 +8,7 @@ use App\Models\Couple;
 use App\Models\CreditCardStatement;
 use App\Models\Transaction;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -74,11 +75,18 @@ class CreditCardStatementTest extends TestCase
 
         $this->actingAs($user)->get(route('credit-card-statements.index'))
             ->assertOk()
-            ->assertSee('Ainda não há despesas em cartão com mês de referência', false);
+            ->assertSee('Escolher cartão', false)
+            ->assertSee('cc-picker-grid', false);
 
         $this->cardExpense($user, $card, $category, 4, 2026, '150.50');
 
-        $html = $this->actingAs($user)->get(route('credit-card-statements.index'))
+        $this->actingAs($user)->get(route('credit-card-statements.index'))
+            ->assertOk()
+            ->assertSee('R$ 150,50', false)
+            ->assertDontSee('id="statement-cycle-', false)
+            ->assertDontSee('Itens da fatura', false);
+
+        $html = $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
             ->assertOk()
             ->assertSee('R$ 150,50', false)
             ->assertSee('04/2026', false)
@@ -107,23 +115,66 @@ class CreditCardStatementTest extends TestCase
 
         $this->actingAs($user)->get(route('credit-card-statements.index'))
             ->assertOk()
-            ->assertSee('04/2026', false)
-            ->assertSee('05/2026', false);
+            ->assertDontSee('id="statement-cycle-', false);
 
         $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
             ->assertOk()
-            ->assertSee('04/2026', false)
-            ->assertDontSee('05/2026', false);
+            ->assertSee('statement-cycle-'.$card->id.'-2026-4', false)
+            ->assertDontSee('statement-cycle-'.$card2->id.'-', false);
 
         $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card2->id]))
             ->assertOk()
-            ->assertSee('05/2026', false)
-            ->assertDontSee('04/2026', false);
+            ->assertSee('statement-cycle-'.$card2->id.'-2026-5', false)
+            ->assertDontSee('statement-cycle-'.$card->id.'-2026-4', false);
 
         $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => 9_999_999]))
             ->assertOk()
-            ->assertSee('04/2026', false)
-            ->assertSee('05/2026', false);
+            ->assertDontSee('id="statement-cycle-', false);
+    }
+
+    public function test_index_alerta_quando_ha_fatura_mes_anterior_em_aberto(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        Carbon::setTestNow(Carbon::parse('2026-04-15', config('app.timezone')));
+
+        try {
+            $this->cardExpense($user, $card, $category, 3, 2026, '80.00');
+
+            $this->actingAs($user)->get(route('credit-card-statements.index'))
+                ->assertOk()
+                ->assertSee('cc-pick-card-past-open', false)
+                ->assertSee('Há faturas de meses anteriores em aberto', false);
+
+            $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 3]), [
+                'account_id' => $checking->id,
+                'payment_method' => 'Pix',
+                'paid_date' => '2026-04-01',
+            ])->assertSessionHasNoErrors();
+
+            $this->actingAs($user)->get(route('credit-card-statements.index'))
+                ->assertOk()
+                ->assertDontSee('cc-pick-card-past-open', false);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_index_sem_alerta_para_fatura_do_mes_corrente(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        Carbon::setTestNow(Carbon::parse('2026-04-15', config('app.timezone')));
+
+        try {
+            $this->cardExpense($user, $card, $category, 4, 2026, '40.00');
+
+            $this->actingAs($user)->get(route('credit-card-statements.index'))
+                ->assertOk()
+                ->assertDontSee('cc-pick-card-past-open', false);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_materialize_preserva_vencimento_ja_definido(): void
@@ -202,7 +253,7 @@ class CreditCardStatementTest extends TestCase
         $this->assertSame('2026-04-10', $meta->due_date->toDateString());
         $this->assertEquals(40.0, (float) $meta->spent_total);
 
-        $this->actingAs($user)->get(route('credit-card-statements.index'))
+        $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
             ->assertOk()
             ->assertSee('10/04/2026', false)
             ->assertSee('data-edit-due="2026-04-10"', false)

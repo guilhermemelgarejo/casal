@@ -57,6 +57,7 @@ class TransactionAmountUpdateTest extends TestCase
         ]);
 
         $this->actingAs($user)->put(route('transactions.update', $tx), [
+            'description' => 'Compra',
             'amount' => '200.00',
         ])->assertSessionHasNoErrors();
 
@@ -196,6 +197,7 @@ class TransactionAmountUpdateTest extends TestCase
         $this->assertTrue($meta->hasPartialPayments());
 
         $this->actingAs($user)->put(route('transactions.update', $purchase), [
+            'description' => 'Compra',
             'amount' => '80.00',
         ])->assertSessionHas('error');
 
@@ -236,6 +238,7 @@ class TransactionAmountUpdateTest extends TestCase
         ], [['category_id' => $category->id, 'amount' => '100.00']]);
 
         $this->actingAs($user)->put(route('transactions.update', $purchase), [
+            'description' => 'Compra',
             'amount' => '45.50',
         ])->assertSessionHasNoErrors();
 
@@ -249,5 +252,100 @@ class TransactionAmountUpdateTest extends TestCase
             ->first();
         $this->assertNotNull($meta);
         $this->assertEquals(45.5, (float) $meta->spent_total);
+    }
+
+    public function test_atualiza_apenas_descricao_sem_alterar_valor_nem_splits(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $checking = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta',
+            'kind' => Account::KIND_REGULAR,
+            'color' => '#111',
+        ]);
+
+        $c1 = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'A',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+        $c2 = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'B',
+            'type' => 'expense',
+            'color' => '#333',
+        ]);
+
+        $tx = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $checking->id,
+            'description' => 'Antiga',
+            'amount' => '100.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-04-05',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+        ], [
+            ['category_id' => $c1->id, 'amount' => '30.00'],
+            ['category_id' => $c2->id, 'amount' => '70.00'],
+        ]);
+
+        $this->actingAs($user)->put(route('transactions.update', $tx), [
+            'description' => 'Nova descrição',
+            'amount' => '100.00',
+        ])->assertSessionHasNoErrors();
+
+        $tx->refresh();
+        $this->assertSame('Nova descrição', $tx->description);
+        $this->assertSame('100.00', number_format((float) $tx->amount, 2, '.', ''));
+        $splits = $tx->categorySplits()->orderBy('id')->get();
+        $this->assertSame('30.00', number_format((float) $splits[0]->amount, 2, '.', ''));
+        $this->assertSame('70.00', number_format((float) $splits[1]->amount, 2, '.', ''));
+    }
+
+    public function test_ao_editar_descricao_em_parcela_mantem_sufixo_parcela(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Outros',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $parcel = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'TV (Parcela 1/2)',
+            'amount' => '50.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-05',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $this->actingAs($user)->put(route('transactions.update', $parcel), [
+            'description' => 'Smart TV',
+            'amount' => '50.00',
+        ])->assertSessionHasNoErrors();
+
+        $parcel->refresh();
+        $this->assertSame('Smart TV (Parcela 1/2)', $parcel->description);
     }
 }

@@ -5,6 +5,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     const bs = typeof bootstrap !== 'undefined' ? bootstrap : window.bootstrap;
 
+    if (bs?.Tooltip) {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+            bs.Tooltip.getOrCreateInstance(el, { container: 'body' });
+        });
+    }
+
     const catForm = document.getElementById('category-form');
     if (catForm) {
         const storeUrl = catForm.dataset.storeUrl || '';
@@ -61,8 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const txFormSetup = document.getElementById('form-new-transaction');
     const splitCatSelects = txFormSetup ? txFormSetup.querySelectorAll('.js-tx-split-cat') : [];
 
+    let txFilterSplitCats = (resetSelection) => {};
     if (typeSelect) {
-        const filterSplitCats = (resetSelection) => {
+        txFilterSplitCats = (resetSelection) => {
             const t = typeSelect.value;
             splitCatSelects.forEach((sel) => {
                 sel.querySelectorAll('option').forEach((opt) => {
@@ -82,30 +89,65 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
 
-        typeSelect.addEventListener('change', () => filterSplitCats(true));
-        filterSplitCats(false);
+        typeSelect.addEventListener('change', () => txFilterSplitCats(true));
+        txFilterSplitCats(false);
     }
 
     const txAllocWrap = document.getElementById('tx-category-allocations-wrap');
     const txAddCatRow = document.getElementById('tx-add-cat-row');
-    const txRemoveCatRow = document.getElementById('tx-remove-cat-row');
-    if (txAllocWrap && txAddCatRow && txRemoveCatRow) {
+    if (txAllocWrap && txAddCatRow) {
         const allocRows = () => Array.from(txAllocWrap.querySelectorAll('.tx-cat-alloc-row'));
 
-        const visibleAllocRows = () => allocRows().filter((row) => !row.classList.contains('d-none'));
+        const visibleAllocRows = () =>
+            allocRows()
+                .filter((row) => !row.classList.contains('d-none'))
+                .sort(
+                    (a, b) =>
+                        parseInt(a.getAttribute('data-tx-alloc-row'), 10) -
+                        parseInt(b.getAttribute('data-tx-alloc-row'), 10),
+                );
 
-        txAddCatRow.addEventListener('click', () => {
-            const hidden = allocRows().find((row) => row.classList.contains('d-none'));
-            if (!hidden) {
-                return;
-            }
-            hidden.classList.remove('d-none');
-        });
+        const syncRemoveButtons = () => {
+            const vis = visibleAllocRows();
+            const hideAll = vis.length <= 1;
+            allocRows().forEach((row) => {
+                const btn = row.querySelector('.js-tx-remove-alloc-row');
+                if (!btn) {
+                    return;
+                }
+                const rowHidden = row.classList.contains('d-none');
+                if (rowHidden || hideAll) {
+                    btn.classList.add('d-none');
+                    btn.setAttribute('disabled', 'disabled');
+                } else {
+                    btn.classList.remove('d-none');
+                    btn.removeAttribute('disabled');
+                }
+            });
+        };
 
-        txRemoveCatRow.addEventListener('click', () => {
+        const removeAllocRow = (rowEl) => {
             const vis = visibleAllocRows();
             if (vis.length <= 1) {
                 return;
+            }
+            const pos = vis.indexOf(rowEl);
+            if (pos === -1) {
+                return;
+            }
+            for (let i = pos; i < vis.length - 1; i += 1) {
+                const cur = vis[i];
+                const next = vis[i + 1];
+                const curCat = cur.querySelector('.js-tx-split-cat');
+                const nextCat = next.querySelector('.js-tx-split-cat');
+                const curAmt = cur.querySelector('.js-tx-split-amount');
+                const nextAmt = next.querySelector('.js-tx-split-amount');
+                if (curCat && nextCat) {
+                    curCat.value = nextCat.value;
+                }
+                if (curAmt && nextAmt) {
+                    curAmt.value = nextAmt.value;
+                }
             }
             const last = vis[vis.length - 1];
             last.classList.add('d-none');
@@ -113,7 +155,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const amt = last.querySelector('.js-tx-split-amount');
             if (sel) sel.value = '';
             if (amt) amt.value = '';
+            txFilterSplitCats(false);
+            syncRemoveButtons();
+        };
+
+        txAddCatRow.addEventListener('click', () => {
+            const hidden = allocRows().find((row) => row.classList.contains('d-none'));
+            if (!hidden) {
+                return;
+            }
+            hidden.classList.remove('d-none');
+            syncRemoveButtons();
         });
+
+        txAllocWrap.addEventListener('click', (e) => {
+            const btn = e.target.closest('.js-tx-remove-alloc-row');
+            if (!btn || !txAllocWrap.contains(btn)) {
+                return;
+            }
+            const row = btn.closest('.tx-cat-alloc-row');
+            if (row) {
+                removeAllocRow(row);
+            }
+        });
+
+        syncRemoveButtons();
     }
 
     const showIncome = document.getElementById('budget-income-display');
@@ -222,12 +288,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const action = btn.getAttribute('data-tx-action') || '';
             const amt = btn.getAttribute('data-tx-amount') || '';
+            const desc = btn.getAttribute('data-tx-description') || '';
             const precheck = btn.getAttribute('data-tx-precheck') || '';
             txEditForm.setAttribute('action', action);
             txEditForm.dataset.txEditPrecheckUrl = precheck;
             const amtInput = txEditForm.querySelector('[name="amount"]');
             if (amtInput) {
                 amtInput.value = amt;
+            }
+            const descInput = txEditForm.querySelector('[name="description"]');
+            if (descInput) {
+                descInput.value = desc;
             }
             const prevTok = txEditForm.querySelector('input[name="credit_limit_confirm_token"]');
             if (prevTok) {
@@ -557,7 +628,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!edit.canEditAmount) {
                     actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-edit-blocked" data-tx-blocked-msg="${editBlockedMsg}" title="Edição não permitida" aria-label="Edição não permitida">${svgTxPencil}</button>`;
                 } else {
-                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-precheck="${precheck}" title="Alterar valor" aria-label="Alterar valor">${svgTxPencil}</button>`;
+                    const descBase = escapeHtmlTx(
+                        row.description_edit_base != null ? String(row.description_edit_base) : String(row.description || ''),
+                    );
+                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-precheck="${precheck}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
                 }
                 if (del.paidInvoice) {
                     actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked ms-1" data-tx-blocked-msg="${escapeHtmlTx(paidMsg)}" title="Exclusão bloqueada" aria-label="Exclusão bloqueada">${svgTxLock}</button>`;
@@ -653,9 +727,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const txForm = document.getElementById('form-new-transaction');
     const installmentsWrapper = document.getElementById('installments-wrapper');
     const installmentsSelect = document.getElementById('installments');
-    const referenceWrapper = document.getElementById('reference-wrapper');
     const referenceMonth = document.getElementById('reference_month');
     const referenceYear = document.getElementById('reference_year');
+    const creditSection = document.getElementById('tx-section-credit');
 
     if (txForm) {
         const mode = txForm.dataset.txFormMode || 'regular_only';
@@ -676,31 +750,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const oldAccountId = txForm.dataset.txOldAccountId || '';
 
         const syncInstallments = (isCredit) => {
+            if (creditSection) {
+                creditSection.classList.toggle('d-none', !isCredit);
+            }
             if (!installmentsWrapper || !installmentsSelect) {
                 return;
             }
             if (isCredit) {
-                installmentsWrapper.classList.remove('d-none');
                 installmentsSelect.disabled = false;
                 installmentsSelect.required = true;
                 if (!installmentsSelect.value) {
                     installmentsSelect.value = '1';
                 }
             } else {
-                installmentsWrapper.classList.add('d-none');
                 installmentsSelect.disabled = true;
                 installmentsSelect.required = false;
             }
-            if (referenceWrapper) {
-                if (isCredit) {
-                    referenceWrapper.classList.remove('d-none');
-                    if (referenceMonth) referenceMonth.disabled = false;
-                    if (referenceYear) referenceYear.disabled = false;
-                } else {
-                    referenceWrapper.classList.add('d-none');
-                    if (referenceMonth) referenceMonth.disabled = true;
-                    if (referenceYear) referenceYear.disabled = true;
-                }
+            if (referenceMonth) {
+                referenceMonth.disabled = !isCredit;
+            }
+            if (referenceYear) {
+                referenceYear.disabled = !isCredit;
             }
         };
 
@@ -804,6 +874,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             applyPaymentFlow(paymentFlow.value);
+        }
+
+        const modalNewTx = document.getElementById('modalNewTransaction');
+        if (modalNewTx) {
+            modalNewTx.addEventListener('show.bs.modal', (ev) => {
+                const rel = ev.relatedTarget;
+                const preset = rel?.getAttribute?.('data-tx-open-preset');
+                const titleEl = document.getElementById('modalNewTransactionLabel');
+                if (preset !== 'income' && preset !== 'expense') {
+                    if (titleEl) {
+                        titleEl.textContent = 'Novo lançamento';
+                    }
+                    return;
+                }
+                if (titleEl) {
+                    titleEl.textContent = preset === 'income' ? 'Nova receita' : 'Nova despesa';
+                }
+                if (typeSelect) {
+                    typeSelect.value = preset === 'income' ? 'income' : 'expense';
+                    typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (paymentFlow && (mode === 'both' || mode === 'regular_only')) {
+                    if (preset === 'income') {
+                        const firstRegular = Array.from(paymentFlow.options).find(
+                            (o) => o.value && o.value !== '__credit__',
+                        );
+                        paymentFlow.value = firstRegular ? firstRegular.value : '';
+                    } else {
+                        paymentFlow.value = mode === 'both' ? '__credit__' : '';
+                    }
+                    paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (mode === 'cards_only' && accountSel) {
+                    const firstCard = Array.from(accountSel.options).find((o) => o.value !== '');
+                    if (firstCard) {
+                        accountSel.value = firstCard.value;
+                    }
+                }
+            });
         }
 
         const precheckUrl = txForm.dataset.creditLimitPrecheckUrl || '';

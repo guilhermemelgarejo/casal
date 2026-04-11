@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Support\PaymentMethods;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -34,9 +35,7 @@ class CreditCardStatementController extends Controller
             }
         }
 
-        $cardIds = $filterCardId !== null
-            ? [$filterCardId]
-            : $cardAccounts->pluck('id')->all();
+        $cardIds = $filterCardId !== null ? [$filterCardId] : [];
 
         $invoiceCycles = collect();
         $invoiceCycleLinesByKey = [];
@@ -120,8 +119,21 @@ class CreditCardStatementController extends Controller
             ->orderBy('name')
             ->get();
 
+        $cardPickerSummaries = [];
+        foreach ($cardAccounts as $a) {
+            $cardPickerSummaries[$a->id] = $this->cardPickerOpenCycleSummary($a, $coupleId);
+        }
+
+        $pastOpenStatementCycles = $cardAccounts->isEmpty()
+            ? collect()
+            : $this->pastOpenCreditCardStatementRows($coupleId, $cardAccounts);
+
+        $pastOpenStatementAccountIds = $pastOpenStatementCycles->map(fn (array $r) => $r['account']->id)->unique()->values();
+
         return view('credit-card-statements.index', compact(
             'cardAccounts',
+            'cardPickerSummaries',
+            'pastOpenStatementAccountIds',
             'invoiceCycles',
             'invoiceCycleLinesByKey',
             'regularAccounts',
@@ -358,6 +370,182 @@ class CreditCardStatementController extends Controller
             ->where('reference_month', $referenceMonth)
             ->where('reference_year', $referenceYear)
             ->first();
+    }
+
+    /**
+     * Primeira fatura em aberto entre o mês de referência atual e o seguinte (calendário app), para o resumo nos cartões da listagem.
+     *
+     * @return array{
+     *     reference_month: int,
+     *     reference_year: int,
+     *     ref_label: string,
+     *     spent_total: float,
+     *     spent_total_str: string,
+     *     remaining: float,
+     *     remaining_str: string,
+     *     partial: bool,
+     *     due_label: string|null,
+     *     due_is_suggestion: bool
+     * }|null
+     */
+    private function cardPickerOpenCycleSummary(Account $account, int $coupleId): ?array
+    {
+        $now = Carbon::now();
+        $nextMonth = $now->copy()->addMonth();
+
+        $candidates = [
+            [(int) $now->month, (int) $now->year],
+            [(int) $nextMonth->month, (int) $nextMonth->year],
+        ];
+
+        foreach ($candidates as [$refMonth, $refYear]) {
+            if (! $this->cycleHasCardExpense($account, $refMonth, $refYear)) {
+                continue;
+            }
+
+            $meta = $this->findMeta($account, $refMonth, $refYear);
+            $spentTotal = $meta !== null
+                ? (float) $meta->spent_total
+                : (float) CreditCardStatement::sumCardExpensesForCycle($coupleId, $account->id, $refMonth, $refYear);
+
+            if ($spentTotal < 0.005) {
+                continue;
+            }
+
+            $isPaid = $meta !== null && $meta->isPaid();
+            if ($isPaid) {
+                continue;
+            }
+
+            $remaining = $meta !== null ? $meta->remainingToPay() : $spentTotal;
+            $partial = $meta !== null && $meta->hasPartialPayments();
+
+            $virtualDue = $account->defaultStatementDueDate($refMonth, $refYear);
+            if ($meta?->due_date) {
+                $dueForDisplay = $meta->due_date;
+                $dueIsSuggestion = false;
+            } elseif ($virtualDue) {
+                $dueForDisplay = $virtualDue;
+                $dueIsSuggestion = true;
+            } else {
+                $dueForDisplay = null;
+                $dueIsSuggestion = false;
+            }
+
+            return [
+                'reference_month' => $refMonth,
+                'reference_year' => $refYear,
+                'ref_label' => sprintf('%02d/%d', $refMonth, $refYear),
+                'spent_total' => $spentTotal,
+                'spent_total_str' => number_format($spentTotal, 2, ',', '.'),
+                'remaining' => $remaining,
+                'remaining_str' => number_format($remaining, 2, ',', '.'),
+                'partial' => $partial,
+                'due_label' => $dueForDisplay?->format('d/m/Y'),
+                'due_is_suggestion' => $dueIsSuggestion,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Ciclos de fatura (mês de referência) anteriores ao mês civil atual com despesa no cartão e ainda não quitados.
+     *
+     * @return Collection<int, array{
+     *     account: Account,
+     *     ref_label: string,
+     *     reference_month: int,
+     *     reference_year: int,
+     *     spent_total_str: string,
+     *     remaining_str: string,
+     *     has_partial: bool,
+     *     statements_url: string
+     * }>
+     */
+    private function pastOpenCreditCardStatementRows(int $coupleId, Collection $cardAccounts): Collection
+    {
+        $now = Carbon::now();
+        $currentOrdinal = $now->year * 12 + $now->month;
+
+        $cardIds = $cardAccounts->pluck('id')->all();
+
+        $candidates = Transaction::query()
+            ->where('couple_id', $coupleId)
+            ->where('type', 'expense')
+            ->whereIn('account_id', $cardIds)
+            ->whereRaw('(reference_year * 12 + reference_month) < ?', [$currentOrdinal])
+            ->groupBy('account_id', 'reference_month', 'reference_year')
+            ->selectRaw('account_id, reference_month, reference_year')
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return collect();
+        }
+
+        $metaList = CreditCardStatement::query()
+            ->where('couple_id', $coupleId)
+            ->where(function ($q) use ($candidates) {
+                foreach ($candidates as $c) {
+                    $q->orWhere(function ($qq) use ($c) {
+                        $qq->where('account_id', (int) $c->account_id)
+                            ->where('reference_month', (int) $c->reference_month)
+                            ->where('reference_year', (int) $c->reference_year);
+                    });
+                }
+            })
+            ->with('paymentTransactions')
+            ->get()
+            ->keyBy(fn (CreditCardStatement $s) => $this->cycleKey($s->account_id, $s->reference_year, $s->reference_month));
+
+        $accountsById = $cardAccounts->keyBy('id');
+
+        $rows = [];
+        foreach ($candidates as $c) {
+            $accId = (int) $c->account_id;
+            $refMonth = (int) $c->reference_month;
+            $refYear = (int) $c->reference_year;
+
+            $account = $accountsById->get($accId);
+            if ($account === null) {
+                continue;
+            }
+
+            $key = $this->cycleKey($accId, $refYear, $refMonth);
+            $meta = $metaList->get($key);
+
+            $spent = $meta !== null
+                ? (float) $meta->spent_total
+                : (float) CreditCardStatement::sumCardExpensesForCycle($coupleId, $accId, $refMonth, $refYear);
+
+            if ($spent < 0.005) {
+                continue;
+            }
+
+            if ($meta !== null && $meta->isPaid()) {
+                continue;
+            }
+
+            $remaining = $meta !== null ? $meta->remainingToPay() : $spent;
+            $refLabel = sprintf('%02d/%d', $refMonth, $refYear);
+
+            $rows[] = [
+                'account' => $account,
+                'ref_label' => $refLabel,
+                'reference_month' => $refMonth,
+                'reference_year' => $refYear,
+                'spent_total_str' => number_format($spent, 2, ',', '.'),
+                'remaining_str' => number_format($remaining, 2, ',', '.'),
+                'has_partial' => $meta !== null && $meta->hasPartialPayments(),
+                'statements_url' => route('credit-card-statements.index', ['account_id' => $accId])
+                    .'#statement-cycle-'.$accId.'-'.$refYear.'-'.$refMonth,
+            ];
+        }
+
+        usort($rows, fn (array $a, array $b): int => ($a['reference_year'] * 12 + $a['reference_month'])
+            <=> ($b['reference_year'] * 12 + $b['reference_month']));
+
+        return collect($rows);
     }
 
     private function firstOrCreateMeta(Account $account, int $referenceMonth, int $referenceYear): CreditCardStatement

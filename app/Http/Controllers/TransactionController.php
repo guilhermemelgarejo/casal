@@ -150,6 +150,7 @@ class TransactionController extends Controller
                     'id' => $editTx->id,
                     'action' => route('transactions.update', $editTx),
                     'amount' => old('amount', $editTx->amount),
+                    'description' => old('description', $editTx->baseDescriptionWithoutInstallmentSuffix()),
                     'edit' => $this->transactionAmountEditMeta($editTx),
                 ];
             }
@@ -280,6 +281,7 @@ class TransactionController extends Controller
                     'id' => $t->id,
                     'parcel_label' => ($idx + 1).'/'.$total,
                     'description' => $t->description,
+                    'description_edit_base' => $t->baseDescriptionWithoutInstallmentSuffix(),
                     'date' => $t->date->format('d/m/Y'),
                     'ref_label' => $refLabel,
                     'statement_url' => $statementUrl,
@@ -460,9 +462,13 @@ class TransactionController extends Controller
             return back()->with('error', $blockReason);
         }
 
+        $suffix = $transaction->installmentParcelSuffixFromDescription();
+        $descriptionMax = $suffix !== null ? max(1, 255 - mb_strlen($suffix)) : 255;
+
         try {
             $request->validate([
                 'amount' => ['required', 'numeric', 'min:0.01'],
+                'description' => ['required', 'string', 'max:'.$descriptionMax],
                 'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
             ]);
         } catch (ValidationException $e) {
@@ -471,6 +477,11 @@ class TransactionController extends Controller
                 ->withInput()
                 ->with('edit_transaction_id', $transaction->id);
         }
+
+        $newDescriptionFull = $this->normalizedDescriptionForUpdate(
+            $transaction,
+            (string) $request->input('description')
+        );
 
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
         $newAmountCents = (int) round(((float) $amountNormalized) * 100);
@@ -499,23 +510,48 @@ class TransactionController extends Controller
         }
 
         $oldAmountFormatted = number_format((float) $transaction->amount, 2, '.', '');
-        if ($oldAmountFormatted === $newAmountFormatted) {
+        $oldDescription = (string) $transaction->description;
+        $amountChanged = $oldAmountFormatted !== $newAmountFormatted;
+        $descriptionChanged = $oldDescription !== $newDescriptionFull;
+
+        if (! $amountChanged && ! $descriptionChanged) {
             session()->forget('edit_transaction_id');
             $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
-            return back()->with('success', 'Valor inalterado.');
+            return back()->with('success', 'Lançamento inalterado.');
         }
 
-        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows) {
-            $transaction->amount = $newAmountFormatted;
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged) {
+            $transaction->description = $newDescriptionFull;
+            if ($amountChanged) {
+                $transaction->amount = $newAmountFormatted;
+            }
             $transaction->save();
-            $transaction->syncCategorySplits($splitRows);
+            if ($amountChanged) {
+                $transaction->syncCategorySplits($splitRows);
+            }
         });
 
         session()->forget('edit_transaction_id');
         $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
-        return back()->with('success', 'Valor do lançamento atualizado.');
+        if ($amountChanged && $descriptionChanged) {
+            $msg = 'Lançamento atualizado.';
+        } elseif ($amountChanged) {
+            $msg = 'Valor do lançamento atualizado.';
+        } else {
+            $msg = 'Descrição atualizada.';
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    private function normalizedDescriptionForUpdate(Transaction $transaction, string $baseInput): string
+    {
+        $base = trim($baseInput);
+        $suffix = $transaction->installmentParcelSuffixFromDescription();
+
+        return $suffix !== null ? $base.$suffix : $base;
     }
 
     /**
@@ -646,7 +682,7 @@ class TransactionController extends Controller
         }
 
         return back()->withErrors([
-            'amount' => 'O limite do cartão exige confirmação no aviso antes de guardar. Confirme e tente de novo.',
+            'amount' => 'O limite do cartão exige confirmação no aviso antes de salvar. Confirme e tente de novo.',
         ])->withInput();
     }
 
@@ -1027,7 +1063,7 @@ class TransactionController extends Controller
         }
 
         return back()->withErrors([
-            'amount' => 'O limite do cartão exige confirmação no aviso antes de guardar. Recarregue a página e tente de novo.',
+            'amount' => 'O limite do cartão exige confirmação no aviso antes de salvar. Recarregue a página e tente de novo.',
         ])->withInput();
     }
 

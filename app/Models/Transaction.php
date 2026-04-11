@@ -248,6 +248,18 @@ class Transaction extends Model
     }
 
     /**
+     * Sufixo " (Parcela x/y)" no fim da descrição, se existir (parcelas no cartão).
+     */
+    public function installmentParcelSuffixFromDescription(): ?string
+    {
+        if (preg_match('/(\s*\(Parcela\s+\d+\/\d+\))\s*$/u', (string) $this->description, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    /**
      * Despesa no cartão cujo mês/ano de referência corresponde a uma fatura já marcada como paga (metadados).
      */
     public function isInPaidCreditCardInvoiceCycle(): bool

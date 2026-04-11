@@ -11,7 +11,13 @@ class AccountController extends Controller
 {
     public function index()
     {
-        $accounts = Auth::user()->couple->accounts;
+        $accounts = Auth::user()->couple->accounts()
+            ->orderByRaw('CASE kind WHEN ? THEN 0 WHEN ? THEN 1 ELSE 2 END', [
+                Account::KIND_REGULAR,
+                Account::KIND_CREDIT_CARD,
+            ])
+            ->orderBy('name')
+            ->get();
 
         return view('accounts.index', compact('accounts'));
     }

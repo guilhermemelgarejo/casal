@@ -47,27 +47,29 @@ class DashboardController extends Controller
         $thresholdAmount = ($income * $thresholdPercentage) / 100;
         $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
 
-        // Agrupamento Cruzado: Conta x Forma de Pagamento
-        $crossSummary = $statsTransactions->where('type', 'expense')
+        // Despesas do período por conta (tipo: conta regular vs cartão)
+        $spendingByAccount = $statsTransactions->where('type', 'expense')
             ->whereNotNull('account_id')
             ->groupBy('account_id')
             ->map(function ($accountTransactions) {
                 $account = $accountTransactions->first()->accountModel;
+                if (! $account) {
+                    return null;
+                }
 
                 return [
                     'account_name' => $account->name,
                     'account_color' => $account->color,
-                    'methods' => $accountTransactions->groupBy(function ($tx) {
-                        if ($tx->accountModel?->isCreditCard()) {
-                            return 'Cartão de crédito';
-                        }
-
-                        return $tx->payment_method ?: '—';
-                    })
-                        ->map(fn ($methodTransactions) => $methodTransactions->sum('amount'))
-                        ->forget(''),
+                    'is_credit_card' => $account->isCreditCard(),
+                    'account_kind_label' => $account->isCreditCard()
+                        ? 'Cartão de crédito'
+                        : 'Conta',
+                    'total' => (float) $accountTransactions->sum('amount'),
                 ];
-            });
+            })
+            ->filter()
+            ->sortByDesc('total')
+            ->values();
 
         return view('dashboard', compact(
             'couple',
@@ -75,7 +77,7 @@ class DashboardController extends Controller
             'totalIncome',
             'totalExpense',
             'balance',
-            'crossSummary',
+            'spendingByAccount',
             'period',
             'month',
             'year',
