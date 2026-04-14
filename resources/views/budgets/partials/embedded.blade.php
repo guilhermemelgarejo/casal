@@ -1,6 +1,6 @@
 {{-- Resumo global do orçamento (mês corrente). Renda: cabeçalho Receitas (`income-toolbar`). Requer: $budgets, $categoriesExpense --}}
 @php
-    $budgetCategoryCount = $categoriesExpense->filter(fn ($c) => ! $c->isCreditCardInvoicePayment())->count();
+    $budgetCategoryCount = $categoriesExpense->filter(fn ($c) => ! $c->isReservedSystemCategory())->count();
 @endphp
 
 @php

@@ -168,6 +168,7 @@ class Transaction extends Model
         'reference_year',
         'installment_parent_id',
         'recurring_transaction_id',
+        'internal_transfer_group_id',
     ];
 
     protected $casts = [
@@ -343,6 +344,14 @@ class Transaction extends Model
     }
 
     /**
+     * Par de lançamentos criado em transferência entre contas (não entra em KPIs nem gasto por categoria).
+     */
+    public function scopeExcludingInternalTransfers(Builder $query): Builder
+    {
+        return $query->whereNull('internal_transfer_group_id');
+    }
+
+    /**
      * Mês de referência para os cartões **Receitas**, **Despesas** e **Saldo** do painel: toda receita;
      * despesas **efetivas em caixa** (conta que não é cartão de crédito **ou** lançamento de pagamento de fatura na conta corrente).
      * **Exclui** compras lançadas diretamente no cartão de crédito (ainda não “pagas” pela conta).
@@ -352,6 +361,7 @@ class Transaction extends Model
         return $query
             ->where('reference_month', $month)
             ->where('reference_year', $year)
+            ->whereNull('internal_transfer_group_id')
             ->where(function (Builder $q) {
                 $q->where('type', 'income')
                     ->orWhere(function (Builder $q2) {

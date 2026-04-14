@@ -25,6 +25,7 @@ class RecurringTransactionController extends Controller
 
         $categories = $couple->categories()
             ->excludingCreditCardInvoicePayment()
+            ->excludingInternalTransferCategories()
             ->orderBy('name')
             ->get();
 

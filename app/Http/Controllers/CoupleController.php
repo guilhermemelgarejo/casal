@@ -44,6 +44,18 @@ class CoupleController extends Controller
                 'color' => '#64748b',
                 'system_key' => Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT,
             ],
+            [
+                'name' => Category::NAME_INTERNAL_TRANSFER_EXPENSE,
+                'type' => 'expense',
+                'color' => '#94a3b8',
+                'system_key' => Category::SYSTEM_KEY_INTERNAL_TRANSFER_EXPENSE,
+            ],
+            [
+                'name' => Category::NAME_INTERNAL_TRANSFER_INCOME,
+                'type' => 'income',
+                'color' => '#94a3b8',
+                'system_key' => Category::SYSTEM_KEY_INTERNAL_TRANSFER_INCOME,
+            ],
             ['name' => 'Salário', 'type' => 'income', 'color' => '#8b5cf6'],
         ];
 

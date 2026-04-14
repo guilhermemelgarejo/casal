@@ -20,14 +20,15 @@ class CategoryController extends Controller
         $budgets = $couple->budgets()
             ->where('month', date('m'))
             ->where('year', date('Y'))
-            ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment())
+            ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment()->excludingInternalTransferCategories())
             ->get();
         $spentByCategory = TransactionCategorySplit::query()
             ->whereHas('transaction', function ($q) use ($couple) {
                 $q->where('couple_id', $couple->id)
                     ->where('reference_month', (int) date('m'))
                     ->where('reference_year', (int) date('Y'))
-                    ->excludingCreditCardInvoicePayments();
+                    ->excludingCreditCardInvoicePayments()
+                    ->excludingInternalTransfers();
             })
             ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
@@ -44,7 +45,16 @@ class CategoryController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::notIn([Category::NAME_CREDIT_CARD_INVOICE_PAYMENT])],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::notIn([
+                    Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+                    Category::NAME_INTERNAL_TRANSFER_EXPENSE,
+                    Category::NAME_INTERNAL_TRANSFER_INCOME,
+                ]),
+            ],
             'type' => 'required|in:income,expense',
             'color' => 'nullable|string',
             'icon' => 'nullable|string',
@@ -67,14 +77,23 @@ class CategoryController extends Controller
             abort(403);
         }
 
-        if ($category->isCreditCardInvoicePayment()) {
+        if ($category->isReservedSystemCategory()) {
             return back()->withErrors([
                 'name' => 'Esta categoria não pode ser editada.',
             ]);
         }
 
         $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::notIn([Category::NAME_CREDIT_CARD_INVOICE_PAYMENT])],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::notIn([
+                    Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+                    Category::NAME_INTERNAL_TRANSFER_EXPENSE,
+                    Category::NAME_INTERNAL_TRANSFER_INCOME,
+                ]),
+            ],
             'type' => 'required|in:income,expense',
             'color' => 'nullable|string',
             'icon' => 'nullable|string',
@@ -91,7 +110,7 @@ class CategoryController extends Controller
             abort(403);
         }
 
-        if ($category->isCreditCardInvoicePayment()) {
+        if ($category->isReservedSystemCategory()) {
             return back()->withErrors([
                 'category' => 'Esta categoria não pode ser excluída.',
             ]);

@@ -28,12 +28,12 @@ class BudgetController extends Controller
             abort(403);
         }
 
-        if ($category->isCreditCardInvoicePayment()) {
+        if ($category->isReservedSystemCategory()) {
             return redirect()
                 ->route('categories.index')
                 ->withFragment('orcamento')
                 ->withErrors([
-                    'category_id' => 'Esta categoria é reservada para pagamentos de fatura de cartão. Use outra categoria no orçamento.',
+                    'category_id' => 'Esta categoria é reservada pelo sistema. Use outra categoria no orçamento.',
                 ])
                 ->withInput();
         }

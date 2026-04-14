@@ -22,6 +22,7 @@ trait PreparesTransactionModalPayload
 
         $categories = $couple->categories()
             ->excludingCreditCardInvoicePayment()
+            ->excludingInternalTransferCategories()
             ->orderBy('name')
             ->get();
         $accounts = $couple->accounts;

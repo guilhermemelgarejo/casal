@@ -110,9 +110,9 @@
                             @forelse ($categoriesExpense as $cat)
                                 @include('categories.partials.category-card', [
                                     'category' => $cat,
-                                    'budgetRow' => $cat->isCreditCardInvoicePayment() ? null : $budgets->firstWhere('category_id', $cat->id),
-                                    'spentInMonth' => $cat->isCreditCardInvoicePayment() ? null : (float) ($spentByCategory[$cat->id] ?? 0),
-                                    'coupleIncome' => $cat->isCreditCardInvoicePayment() ? null : (float) (Auth::user()->couple->monthly_income ?? 0),
+                                    'budgetRow' => $cat->isReservedSystemCategory() ? null : $budgets->firstWhere('category_id', $cat->id),
+                                    'spentInMonth' => $cat->isReservedSystemCategory() ? null : (float) ($spentByCategory[$cat->id] ?? 0),
+                                    'coupleIncome' => $cat->isReservedSystemCategory() ? null : (float) (Auth::user()->couple->monthly_income ?? 0),
                                 ])
                             @empty
                                 <div class="cat-empty text-center py-4 px-3">

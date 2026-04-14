@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountTransferController;
 use App\Http\Controllers\Admin\SubscriptionAdminController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BudgetController;
@@ -41,6 +42,7 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::put('/recorrentes/{recurringTransaction}', [RecurringTransactionController::class, 'update'])->name('recurring-transactions.update');
     Route::delete('/recorrentes/{recurringTransaction}', [RecurringTransactionController::class, 'destroy'])->name('recurring-transactions.destroy');
     Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
+    Route::post('/accounts/transfer', [AccountTransferController::class, 'store'])->name('accounts.transfer');
     Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
     Route::put('/accounts/{account}', [AccountController::class, 'update'])->name('accounts.update');
     Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->name('accounts.destroy');

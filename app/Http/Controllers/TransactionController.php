@@ -14,6 +14,7 @@ use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -94,6 +95,11 @@ class TransactionController extends Controller
         $transactions->appends($appendQuery);
 
         $modalPayload = $this->transactionModalPayload();
+        /** @var Collection<int, Account> $regularAccounts */
+        $regularAccounts = $modalPayload['regularAccounts'] ?? collect();
+        $canCreateAccountTransfer = $regularAccounts->count() >= 2;
+        $transferPaymentMethods = PaymentMethods::forRegularAccounts();
+
         $txRecurringPrefill = null;
         $txRecurringPrefillBlockedReason = null;
         if ($prefillRecurringId !== null) {
@@ -147,7 +153,9 @@ class TransactionController extends Controller
                 'txRecurringPrefill',
                 'txRecurringPrefillBlockedReason',
                 'recurringReminders',
-                'creditCardInvoiceReminders'
+                'creditCardInvoiceReminders',
+                'canCreateAccountTransfer',
+                'transferPaymentMethods'
             ),
             $modalPayload
         ));
@@ -350,6 +358,10 @@ class TransactionController extends Controller
 
     private function transactionAmountEditBlockedReason(Transaction $transaction): ?string
     {
+        if ($transaction->internal_transfer_group_id) {
+            return 'Não é possível alterar o valor de uma transferência entre contas. Exclua os dois lançamentos e registe de novo.';
+        }
+
         if ($transaction->isCreditCardInvoicePaymentTransaction()) {
             return 'Não é possível alterar o valor de um pagamento de fatura. Exclua o lançamento em Faturas de cartão se precisar corrigir.';
         }
@@ -951,6 +963,26 @@ class TransactionController extends Controller
             'installment_scope' => ['nullable', 'string', Rule::in(['single', 'all'])],
         ]);
 
+        if ($transaction->internal_transfer_group_id) {
+            $peer = Transaction::query()
+                ->where('couple_id', $transaction->couple_id)
+                ->where('internal_transfer_group_id', $transaction->internal_transfer_group_id)
+                ->where('id', '<>', $transaction->id)
+                ->first();
+
+            DB::transaction(function () use ($transaction, $peer) {
+                if ($peer !== null) {
+                    $peer->delete();
+                }
+                $transaction->delete();
+            });
+
+            return back()->with(
+                'success',
+                'Transferência excluída (os dois lançamentos foram removidos).'
+            );
+        }
+
         $scope = $request->input('installment_scope', 'single');
 
         $rootId = $transaction->installmentRootId();
@@ -1084,6 +1116,9 @@ class TransactionController extends Controller
             }
             if ($category->isCreditCardInvoicePayment()) {
                 return ['errors' => ['category_allocations' => ['Não é possível usar a categoria de quitação de fatura neste lançamento.']]];
+            }
+            if ($category->isInternalTransferCategory()) {
+                return ['errors' => ['category_allocations' => ['Não é possível usar categorias reservadas a transferências entre contas neste lançamento.']]];
             }
             if ($category->type !== $type) {
                 return ['errors' => ['category_allocations' => ['Todas as categorias devem ser do mesmo tipo (Receita ou Despesa).']]];

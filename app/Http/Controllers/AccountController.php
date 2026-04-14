@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Support\PaymentMethods;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,15 @@ class AccountController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('accounts.index', compact('accounts'));
+        $regularCount = $accounts->where('kind', Account::KIND_REGULAR)->count();
+        $canCreateAccountTransfer = $regularCount >= 2;
+        $transferPaymentMethods = PaymentMethods::forRegularAccounts();
+
+        return view('accounts.index', compact(
+            'accounts',
+            'canCreateAccountTransfer',
+            'transferPaymentMethods'
+        ));
     }
 
     public function store(Request $request)

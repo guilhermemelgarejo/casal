@@ -1,6 +1,6 @@
 @php
     $isIncome = $category->type === 'income';
-    $isFixed = $category->isCreditCardInvoicePayment();
+    $isFixed = $category->isReservedSystemCategory();
     $showBudgetMeta = ! $isIncome && ! $isFixed;
     $budgetRow = $budgetRow ?? null;
     $spentInMonth = (float) ($spentInMonth ?? 0);
@@ -28,7 +28,13 @@
                         @endif
                     </div>
                     @if ($isFixed)
-                        <p class="cat-item-card__meta cat-item-card__meta--short small mb-0 mt-1">Quitação de fatura — não editável.</p>
+                        <p class="cat-item-card__meta cat-item-card__meta--short small mb-0 mt-1">
+                            @if ($category->isCreditCardInvoicePayment())
+                                Quitação de fatura — não editável.
+                            @else
+                                Reservada ao sistema — não editável.
+                            @endif
+                        </p>
                     @endif
                 </div>
                 @unless ($isFixed)
