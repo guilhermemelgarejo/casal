@@ -113,7 +113,7 @@ class RecurringTransactionTest extends TestCase
         }
     }
 
-    public function test_recurring_index_mostra_painel_de_lembretes_igual_ao_das_outras_paginas(): void
+    public function test_recurring_index_nao_mostra_painel_de_lembretes(): void
     {
         ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
 
@@ -137,13 +137,9 @@ class RecurringTransactionTest extends TestCase
         try {
             $html = $this->actingAs($user)->get(route('recurring-transactions.index'))->assertOk()->getContent();
 
-            $this->assertStringContainsString('rt-reminder-card', $html);
-            $this->assertStringContainsString('Lembretes deste mês', $html);
-            $this->assertStringContainsString('Gerir modelos', $html);
-            $this->assertStringContainsString('rt-reminder-btn--header', $html);
+            $this->assertStringNotContainsString('rt-reminder-card', $html);
+            $this->assertStringNotContainsString('Lembretes deste mês', $html);
             $this->assertStringContainsString('Mensalidade', $html);
-            $this->assertStringContainsString('Dia previsto:', $html);
-            $this->assertStringContainsString('10/04/2026', $html);
         } finally {
             $this->travelBack();
         }
@@ -172,7 +168,7 @@ class RecurringTransactionTest extends TestCase
 
         try {
             $this->actingAs($user)
-                ->get(route('recurring-transactions.index'))
+                ->get(route('dashboard'))
                 ->assertOk()
                 ->assertSee('rt-reminder-card--overdue', false);
         } finally {
@@ -203,7 +199,7 @@ class RecurringTransactionTest extends TestCase
 
         try {
             $this->actingAs($user)
-                ->get(route('recurring-transactions.index'))
+                ->get(route('dashboard'))
                 ->assertOk()
                 ->assertDontSee('rt-reminder-card--overdue', false);
         } finally {

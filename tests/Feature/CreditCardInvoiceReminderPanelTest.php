@@ -97,8 +97,7 @@ class CreditCardInvoiceReminderPanelTest extends TestCase
             $this->actingAs($user)
                 ->get(route('recurring-transactions.index'))
                 ->assertOk()
-                ->assertSee('Faturas em aberto', false)
-                ->assertSee('Visa Lembrete', false);
+                ->assertDontSee('Faturas em aberto', false);
         } finally {
             $this->travelBack();
         }

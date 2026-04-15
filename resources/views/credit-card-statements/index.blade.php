@@ -65,7 +65,15 @@
                                 <div class="cc-picker-toolbar-inner d-flex flex-column align-items-stretch gap-3">
                                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                         <span class="small fw-semibold text-secondary text-uppercase cc-picker-toolbar-label">Trocar cartão</span>
-                                        <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 align-self-start">Voltar à escolha</a>
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary rounded-pill px-3"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#newAvulsaStatementModal"
+                                            >Cadastrar fatura avulsa</button>
+                                            <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 align-self-start">Voltar à escolha</a>
+                                        </div>
                                     </div>
                                     <div class="cc-picker-grid cc-picker-grid--toolbar justify-content-center">
                                         @foreach ($cardAccounts as $ca)
@@ -135,7 +143,12 @@
                                             <div class="card-header cc-statement-header d-flex flex-wrap justify-content-between align-items-start gap-2 py-3 border-0 {{ $statementHeaderClass }}">
                                                 <div class="min-w-0">
                                                     <div class="fw-semibold">{{ $cycle->account->name }}</div>
-                                                    <div class="small text-secondary">Ref. {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}</div>
+                                                    <div class="small text-secondary d-flex flex-wrap align-items-center gap-2">
+                                                        <span>Ref. {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}</span>
+                                                        @if ($meta?->is_avulsa)
+                                                            <span class="badge text-bg-secondary">Avulsa</span>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                                 <div class="text-md-end">
                                                     <div class="fs-5 fw-semibold text-nowrap">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</div>
@@ -194,11 +207,11 @@
                                                         </div>
                                                     </div>
                                                     <div class="col-lg-3">
-                                                        <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                                                        <div class="d-flex flex-wrap flex-lg-nowrap gap-2 justify-content-lg-end">
                                                             @if ($showPaymentForms)
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-sm btn-outline-secondary"
+                                                                    class="btn btn-sm btn-outline-secondary text-nowrap"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#payStatementModal"
                                                                     data-pay-action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
@@ -210,21 +223,42 @@
                                                             @endif
                                                             <button
                                                                 type="button"
-                                                                class="btn btn-sm btn-outline-primary"
+                                                                class="btn btn-sm btn-outline-primary text-nowrap"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#editStatementModal"
                                                                 data-edit-action="{{ route('credit-card-statements.update', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
                                                                 data-edit-subtitle="{{ $cycle->account->name }} — {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}"
                                                                 data-edit-due="{{ $editDueValue }}"
+                                                                data-edit-is-avulsa="{{ $meta?->is_avulsa ? '1' : '0' }}"
+                                                                data-edit-can-edit="{{ $meta?->canEditAvulsaFields() ? '1' : '0' }}"
+                                                                data-edit-total="{{ $meta?->is_avulsa ? number_format((float) $meta->spent_total, 2, ',', '.') : '' }}"
                                                             >Editar</button>
-                                                            <button
-                                                                type="button"
-                                                                class="btn btn-sm btn-outline-secondary"
-                                                                data-bs-toggle="modal"
-                                                                data-bs-target="#statementItemsModal"
-                                                                data-statement-subtitle="{{ $cycleSubtitle }}"
-                                                                data-statement-cycle-key="{{ $cycle->cycle_key }}"
-                                                            >Itens da fatura</button>
+                                                            @if ($meta?->is_avulsa)
+                                                                <form
+                                                                    action="{{ route('credit-card-statements.destroy', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
+                                                                    method="POST"
+                                                                    class="d-inline"
+                                                                    data-confirm="Excluir esta fatura avulsa? Esta ação não pode ser desfeita."
+                                                                    data-confirm-title="Excluir fatura avulsa"
+                                                                    data-confirm-accept="Sim, excluir"
+                                                                    data-confirm-cancel="Cancelar"
+                                                                    data-confirm-icon="warning"
+                                                                >
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Excluir</button>
+                                                                </form>
+                                                            @endif
+                                                            @unless ($meta?->is_avulsa)
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-sm btn-outline-secondary text-nowrap"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#statementItemsModal"
+                                                                    data-statement-subtitle="{{ $cycleSubtitle }}"
+                                                                    data-statement-cycle-key="{{ $cycle->cycle_key }}"
+                                                                >Itens da fatura</button>
+                                                            @endunless
                                                         </div>
                                                     </div>
                                                 </div>
@@ -336,11 +370,20 @@
                                         </div>
                                         <div class="modal-body">
                                             <p class="small text-secondary mb-3" id="editStatementSubtitle"></p>
-                                            <div class="mb-0">
+                                            <div class="vstack gap-3 mb-0">
+                                                <div id="editStatementTotalWrap" class="d-none">
+                                                    <x-input-label for="editStatementTotal" value="Total da fatura (avulsa)" />
+                                                    <input type="text" inputmode="decimal" name="spent_total" id="editStatementTotal" class="form-control mt-1" value="{{ old('spent_total') }}">
+                                                    <x-input-error :messages="$errors->get('spent_total')" class="mt-2" />
+                                                </div>
+
                                                 <x-input-label for="editStatementDue" value="Vencimento" />
                                                 <input type="date" name="due_date" id="editStatementDue" class="form-control mt-1" value="{{ old('due_date') }}">
                                                 <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
                                             </div>
+                                            <p class="small text-secondary mt-3 mb-0 d-none" id="editStatementLockedHint">
+                                                Esta fatura avulsa não pode mais ser editada após registrar pagamentos.
+                                            </p>
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -351,8 +394,58 @@
                             </div>
                         </div>
 
+                        <div class="modal fade" id="newAvulsaStatementModal" tabindex="-1" aria-labelledby="newAvulsaStatementModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <form method="POST" action="{{ route('credit-card-statements.store-avulsa', [$cardAccounts->firstWhere('id', $filterCardId)]) }}">
+                                        @csrf
+                                        <input type="hidden" name="_form" value="cc-statement-avulsa">
+                                        <div class="modal-header">
+                                            <h2 class="modal-title h5 mb-0" id="newAvulsaStatementModalLabel">Cadastrar fatura avulsa</h2>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="small text-secondary mb-3">
+                                                Use para registrar uma fatura sem itens lançados. A referência (mês/ano) não poderá ser alterada depois.
+                                            </p>
+                                            <div class="row g-3">
+                                                <div class="col-6">
+                                                    <x-input-label for="avulsaRefMonth" value="Mês de referência" />
+                                                    <select id="avulsaRefMonth" name="reference_month" class="form-select mt-1" required>
+                                                        @for ($m = 1; $m <= 12; $m++)
+                                                            <option value="{{ $m }}" @selected((int) old('reference_month') === $m)>{{ sprintf('%02d', $m) }}</option>
+                                                        @endfor
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('reference_month')" class="mt-2" />
+                                                </div>
+                                                <div class="col-6">
+                                                    <x-input-label for="avulsaRefYear" value="Ano de referência" />
+                                                    <input type="number" id="avulsaRefYear" name="reference_year" class="form-control mt-1" min="2000" max="2100" required value="{{ old('reference_year', now()->year) }}">
+                                                    <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
+                                                </div>
+                                                <div class="col-12">
+                                                    <x-input-label for="avulsaTotal" value="Total da fatura" />
+                                                    <input type="text" inputmode="decimal" id="avulsaTotal" name="spent_total" class="form-control mt-1" required value="{{ old('spent_total') }}" placeholder="Ex.: 1234,56">
+                                                    <x-input-error :messages="$errors->get('spent_total')" class="mt-2" />
+                                                </div>
+                                                <div class="col-12">
+                                                    <x-input-label for="avulsaDue" value="Vencimento (opcional)" />
+                                                    <input type="date" id="avulsaDue" name="due_date" class="form-control mt-1" value="{{ old('due_date') }}">
+                                                    <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                            <x-primary-button type="submit" class="rounded-pill px-4">Cadastrar</x-primary-button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
                         <p class="small text-secondary mt-3 mb-0">
-                            <a href="{{ route('transactions.index') }}">Lançamentos</a> — para mudar o total da fatura, ajuste ou exclua as despesas no cartão naquele mês de referência.
+                            <a href="{{ route('transactions.index') }}">Lançamentos</a> — em faturas normais, o total é calculado pelos itens do cartão. Em fatura <strong>avulsa</strong>, o total pode ser ajustado até existir um pagamento.
                         </p>
 
                         @php
@@ -418,6 +511,39 @@
                             </script>
                             <script>
                                 (function () {
+                                    const maskMoneyPtBr = (inputEl) => {
+                                        if (!inputEl) return;
+
+                                        const format = (raw) => {
+                                            let s = String(raw || '');
+                                            // Mantém apenas dígitos.
+                                            s = s.replace(/[^\d]/g, '');
+                                            if (s === '') return '';
+
+                                            // Converte para centavos (sempre 2 casas).
+                                            while (s.length < 3) s = '0' + s;
+                                            const cents = s.slice(-2);
+                                            let intPart = s.slice(0, -2);
+
+                                            // Remove zeros à esquerda (mas mantém pelo menos 0).
+                                            intPart = intPart.replace(/^0+(?=\d)/, '');
+                                            if (intPart === '') intPart = '0';
+
+                                            // Milhar com ponto.
+                                            intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            return `${intPart},${cents}`;
+                                        };
+
+                                        const apply = () => {
+                                            const cur = inputEl.value;
+                                            const next = format(cur);
+                                            inputEl.value = next;
+                                        };
+
+                                        inputEl.addEventListener('input', apply);
+                                        inputEl.addEventListener('blur', apply);
+                                    };
+
                                     const itemsModalEl = document.getElementById('statementItemsModal');
                                     const itemsSubtitleEl = document.getElementById('statementItemsSubtitle');
                                     const itemsTbody = document.getElementById('statementItemsTbody');
@@ -476,6 +602,10 @@
                                     const editForm = document.getElementById('editStatementForm');
                                     const editSubtitleEl = document.getElementById('editStatementSubtitle');
                                     const editDueInput = document.getElementById('editStatementDue');
+                                    const editTotalWrap = document.getElementById('editStatementTotalWrap');
+                                    const editTotalInput = document.getElementById('editStatementTotal');
+                                    const editLockedHint = document.getElementById('editStatementLockedHint');
+                                    maskMoneyPtBr(editTotalInput);
                                     if (editModalEl && editForm) {
                                         editModalEl.addEventListener('show.bs.modal', function (e) {
                                             const btn = e.relatedTarget;
@@ -486,6 +616,22 @@
                                             }
                                             if (editDueInput) {
                                                 editDueInput.value = btn.getAttribute('data-edit-due') || '';
+                                            }
+
+                                            const isAvulsa = (btn.getAttribute('data-edit-is-avulsa') || '') === '1';
+                                            const canEdit = (btn.getAttribute('data-edit-can-edit') || '') === '1';
+                                            if (editTotalWrap) {
+                                                editTotalWrap.classList.toggle('d-none', !isAvulsa);
+                                            }
+                                            if (editTotalInput) {
+                                                editTotalInput.value = isAvulsa ? (btn.getAttribute('data-edit-total') || '') : '';
+                                                editTotalInput.disabled = !isAvulsa || !canEdit;
+                                            }
+                                            if (editDueInput) {
+                                                editDueInput.disabled = isAvulsa && !canEdit;
+                                            }
+                                            if (editLockedHint) {
+                                                editLockedHint.classList.toggle('d-none', !(isAvulsa && !canEdit));
                                             }
                                         });
                                     }
@@ -527,6 +673,9 @@
                                         });
                                     }
 
+                                    const avulsaTotalInput = document.getElementById('avulsaTotal');
+                                    maskMoneyPtBr(avulsaTotalInput);
+
                                     @if ($openEditReopen)
                                     document.addEventListener('DOMContentLoaded', function () {
                                         if (!editForm || !editModalEl) return;
@@ -535,6 +684,16 @@
                                             editSubtitleEl.textContent = {!! json_encode($openEditSubtitleJs) !!};
                                         }
                                         if (editDueInput) editDueInput.value = {!! json_encode(old('due_date', '')) !!};
+                                        // Em reabertura por erro, tentamos manter o total (se aplicável).
+                                        const totalWrap = document.getElementById('editStatementTotalWrap');
+                                        const totalInput = document.getElementById('editStatementTotal');
+                                        if (totalWrap && totalInput) {
+                                            const oldTotal = {!! json_encode(old('spent_total', '')) !!};
+                                            if (oldTotal && String(oldTotal).trim() !== '') {
+                                                totalWrap.classList.remove('d-none');
+                                                totalInput.value = oldTotal;
+                                            }
+                                        }
                                         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
                                             bootstrap.Modal.getOrCreateInstance(editModalEl).show();
                                         }
@@ -560,6 +719,14 @@
                                         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
                                             bootstrap.Modal.getOrCreateInstance(payModalEl).show();
                                         }
+                                    });
+                                    @endif
+
+                                    @if (old('_form') === 'cc-statement-avulsa' && $errors->any())
+                                    document.addEventListener('DOMContentLoaded', function () {
+                                        const avulsaModalEl = document.getElementById('newAvulsaStatementModal');
+                                        if (!avulsaModalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+                                        bootstrap.Modal.getOrCreateInstance(avulsaModalEl).show();
                                     });
                                     @endif
                                 })();

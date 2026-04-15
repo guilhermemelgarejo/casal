@@ -17,6 +17,35 @@ use Illuminate\Validation\Rule;
 
 class CreditCardStatementController extends Controller
 {
+    private static function normalizeMoneyBrToNumeric(string $raw): string
+    {
+        $s = trim($raw);
+        if ($s === '') {
+            return '';
+        }
+
+        // Aceita "5653,37", "5.653,37", "5653.37", "5,653.37".
+        $lastComma = strrpos($s, ',');
+        $lastDot = strrpos($s, '.');
+
+        if ($lastComma !== false && $lastDot !== false) {
+            $commaIsDecimal = $lastComma > $lastDot;
+            if ($commaIsDecimal) {
+                $s = str_replace('.', '', $s);
+                $s = str_replace(',', '.', $s);
+            } else {
+                $s = str_replace(',', '', $s);
+            }
+        } elseif ($lastComma !== false) {
+            $s = str_replace('.', '', $s);
+            $s = str_replace(',', '.', $s);
+        } else {
+            $s = str_replace(',', '', $s);
+        }
+
+        return $s;
+    }
+
     public function index(Request $request)
     {
         $couple = Auth::user()->couple;
@@ -112,6 +141,32 @@ class CreditCardStatementController extends Controller
                     'cycle_lines' => $linesByKey->get($key, []),
                 ];
             });
+
+            // Inclui faturas avulsas (meta existente mesmo sem itens lançados).
+            $existingKeys = $invoiceCycles->map(fn ($c) => (string) $c->cycle_key)->flip();
+            $avulsas = $metaByKey
+                ->filter(fn (CreditCardStatement $m) => $m->is_avulsa)
+                ->reject(fn (CreditCardStatement $m) => $existingKeys->has($this->cycleKey($m->account_id, $m->reference_year, $m->reference_month)))
+                ->map(function (CreditCardStatement $meta) use ($accountsById) {
+                    $key = $this->cycleKey($meta->account_id, $meta->reference_year, $meta->reference_month);
+
+                    return (object) [
+                        'cycle_key' => $key,
+                        'account' => $accountsById[$meta->account_id],
+                        'reference_month' => (int) $meta->reference_month,
+                        'reference_year' => (int) $meta->reference_year,
+                        'spent_total' => (float) $meta->spent_total,
+                        'meta' => $meta,
+                        'cycle_lines' => [],
+                    ];
+                });
+
+            if ($avulsas->isNotEmpty()) {
+                $invoiceCycles = $invoiceCycles
+                    ->concat($avulsas)
+                    ->sortByDesc(fn ($c) => sprintf('%04d-%02d', (int) $c->reference_year, (int) $c->reference_month))
+                    ->values();
+            }
         }
 
         $regularAccounts = $couple->accounts()
@@ -141,16 +196,129 @@ class CreditCardStatementController extends Controller
         ));
     }
 
+    public function storeAvulsa(Request $request, Account $account)
+    {
+        $this->authorizeCreditCardAccount($account);
+
+        // Identifica o formulário para reabrir o modal no retorno com erro.
+        $request->merge(['_form' => (string) $request->input('_form', 'cc-statement-avulsa')]);
+
+        if ($request->filled('spent_total')) {
+            $request->merge([
+                'spent_total' => self::normalizeMoneyBrToNumeric((string) $request->input('spent_total')),
+            ]);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reference_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'reference_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'spent_total' => ['required', 'numeric', 'min:0.01'],
+            'due_date' => ['nullable', 'date'],
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $validated = $validator->validated();
+
+        // Se já houver itens lançados nesse ciclo, não permitir fatura avulsa.
+        if ($this->cycleHasCardExpense($account, (int) $validated['reference_month'], (int) $validated['reference_year'])) {
+            return back()->withErrors([
+                'reference_month' => 'Este ciclo já tem itens lançados no cartão. Use a fatura normal do ciclo.',
+            ])->withInput();
+        }
+
+        $coupleId = (int) Auth::user()->couple_id;
+        $refMonth = (int) $validated['reference_month'];
+        $refYear = (int) $validated['reference_year'];
+
+        $existing = CreditCardStatement::query()
+            ->where('couple_id', $coupleId)
+            ->where('account_id', (int) $account->id)
+            ->where('reference_month', $refMonth)
+            ->where('reference_year', $refYear)
+            ->first();
+
+        $spent = number_format((float) $validated['spent_total'], 2, '.', '');
+
+        // Se já existe um meta “vazio” (sem itens e sem pagamentos), em vez de bloquear,
+        // promovemos para fatura avulsa e atualizamos o total/vencimento.
+        if ($existing) {
+            if ($existing->paymentTransactions()->exists()) {
+                return back()->withErrors([
+                    'reference_month' => 'Já existe uma fatura neste ciclo e ela possui pagamentos vinculados.',
+                ])->withInput();
+            }
+
+            $existing->update([
+                'is_avulsa' => true,
+                'spent_total' => $spent,
+                'due_date' => $validated['due_date'] ?? null,
+                'paid_at' => null,
+            ]);
+
+            return back()->with('success', 'Fatura avulsa atualizada.');
+        }
+
+        try {
+            CreditCardStatement::create([
+                'couple_id' => $coupleId,
+                'account_id' => (int) $account->id,
+                'reference_month' => $refMonth,
+                'reference_year' => $refYear,
+                'spent_total' => $spent,
+                'due_date' => $validated['due_date'] ?? null,
+                'paid_at' => null,
+                'is_avulsa' => true,
+            ]);
+        } catch (\Throwable) {
+            // Em caso de falha ao gravar: só afirmamos “já existe” se realmente existir registro.
+            $existsNow = CreditCardStatement::query()
+                ->where('account_id', (int) $account->id)
+                ->where('reference_month', $refMonth)
+                ->where('reference_year', $refYear)
+                ->exists();
+
+            return back()->withErrors([
+                'reference_month' => $existsNow
+                    ? 'Já existe uma fatura para este cartão neste mês de referência.'
+                    : 'Não foi possível cadastrar a fatura avulsa. Tente novamente.',
+            ])->withInput();
+        }
+
+        return back()->with('success', 'Fatura avulsa cadastrada.');
+    }
+
     public function update(Request $request, Account $account, int $referenceYear, int $referenceMonth)
     {
         $this->authorizeCreditCardAccount($account);
 
-        if (! $this->cycleHasCardExpense($account, $referenceMonth, $referenceYear)) {
-            abort(404);
+        if ($request->filled('spent_total')) {
+            $request->merge([
+                'spent_total' => self::normalizeMoneyBrToNumeric((string) $request->input('spent_total')),
+            ]);
+        }
+
+        $meta = CreditCardStatement::query()
+            ->where('couple_id', Auth::user()->couple_id)
+            ->where('account_id', $account->id)
+            ->where('reference_month', $referenceMonth)
+            ->where('reference_year', $referenceYear)
+            ->with('paymentTransactions')
+            ->first();
+
+        if (! $meta) {
+            // Para faturas “normais”, só edita se houver itens no ciclo.
+            if (! $this->cycleHasCardExpense($account, $referenceMonth, $referenceYear)) {
+                abort(404);
+            }
+            $meta = $this->firstOrCreateMeta($account, $referenceMonth, $referenceYear);
         }
 
         $validator = Validator::make($request->all(), [
             'due_date' => ['nullable', 'date'],
+            'spent_total' => ['nullable', 'numeric', 'min:0.01'],
         ]);
 
         if ($validator->fails()) {
@@ -166,10 +334,36 @@ class CreditCardStatementController extends Controller
 
         $validated = $validator->validated();
 
-        $meta = $this->firstOrCreateMeta($account, $referenceMonth, $referenceYear);
+        // Referência nunca é editável (já está no path), e total/vencimento só podem mudar
+        // em fatura avulsa antes de qualquer pagamento.
+        if ($meta->is_avulsa) {
+            if (! $meta->canEditAvulsaFields()) {
+                return back()->withErrors([
+                    'due_date' => 'Esta fatura avulsa não pode mais ser editada após registrar pagamentos.',
+                ])->withInput()->with('open_statement_edit', [
+                    'account_id' => $account->id,
+                    'reference_year' => $referenceYear,
+                    'reference_month' => $referenceMonth,
+                ]);
+            }
+        } else {
+            // Fatura normal: só permite alterar vencimento (total vem dos itens).
+            if (array_key_exists('spent_total', $validated) && $validated['spent_total'] !== null) {
+                return back()->withErrors([
+                    'spent_total' => 'O total desta fatura é calculado pelos itens lançados no cartão.',
+                ])->withInput()->with('open_statement_edit', [
+                    'account_id' => $account->id,
+                    'reference_year' => $referenceYear,
+                    'reference_month' => $referenceMonth,
+                ]);
+            }
+        }
 
         $meta->update([
             'due_date' => $validated['due_date'] ?? null,
+            'spent_total' => ($meta->is_avulsa && array_key_exists('spent_total', $validated) && $validated['spent_total'] !== null)
+                ? number_format((float) str_replace(',', '.', (string) $validated['spent_total']), 2, '.', '')
+                : $meta->spent_total,
         ]);
 
         return back()->with('success', 'Fatura atualizada.');
@@ -179,11 +373,18 @@ class CreditCardStatementController extends Controller
     {
         $this->authorizeCreditCardAccount($account);
 
-        if (! $this->cycleHasCardExpense($account, $referenceMonth, $referenceYear)) {
+        $meta = CreditCardStatement::query()
+            ->where('couple_id', Auth::user()->couple_id)
+            ->where('account_id', $account->id)
+            ->where('reference_month', $referenceMonth)
+            ->where('reference_year', $referenceYear)
+            ->first();
+
+        if (! $meta && ! $this->cycleHasCardExpense($account, $referenceMonth, $referenceYear)) {
             abort(404);
         }
 
-        $meta = $this->firstOrCreateMeta($account, $referenceMonth, $referenceYear);
+        $meta = $meta ?: $this->firstOrCreateMeta($account, $referenceMonth, $referenceYear);
 
         $meta->refresh();
 
@@ -219,7 +420,7 @@ class CreditCardStatementController extends Controller
 
         $coupleId = Auth::user()->couple_id;
         $cycleTotal = $this->cycleSpentTotal($account, $referenceMonth, $referenceYear);
-        $cycleTotalFloat = (float) $cycleTotal;
+        $cycleTotalFloat = $meta->is_avulsa ? (float) $meta->spent_total : (float) $cycleTotal;
         $paidSoFar = $meta->paymentsTotal();
 
         if (empty($validated['account_id']) || empty($validated['paid_date'])) {
@@ -301,6 +502,32 @@ class CreditCardStatementController extends Controller
                 ? 'Lançamento criado e fatura quitada.'
                 : 'Lançamento criado. Ainda há valor pendente na fatura.'
         );
+    }
+
+    public function destroy(Account $account, int $referenceYear, int $referenceMonth)
+    {
+        $this->authorizeCreditCardAccount($account);
+
+        $meta = CreditCardStatement::query()
+            ->where('couple_id', Auth::user()->couple_id)
+            ->where('account_id', $account->id)
+            ->where('reference_month', $referenceMonth)
+            ->where('reference_year', $referenceYear)
+            ->firstOrFail();
+
+        if (! $meta->is_avulsa) {
+            abort(403);
+        }
+
+        if ($meta->paymentTransactions()->exists()) {
+            return back()->withErrors([
+                'payment' => 'Não é possível excluir uma fatura avulsa que já possui pagamentos vinculados.',
+            ]);
+        }
+
+        $meta->delete();
+
+        return back()->with('success', 'Fatura avulsa excluída.');
     }
 
     private function authorizeCreditCardAccount(Account $account): void

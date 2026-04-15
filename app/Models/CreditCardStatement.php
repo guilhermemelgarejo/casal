@@ -9,6 +9,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CreditCardStatement extends Model
 {
+    public function isAvulsa(): bool
+    {
+        return (bool) $this->is_avulsa;
+    }
+
+    public function canEditAvulsaFields(): bool
+    {
+        return $this->isAvulsa() && ! $this->paymentTransactions()->exists();
+    }
+
     /**
      * Soma das despesas no cartão para o ciclo (valor persistido em {@see $spent_total}).
      */
@@ -86,6 +96,7 @@ class CreditCardStatement extends Model
         'spent_total',
         'due_date',
         'paid_at',
+        'is_avulsa',
     ];
 
     protected function casts(): array

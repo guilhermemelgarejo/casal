@@ -127,10 +127,12 @@ document.addEventListener('DOMContentLoaded', () => {
         txFilterSplitCats(false);
     }
 
-    const txAllocWrap = document.getElementById('tx-category-allocations-wrap');
-    const txAddCatRow = document.getElementById('tx-add-cat-row');
-    if (txAllocWrap && txAddCatRow) {
-        const allocRows = () => Array.from(txAllocWrap.querySelectorAll('.tx-cat-alloc-row'));
+    const initTxAllocEditor = (wrapEl, addBtnEl) => {
+        if (!wrapEl || !addBtnEl) {
+            return;
+        }
+
+        const allocRows = () => Array.from(wrapEl.querySelectorAll('.tx-cat-alloc-row'));
 
         const visibleAllocRows = () =>
             allocRows()
@@ -193,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncRemoveButtons();
         };
 
-        txAddCatRow.addEventListener('click', () => {
+        addBtnEl.addEventListener('click', () => {
             const hidden = allocRows().find((row) => row.classList.contains('d-none'));
             if (!hidden) {
                 return;
@@ -202,9 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
             syncRemoveButtons();
         });
 
-        txAllocWrap.addEventListener('click', (e) => {
+        wrapEl.addEventListener('click', (e) => {
             const btn = e.target.closest('.js-tx-remove-alloc-row');
-            if (!btn || !txAllocWrap.contains(btn)) {
+            if (!btn || !wrapEl.contains(btn)) {
                 return;
             }
             const row = btn.closest('.tx-cat-alloc-row');
@@ -214,7 +216,146 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         syncRemoveButtons();
-    }
+    };
+
+    initTxAllocEditor(
+        document.getElementById('tx-category-allocations-wrap'),
+        document.getElementById('tx-add-cat-row'),
+    );
+    initTxAllocEditor(
+        document.getElementById('edit-tx-category-allocations-wrap'),
+        document.getElementById('edit-tx-add-cat-row'),
+    );
+
+    const parseMoneyToCents = (raw) => {
+        const input = String(raw || '').trim();
+        if (input === '') {
+            return null;
+        }
+
+        // Aceita "10,50", "10.50", "1.234,56", "1,234.56".
+        const lastComma = input.lastIndexOf(',');
+        const lastDot = input.lastIndexOf('.');
+        let normalized = input.replace(/\s+/g, '');
+
+        if (lastComma !== -1 && lastDot !== -1) {
+            const commaIsDecimal = lastComma > lastDot;
+            if (commaIsDecimal) {
+                normalized = normalized.replace(/\./g, '').replace(',', '.');
+            } else {
+                normalized = normalized.replace(/,/g, '');
+            }
+        } else if (lastComma !== -1) {
+            normalized = normalized.replace(/\./g, '').replace(',', '.');
+        } else {
+            normalized = normalized.replace(/,/g, '');
+        }
+
+        const n = Number.parseFloat(normalized);
+        if (!Number.isFinite(n) || n <= 0) {
+            return null;
+        }
+        return Math.round(n * 100);
+    };
+
+    const formatCentsToMoney = (cents) => {
+        const v = (Math.round(cents) / 100).toFixed(2);
+        return v;
+    };
+
+    const distributeTotalAcrossAllocations = (totalCents, wrapEl) => {
+        if (!wrapEl || totalCents == null || totalCents < 1) {
+            return;
+        }
+
+        const rows = Array.from(wrapEl.querySelectorAll('.tx-cat-alloc-row')).filter(
+            (r) => !r.classList.contains('d-none'),
+        );
+        if (rows.length < 1) {
+            return;
+        }
+
+        const mapped = rows
+            .map((row) => {
+                const cat = row.querySelector('.js-tx-split-cat');
+                const amt = row.querySelector('.js-tx-split-amount');
+                const amtCents = amt ? parseMoneyToCents(amt.value) : null;
+                return { row, cat, amt, amtCents };
+            })
+            .filter((x) => x.amt);
+
+        if (mapped.length < 1) {
+            return;
+        }
+
+        const selected = mapped.filter((x) => x.cat && String(x.cat.value || '').trim() !== '');
+
+        // Nenhuma categoria selecionada ainda: preenche a primeira linha visível.
+        if (selected.length < 1) {
+            const target = mapped[0]?.amt;
+            if (target) {
+                target.value = formatCentsToMoney(totalCents);
+            }
+            return;
+        }
+
+        // Apenas 1 categoria selecionada: ela recebe 100%.
+        if (selected.length === 1) {
+            selected[0].amt.value = formatCentsToMoney(totalCents);
+            return;
+        }
+
+        // 2+ categorias selecionadas:
+        // - se já existem valores, reescala proporcionalmente
+        // - se não há valores, distribui igualmente
+        const filled = selected.filter((x) => x.amtCents != null && x.amtCents > 0);
+        const sumFilled = filled.reduce((acc, x) => acc + (x.amtCents || 0), 0);
+        if (sumFilled < 1) {
+            const base = Math.floor(totalCents / selected.length);
+            const rem = totalCents - base * selected.length;
+            selected.forEach((x, idx) => {
+                const c = base + (idx === selected.length - 1 ? rem : 0);
+                x.amt.value = formatCentsToMoney(c);
+            });
+            return;
+        }
+
+        let allocated = 0;
+        for (let i = 0; i < selected.length; i += 1) {
+            const isLast = i === selected.length - 1;
+            const rowCents = selected[i].amtCents || 0;
+            const newCents = isLast ? totalCents - allocated : Math.floor((totalCents * rowCents) / sumFilled);
+            allocated += newCents;
+            selected[i].amt.value = formatCentsToMoney(newCents);
+        }
+    };
+
+    const initTxAutoDistribution = (totalInputEl, wrapEl) => {
+        if (!totalInputEl || !wrapEl) {
+            return;
+        }
+
+        const handler = () => {
+            const cents = parseMoneyToCents(totalInputEl.value);
+            if (cents == null) {
+                return;
+            }
+            distributeTotalAcrossAllocations(cents, wrapEl);
+        };
+
+        totalInputEl.addEventListener('input', handler);
+        totalInputEl.addEventListener('change', handler);
+        totalInputEl.addEventListener('blur', handler);
+    };
+
+    initTxAutoDistribution(
+        document.getElementById('amount'),
+        document.getElementById('tx-category-allocations-wrap'),
+    );
+    initTxAutoDistribution(
+        document.getElementById('edit-tx-amount'),
+        document.getElementById('edit-tx-category-allocations-wrap'),
+    );
 
     const showIncome = document.getElementById('budget-income-display');
     const editIncome = document.getElementById('budget-income-editor');
@@ -302,6 +443,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const txEditModal = document.getElementById('modalEditTransactionAmount');
     const installmentModalForEditReturn = document.getElementById('modalInstallmentGroupSummary');
     if (txEditForm && txEditModal) {
+        const filterSplitCatsInWrap = (wrapEl, type) => {
+            if (!wrapEl || (type !== 'income' && type !== 'expense')) {
+                return;
+            }
+            wrapEl.querySelectorAll('.js-tx-split-cat').forEach((sel) => {
+                const curVal = sel.value;
+                Array.from(sel.options).forEach((opt) => {
+                    if (!opt.value) return;
+                    const ot = opt.getAttribute('data-type');
+                    const ok = ot === type;
+                    opt.hidden = !ok;
+                    opt.disabled = !ok;
+                });
+                const cur = sel.querySelector(`option[value="${curVal}"]`);
+                if (cur && (cur.hidden || cur.disabled)) {
+                    sel.value = '';
+                }
+            });
+        };
+
         txEditModal.addEventListener('show.bs.modal', (ev) => {
             const btn = ev.relatedTarget;
             txEditModal.dataset.txReopenInstallmentModal = '';
@@ -316,6 +477,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     returnInstInput.value = '0';
                 }
             }
+            const scopeWrap = txEditForm.querySelector('#edit-tx-scope-all-wrap');
+            const scopeCheckbox = txEditForm.querySelector('#edit-tx-scope-all');
+            const scopeInput = txEditForm.querySelector('#edit-tx-installment-scope');
+            if (scopeWrap && scopeCheckbox && scopeInput) {
+                scopeWrap.classList.add('d-none');
+                scopeCheckbox.checked = false;
+                scopeInput.value = 'single';
+
+                if (
+                    btn?.classList.contains('js-tx-edit-amount-open') &&
+                    btn.getAttribute('data-tx-from-installment-modal') === '1'
+                ) {
+                    const peerCount = Number.parseInt(btn.getAttribute('data-tx-peer-count') || '0', 10);
+                    if (peerCount > 1) {
+                        scopeWrap.classList.remove('d-none');
+                    }
+                }
+            }
             if (!btn || !btn.classList.contains('js-tx-edit-amount-open')) {
                 return;
             }
@@ -326,6 +505,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const amt = btn.getAttribute('data-tx-amount') || '';
             const desc = btn.getAttribute('data-tx-description') || '';
             const precheck = btn.getAttribute('data-tx-precheck') || '';
+            const txType = btn.getAttribute('data-tx-type') || '';
+            const allocRaw = btn.getAttribute('data-tx-allocations') || '';
             txEditForm.setAttribute('action', action);
             txEditForm.dataset.txEditPrecheckUrl = precheck;
             const amtInput = txEditForm.querySelector('[name="amount"]');
@@ -336,11 +517,50 @@ document.addEventListener('DOMContentLoaded', () => {
             if (descInput) {
                 descInput.value = desc;
             }
+
+            const allocWrap = txEditForm.querySelector('#edit-tx-category-allocations-wrap');
+            if (allocWrap) {
+                let alloc = [];
+                if (allocRaw) {
+                    try {
+                        alloc = JSON.parse(decodeURIComponent(String(allocRaw)));
+                    } catch {
+                        alloc = [];
+                    }
+                }
+                const rows = Array.from(allocWrap.querySelectorAll('.tx-cat-alloc-row')).sort(
+                    (a, b) =>
+                        parseInt(a.getAttribute('data-tx-alloc-row') || '0', 10) -
+                        parseInt(b.getAttribute('data-tx-alloc-row') || '0', 10),
+                );
+                rows.forEach((rowEl, idx) => {
+                    const sel = rowEl.querySelector('.js-tx-split-cat');
+                    const amtEl = rowEl.querySelector('.js-tx-split-amount');
+                    const sp = Array.isArray(alloc) ? alloc[idx] : null;
+                    if (sel) sel.value = sp && sp.category_id != null ? String(sp.category_id) : '';
+                    if (amtEl) amtEl.value = sp && sp.amount != null ? String(sp.amount) : '';
+                    if (idx === 0 || (Array.isArray(alloc) && idx < alloc.length)) {
+                        rowEl.classList.remove('d-none');
+                    } else {
+                        rowEl.classList.add('d-none');
+                    }
+                });
+
+                filterSplitCatsInWrap(allocWrap, txType);
+            }
             const prevTok = txEditForm.querySelector('input[name="credit_limit_confirm_token"]');
             if (prevTok) {
                 prevTok.remove();
             }
             txEditForm.dataset.txCreditLimitSubmitting = '0';
+        });
+
+        txEditForm.querySelector('#edit-tx-scope-all')?.addEventListener('change', (e) => {
+            const scopeInput = txEditForm.querySelector('#edit-tx-installment-scope');
+            if (!scopeInput) {
+                return;
+            }
+            scopeInput.value = e.target.checked ? 'all' : 'single';
         });
 
         txEditModal.addEventListener('hidden.bs.modal', () => {
@@ -659,6 +879,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     edit.blockedMessage || 'Não é possível editar o valor deste lançamento.',
                 );
                 const precheck = edit.needsCreditLimitPrecheck ? escapeHtmlTx(edit.precheckUrl || '') : '';
+                const allocEnc = encodeURIComponent(
+                    JSON.stringify(Array.isArray(row.category_allocations) ? row.category_allocations : []),
+                );
 
                 let actions = '';
                 if (!edit.canEditAmount) {
@@ -667,7 +890,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const descBase = escapeHtmlTx(
                         row.description_edit_base != null ? String(row.description_edit_base) : String(row.description || ''),
                     );
-                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-precheck="${precheck}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
+                    const peerCount = Array.isArray(group.rows) ? group.rows.length : 0;
+                    const txType = escapeHtmlTx(row.type || '');
+                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-precheck="${precheck}" data-tx-peer-count="${peerCount}" data-tx-root-id="${escapeHtmlTx(String(group.rootId || rootId))}" data-tx-type="${txType}" data-tx-allocations="${allocEnc}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
                 }
                 if (del.paidInvoice) {
                     actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked ms-1" data-tx-blocked-msg="${escapeHtmlTx(paidMsg)}" title="Exclusão bloqueada" aria-label="Exclusão bloqueada">${svgTxLock}</button>`;
@@ -789,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const destLabel = document.getElementById('tx-destination-label');
         const accountSel = document.getElementById('tx-account-id');
         const noAccountHint = document.getElementById('tx-no-account-hint');
+        const accountMeta = document.getElementById('tx-account-meta');
         const oldAccountId = txForm.dataset.txOldAccountId || '';
 
         const syncInstallments = (isCredit) => {
@@ -839,6 +1065,45 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const setAccountMetaText = (t) => {
+            if (!accountMeta) return;
+            accountMeta.textContent = t || '';
+        };
+
+        const syncAccountMeta = () => {
+            if (!accountSel) {
+                return;
+            }
+            const accId = accountSel.value;
+            if (!accId) {
+                setAccountMetaText('');
+                return;
+            }
+            const isCredit = isCreditUi() || (fundingInput && fundingInput.value === 'credit_card');
+            if (isCredit) {
+                const item = (payload.cards || []).find((a) => String(a.id) === String(accId));
+                if (!item) {
+                    setAccountMetaText('');
+                    return;
+                }
+                if (!item.limit_tracked) {
+                    setAccountMetaText('Limite: sem controle configurado');
+                    return;
+                }
+                const av = item.limit_available_label ? `R$ ${item.limit_available_label}` : '—';
+                const tot = item.limit_total_label ? `R$ ${item.limit_total_label}` : '—';
+                setAccountMetaText(`Limite disponível: ${av} · total: ${tot}`);
+                return;
+            }
+            const item = (payload.regular || []).find((a) => String(a.id) === String(accId));
+            if (!item) {
+                setAccountMetaText('');
+                return;
+            }
+            const bal = item.balance_label ? `R$ ${item.balance_label}` : '—';
+            setAccountMetaText(`Saldo atual: ${bal}`);
+        };
+
         const isCreditUi = () =>
             mode === 'cards_only' || (paymentFlow && paymentFlow.value === '__credit__');
 
@@ -865,6 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 accountSel.removeAttribute('name');
                 accountSel.required = false;
                 if (noAccountHint) noAccountHint.classList.add('d-none');
+                setAccountMetaText('');
                 syncInstallments(false);
                 return;
             }
@@ -884,6 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 accountSel.required = (payload.cards || []).length > 0;
                 if (noAccountHint) noAccountHint.classList.add('d-none');
                 syncInstallments(true);
+                syncAccountMeta();
             } else {
                 fundingInput.value = 'account';
                 if (pmInput) {
@@ -903,11 +1170,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     noAccountHint.classList.toggle('d-none', asOptions.length > 0);
                 }
                 syncInstallments(false);
+                syncAccountMeta();
             }
         };
 
         if (mode === 'cards_only') {
             syncInstallments(true);
+            syncAccountMeta();
         } else if (paymentFlow && accountSel) {
             paymentFlow.addEventListener('change', () => {
                 applyPaymentFlow(paymentFlow.value);
@@ -916,6 +1185,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             applyPaymentFlow(paymentFlow.value);
+        }
+
+        if (accountSel) {
+            accountSel.addEventListener('change', () => {
+                syncAccountMeta();
+            });
         }
 
         const modalNewTx = document.getElementById('modalNewTransaction');
@@ -953,6 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (firstCard) {
                         accountSel.value = firstCard.value;
                     }
+                    syncAccountMeta();
                 }
             });
         }
@@ -1037,6 +1313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 paymentFlow.value = '';
                 paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
             }
+            setAccountMetaText('');
 
             const allocWrap = document.getElementById('tx-category-allocations-wrap');
             if (allocWrap) {
@@ -1066,6 +1343,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mode === 'cards_only') {
                 syncInstallments(true);
                 syncCreditReferencePlusOneMonth();
+                syncAccountMeta();
             }
         };
 
@@ -1109,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     accountSel.value = String(prefill.account_id);
                 }
                 syncInstallments(true);
+                syncAccountMeta();
             } else if (paymentFlow) {
                 if (fund === 'credit_card') {
                     paymentFlow.value = '__credit__';
@@ -1121,6 +1400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     accountSel.value = String(prefill.account_id);
                 }
                 syncInstallments(fund === 'credit_card' || paymentFlow.value === '__credit__');
+                syncAccountMeta();
             }
             if (referenceMonth && referenceYear && prefill.date && isCreditUi()) {
                 const d = new Date(`${prefill.date}T12:00:00`);

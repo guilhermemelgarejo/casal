@@ -227,11 +227,16 @@
                                 <select id="transfer_from" name="from_account_id" class="form-select mt-1" required>
                                     <option value="" disabled @selected(old('_form') !== 'account-transfer' || ! old('from_account_id'))>Selecione…</option>
                                     @foreach ($regularAccounts as $acc)
-                                        <option value="{{ $acc->id }}" @selected(old('_form') === 'account-transfer' && (int) old('from_account_id') === $acc->id)>
+                                        <option
+                                            value="{{ $acc->id }}"
+                                            data-balance-label="{{ number_format((float) $acc->balance, 2, ',', '.') }}"
+                                            @selected(old('_form') === 'account-transfer' && (int) old('from_account_id') === $acc->id)
+                                        >
                                             {{ $acc->name }}
                                         </option>
                                     @endforeach
                                 </select>
+                                <p class="form-text mb-0" id="transfer_from_meta" aria-live="polite"></p>
                                 <x-input-error :messages="$errors->get('from_account_id')" class="mt-2" />
                             </div>
 
@@ -240,11 +245,16 @@
                                 <select id="transfer_to" name="to_account_id" class="form-select mt-1" required>
                                     <option value="" disabled @selected(old('_form') !== 'account-transfer' || ! old('to_account_id'))>Selecione…</option>
                                     @foreach ($regularAccounts as $acc)
-                                        <option value="{{ $acc->id }}" @selected(old('_form') === 'account-transfer' && (int) old('to_account_id') === $acc->id)>
+                                        <option
+                                            value="{{ $acc->id }}"
+                                            data-balance-label="{{ number_format((float) $acc->balance, 2, ',', '.') }}"
+                                            @selected(old('_form') === 'account-transfer' && (int) old('to_account_id') === $acc->id)
+                                        >
                                             {{ $acc->name }}
                                         </option>
                                     @endforeach
                                 </select>
+                                <p class="form-text mb-0" id="transfer_to_meta" aria-live="polite"></p>
                                 <x-input-error :messages="$errors->get('to_account_id')" class="mt-2" />
                             </div>
 
@@ -343,6 +353,28 @@
                 if (transferModal && transferModal.dataset.openOnLoad === '1') {
                     bootstrap.Modal.getOrCreateInstance(transferModal).show();
                 }
+
+                const fromSel = document.getElementById('transfer_from');
+                const toSel = document.getElementById('transfer_to');
+                const fromMeta = document.getElementById('transfer_from_meta');
+                const toMeta = document.getElementById('transfer_to_meta');
+
+                const syncTransferMeta = () => {
+                    if (fromMeta && fromSel) {
+                        const opt = fromSel.selectedOptions?.[0];
+                        const bal = opt?.dataset?.balanceLabel;
+                        fromMeta.textContent = fromSel.value ? `Saldo atual: R$ ${bal || '—'}` : '';
+                    }
+                    if (toMeta && toSel) {
+                        const opt = toSel.selectedOptions?.[0];
+                        const bal = opt?.dataset?.balanceLabel;
+                        toMeta.textContent = toSel.value ? `Saldo atual: R$ ${bal || '—'}` : '';
+                    }
+                };
+
+                fromSel?.addEventListener('change', syncTransferMeta);
+                toSel?.addEventListener('change', syncTransferMeta);
+                syncTransferMeta();
             })();
         </script>
     @endpush

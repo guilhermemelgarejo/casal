@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\CreditCardStatement;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Support\CreditCardInvoiceReminders;
@@ -236,9 +237,11 @@ class TransactionController extends Controller
             abort(403);
         }
 
-        $blockReason = $this->transactionAmountEditBlockedReason($transaction);
-        if ($blockReason !== null) {
-            return back()->with('error', $blockReason);
+        // Permite atualizar apenas o valor (clientes/testes antigos) reaproveitando a descrição atual.
+        if (! $request->filled('description')) {
+            $request->merge([
+                'description' => $transaction->baseDescriptionWithoutInstallmentSuffix(),
+            ]);
         }
 
         $suffix = $transaction->installmentParcelSuffixFromDescription();
@@ -249,6 +252,10 @@ class TransactionController extends Controller
                 'amount' => ['required', 'numeric', 'min:0.01'],
                 'description' => ['required', 'string', 'max:'.$descriptionMax],
                 'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
+                'category_allocations' => 'nullable|array|max:5',
+                'category_allocations.*.category_id' => 'nullable|exists:categories,id',
+                'category_allocations.*.amount' => 'nullable|numeric|min:0.01',
+                'installment_scope' => ['nullable', 'string', Rule::in(['single', 'all'])],
             ]);
         } catch (ValidationException $e) {
             return back()
@@ -272,6 +279,16 @@ class TransactionController extends Controller
         }
 
         $newAmountFormatted = number_format($newAmountCents / 100, 2, '.', '');
+        $oldAmountFormatted = number_format((float) $transaction->amount, 2, '.', '');
+        $amountChanged = $oldAmountFormatted !== $newAmountFormatted;
+
+        $descriptionChanged = (string) $transaction->description !== $newDescriptionFull;
+        $hasCategoryAllocations = is_array($request->input('category_allocations'));
+
+        $blockReason = $this->transactionEditBlockedReason($transaction, $amountChanged);
+        if ($blockReason !== null) {
+            return back()->with('error', $blockReason);
+        }
 
         $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmedForUpdate(
             $request,
@@ -282,45 +299,89 @@ class TransactionController extends Controller
             return $limitRedirect->with('edit_transaction_id', $transaction->id);
         }
 
-        try {
-            $splitRows = $this->categorySplitRowsScaledToAmount($transaction, $newAmountCents);
-        } catch (ValidationException $e) {
-            return back()->withErrors($e->errors())->withInput()->with('edit_transaction_id', $transaction->id);
+        $splitRows = null;
+        $installmentScope = $request->input('installment_scope', 'single');
+        $applyToAllInstallments = $installmentScope === 'all';
+        $allocPairs = null;
+        if ($hasCategoryAllocations) {
+            $allocParsed = $this->parseCategoryAllocations(
+                $request,
+                $newAmountCents,
+                (string) $transaction->type,
+                (int) Auth::user()->couple_id
+            );
+            if (isset($allocParsed['errors'])) {
+                return back()
+                    ->withErrors($allocParsed['errors'])
+                    ->withInput()
+                    ->with('edit_transaction_id', $transaction->id);
+            }
+
+            $allocPairs = $allocParsed['pairs'];
+            $splitRows = array_map(
+                fn ($p) => [
+                    'category_id' => (int) $p['category_id'],
+                    'amount' => number_format(((int) $p['cents']) / 100, 2, '.', ''),
+                ],
+                $allocParsed['pairs']
+            );
+        } elseif ($amountChanged) {
+            try {
+                $splitRows = $this->categorySplitRowsScaledToAmount($transaction, $newAmountCents);
+            } catch (ValidationException $e) {
+                return back()->withErrors($e->errors())->withInput()->with('edit_transaction_id', $transaction->id);
+            }
         }
 
-        $oldAmountFormatted = number_format((float) $transaction->amount, 2, '.', '');
-        $oldDescription = (string) $transaction->description;
-        $amountChanged = $oldAmountFormatted !== $newAmountFormatted;
-        $descriptionChanged = $oldDescription !== $newDescriptionFull;
+        $categoryChanged = $splitRows !== null;
+        if ($applyToAllInstallments && ! $categoryChanged) {
+            $applyToAllInstallments = false;
+        }
 
-        if (! $amountChanged && ! $descriptionChanged) {
+        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged) {
             session()->forget('edit_transaction_id');
             $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
             return back()->with('success', 'Lançamento inalterado.');
         }
 
-        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged) {
-            $transaction->description = $newDescriptionFull;
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs) {
+            if ($descriptionChanged) {
+                $transaction->description = $newDescriptionFull;
+            }
             if ($amountChanged) {
                 $transaction->amount = $newAmountFormatted;
             }
-            $transaction->save();
-            if ($amountChanged) {
-                $transaction->syncCategorySplits($splitRows);
+            if ($amountChanged || $descriptionChanged) {
+                $transaction->save();
+            }
+            if ($categoryChanged && $splitRows !== null) {
+                if ($applyToAllInstallments) {
+                    $group = $this->installmentGroupTransactionsFor($transaction);
+                    if ($group->count() <= 1) {
+                        $transaction->syncCategorySplits($splitRows);
+                    } else {
+                        $ratios = $this->categoryRatiosFromAllocPairs($allocPairs ?? []);
+                        if ($ratios === []) {
+                            $transaction->syncCategorySplits($splitRows);
+                            return;
+                        }
+                        foreach ($group as $tx) {
+                            $txAmountCents = (int) round(((float) str_replace(',', '.', (string) $tx->amount)) * 100);
+                            $rowsForTx = $this->categorySplitRowsFromRatiosForAmountCents($ratios, $txAmountCents);
+                            $tx->syncCategorySplits($rowsForTx);
+                        }
+                    }
+                } else {
+                    $transaction->syncCategorySplits($splitRows);
+                }
             }
         });
 
         session()->forget('edit_transaction_id');
         $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
-        if ($amountChanged && $descriptionChanged) {
-            $msg = 'Lançamento atualizado.';
-        } elseif ($amountChanged) {
-            $msg = 'Valor do lançamento atualizado.';
-        } else {
-            $msg = 'Descrição atualizada.';
-        }
+        $msg = $this->transactionUpdateFlashMessage($amountChanged, $descriptionChanged, $categoryChanged);
 
         return back()->with('success', $msg);
     }
@@ -376,6 +437,115 @@ class TransactionController extends Controller
         }
 
         return null;
+    }
+
+    private function transactionEditBlockedReason(Transaction $transaction, bool $wantsAmountChange): ?string
+    {
+        if ($transaction->internal_transfer_group_id) {
+            return 'Não é possível alterar uma transferência entre contas. Exclua os dois lançamentos e registe de novo.';
+        }
+
+        if ($transaction->isCreditCardInvoicePaymentTransaction()) {
+            return 'Não é possível alterar um pagamento de fatura. Exclua o lançamento em Faturas de cartão se precisar corrigir.';
+        }
+
+        if ($wantsAmountChange && $transaction->blocksAmountEditDueToCreditCardStatement()) {
+            return 'Não é possível alterar o valor: esta fatura de cartão já tem pagamento registrado ou está quitada.';
+        }
+
+        return null;
+    }
+
+    private function transactionUpdateFlashMessage(bool $amountChanged, bool $descriptionChanged, bool $categoryChanged): string
+    {
+        if ($amountChanged && $descriptionChanged && $categoryChanged) {
+            return 'Lançamento atualizado.';
+        }
+        if ($amountChanged && $descriptionChanged) {
+            return 'Lançamento atualizado.';
+        }
+        if ($amountChanged && $categoryChanged) {
+            return 'Valor e categorias atualizados.';
+        }
+        if ($descriptionChanged && $categoryChanged) {
+            return 'Descrição e categorias atualizadas.';
+        }
+        if ($amountChanged) {
+            return 'Valor do lançamento atualizado.';
+        }
+        if ($descriptionChanged) {
+            return 'Descrição atualizada.';
+        }
+
+        return 'Categorias atualizadas.';
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Transaction>
+     */
+    private function installmentGroupTransactionsFor(Transaction $transaction): Collection
+    {
+        $rootId = $transaction->installmentRootId();
+
+        return Transaction::query()
+            ->where('couple_id', $transaction->couple_id)
+            ->where(function ($q) use ($rootId) {
+                $q->where('id', $rootId)
+                    ->orWhere('installment_parent_id', $rootId);
+            })
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * @param  array<int, array{category_id: int, cents: int}>  $pairs
+     * @return array<int, array{category_id: int, numerator: int, denominator: int}>
+     */
+    private function categoryRatiosFromAllocPairs(array $pairs): array
+    {
+        $sum = array_sum(array_map(fn ($p) => (int) $p['cents'], $pairs));
+        if ($sum < 1) {
+            return [];
+        }
+
+        return array_map(fn ($p) => [
+            'category_id' => (int) $p['category_id'],
+            'numerator' => (int) $p['cents'],
+            'denominator' => $sum,
+        ], $pairs);
+    }
+
+    /**
+     * @param  array<int, array{category_id: int, numerator: int, denominator: int}>  $ratios
+     * @return array<int, array{category_id: int, amount: string}>
+     */
+    private function categorySplitRowsFromRatiosForAmountCents(array $ratios, int $amountCents): array
+    {
+        if ($amountCents < 1 || count($ratios) < 1) {
+            return [];
+        }
+
+        $rows = [];
+        $allocated = 0;
+        $lastIdx = count($ratios) - 1;
+        for ($i = 0; $i < $lastIdx; $i++) {
+            $r = $ratios[$i];
+            $c = (int) intdiv($amountCents * (int) $r['numerator'], (int) $r['denominator']);
+            $rows[] = [
+                'category_id' => (int) $r['category_id'],
+                'amount' => number_format($c / 100, 2, '.', ''),
+            ];
+            $allocated += $c;
+        }
+
+        $last = $ratios[$lastIdx];
+        $lastCents = $amountCents - $allocated;
+        $rows[] = [
+            'category_id' => (int) $last['category_id'],
+            'amount' => number_format($lastCents / 100, 2, '.', ''),
+        ];
+
+        return $rows;
     }
 
     /**
@@ -537,6 +707,36 @@ class TransactionController extends Controller
             return back()->withErrors($resolved['errors'])->withInput();
         }
         $ctx = $resolved;
+
+        if ($ctx['isCredit'] && $request->type === 'expense') {
+            $refBase = $ctx['referenceBase'];
+            $cycles = [];
+            for ($i = 0; $i < (int) $ctx['installments']; $i++) {
+                $ref = $refBase->copy()->addMonths($i);
+                $cycles[] = ['m' => (int) $ref->month, 'y' => (int) $ref->year];
+            }
+            $cycles = collect($cycles)->unique(fn ($c) => $c['y'].'-'.$c['m'])->values();
+
+            $hasBlocked = CreditCardStatement::query()
+                ->where('couple_id', Auth::user()->couple_id)
+                ->where('account_id', (int) $request->account_id)
+                ->where('is_avulsa', true)
+                ->where(function ($q) use ($cycles) {
+                    foreach ($cycles as $c) {
+                        $q->orWhere(function ($qq) use ($c) {
+                            $qq->where('reference_month', (int) $c['m'])
+                                ->where('reference_year', (int) $c['y']);
+                        });
+                    }
+                })
+                ->exists();
+
+            if ($hasBlocked) {
+                return back()->withErrors([
+                    'reference_month' => 'Não é possível lançar compras neste cartão: existe uma fatura avulsa no(s) ciclo(s) de referência envolvido(s).',
+                ])->withInput();
+            }
+        }
 
         $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmed($request, $ctx, $allocParsed['pairs']);
         if ($limitRedirect !== null) {

@@ -441,4 +441,161 @@ class CreditCardStatementTest extends TestCase
             'due_date' => '2026-12-01',
         ])->assertNotFound();
     }
+
+    public function test_cadastrar_fatura_avulsa_aparece_na_lista_mesmo_sem_itens(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        $this->actingAs($user)->post(route('credit-card-statements.store-avulsa', [$card]), [
+            'reference_month' => 1,
+            'reference_year' => 2026,
+            'spent_total' => '123,45',
+            'due_date' => '2026-01-20',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('credit_card_statements', [
+            'account_id' => $card->id,
+            'reference_month' => 1,
+            'reference_year' => 2026,
+            'is_avulsa' => true,
+        ]);
+
+        $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
+            ->assertOk()
+            ->assertSee('01/2026', false)
+            ->assertSee('R$ 123,45', false)
+            ->assertSee('Excluir', false);
+    }
+
+    public function test_pagamento_em_fatura_avulsa_usa_total_do_meta(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        CreditCardStatement::create([
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 2,
+            'reference_year' => 2026,
+            'spent_total' => '200.00',
+            'due_date' => '2026-02-15',
+            'paid_at' => null,
+            'is_avulsa' => true,
+        ]);
+
+        $this->actingAs($user)->post(route('credit-card-statements.attach-payment', [$card, 2026, 2]), [
+            'account_id' => $checking->id,
+            'payment_method' => 'Pix',
+            'paid_date' => '2026-02-10',
+        ])->assertSessionHasNoErrors();
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 2)
+            ->where('reference_year', 2026)
+            ->first();
+
+        $this->assertNotNull($meta);
+        $this->assertTrue($meta->isPaid());
+        $this->assertEquals(200.0, $meta->paymentsTotal());
+    }
+
+    public function test_bloqueia_compras_em_ciclo_com_fatura_avulsa_inclusive_parcelado(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        CreditCardStatement::create([
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'spent_total' => '100.00',
+            'due_date' => null,
+            'paid_at' => null,
+            'is_avulsa' => true,
+        ]);
+
+        // À vista no ciclo bloqueado.
+        $this->actingAs($user)->post(route('transactions.store'), [
+            'funding' => 'credit_card',
+            'account_id' => $card->id,
+            'description' => 'Compra bloqueada',
+            'amount' => '10.00',
+            'type' => 'expense',
+            'date' => '2026-03-10',
+            'installments' => 1,
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '10.00'],
+            ],
+        ])->assertSessionHasErrors('reference_month');
+
+        // Parcelado: segunda parcela cairia no ciclo bloqueado.
+        CreditCardStatement::create([
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 6,
+            'reference_year' => 2026,
+            'spent_total' => '100.00',
+            'due_date' => null,
+            'paid_at' => null,
+            'is_avulsa' => true,
+        ]);
+
+        $this->actingAs($user)->post(route('transactions.store'), [
+            'funding' => 'credit_card',
+            'account_id' => $card->id,
+            'description' => 'Compra parcelada bloqueada',
+            'amount' => '20.00',
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'installments' => 2,
+            'reference_month' => 5,
+            'reference_year' => 2026,
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '20.00'],
+            ],
+        ])->assertSessionHasErrors('reference_month');
+    }
+
+    public function test_store_avulsa_promove_meta_existente_sem_itens(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        // Meta existente (ex.: criado por edição de vencimento no passado), mas sem itens nem pagamentos.
+        CreditCardStatement::create([
+            'couple_id' => $couple->id,
+            'account_id' => $card->id,
+            'reference_month' => 10,
+            'reference_year' => 2026,
+            'spent_total' => '0.00',
+            'due_date' => null,
+            'paid_at' => null,
+            'is_avulsa' => false,
+        ]);
+
+        $this->actingAs($user)->post(route('credit-card-statements.store-avulsa', [$card]), [
+            'reference_month' => 10,
+            'reference_year' => 2026,
+            'spent_total' => '321,00',
+            'due_date' => '2026-10-20',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('credit_card_statements', [
+            'account_id' => $card->id,
+            'reference_month' => 10,
+            'reference_year' => 2026,
+            'is_avulsa' => true,
+        ]);
+
+        $meta = CreditCardStatement::query()
+            ->where('account_id', $card->id)
+            ->where('reference_month', 10)
+            ->where('reference_year', 2026)
+            ->first();
+        $this->assertNotNull($meta);
+        $this->assertTrue((bool) $meta->is_avulsa);
+        $this->assertEquals(321.0, (float) $meta->spent_total);
+        $this->assertSame('2026-10-20', $meta->due_date?->toDateString());
+    }
 }

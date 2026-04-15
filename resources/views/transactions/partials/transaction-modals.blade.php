@@ -53,8 +53,9 @@
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="return_from_installment_modal" id="input-return-from-installment-modal" value="0">
+                    <input type="hidden" name="installment_scope" id="edit-tx-installment-scope" value="single">
                     <div class="modal-body">
-                        <p class="small text-secondary mb-3">Altere a descrição e/ou o valor. Se mudar o valor, as categorias são ajustadas na mesma proporção. Em cartão de crédito, o total da fatura é recalculado. Em parcelas, edita-se só o texto base; o sufixo <span class="text-nowrap">(Parcela x/y)</span> mantém-se.</p>
+                        <p class="small text-secondary mb-3">Altere a descrição, o valor e/ou as categorias. Se mudar só o valor, as categorias são ajustadas na mesma proporção. Em cartão de crédito, o total da fatura é recalculado. Em parcelas, edita-se só o texto base; o sufixo <span class="text-nowrap">(Parcela x/y)</span> mantém-se.</p>
                         <div class="mb-3">
                             <x-input-label for="edit-tx-description" value="Descrição" />
                             <x-text-input
@@ -81,6 +82,91 @@
                             />
                             <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                         </div>
+
+                        <div class="form-check mt-3 d-none" id="edit-tx-scope-all-wrap">
+                            <input class="form-check-input" type="checkbox" value="1" id="edit-tx-scope-all">
+                            <label class="form-check-label" for="edit-tx-scope-all">
+                                Aplicar categorias em todas as parcelas desta compra
+                            </label>
+                            <div class="form-text">O valor total de cada parcela é mantido; apenas a repartição por categorias é aplicada a todas.</div>
+                        </div>
+
+                        @php
+                            $editAllocVisibleRows = 1;
+                            for ($r = 0; $r < 5; $r++) {
+                                $ov = old('category_allocations.'.$r.'.category_id');
+                                if ($ov !== null && $ov !== '') {
+                                    $editAllocVisibleRows = max($editAllocVisibleRows, $r + 1);
+                                }
+                            }
+                            if (! $errors->has('category_allocations')) {
+                                $existingEditAllocs = ($editTransactionModalMeta ?? [])['category_allocations'] ?? [];
+                                if (is_array($existingEditAllocs) && count($existingEditAllocs) > 1) {
+                                    $editAllocVisibleRows = max($editAllocVisibleRows, min(5, count($existingEditAllocs)));
+                                }
+                            }
+                        @endphp
+                        <hr class="my-3">
+                        <div>
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <div class="fw-semibold">Categorias e valores</div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="edit-tx-add-cat-row">Adicionar categoria</button>
+                            </div>
+                            <p class="small text-secondary mb-2 mt-1">Até 5 linhas. A soma deve ser igual ao valor total.</p>
+                            <div id="edit-tx-category-allocations-wrap" data-tx-alloc-root="1">
+                                @for($si = 0; $si < 5; $si++)
+                                    @php
+                                        $existing = (($editTransactionModalMeta ?? [])['category_allocations'][$si] ?? null);
+                                        $catIdDefault = is_array($existing) ? ($existing['category_id'] ?? '') : '';
+                                        $amtDefault = is_array($existing) ? ($existing['amount'] ?? '') : '';
+                                    @endphp
+                                    <div class="tx-cat-alloc-row row g-2 mb-2 align-items-end {{ $si < $editAllocVisibleRows ? '' : 'd-none' }}" data-tx-alloc-row="{{ $si }}">
+                                        <div class="col-12 col-md-6 min-w-0">
+                                            <label class="form-label small text-secondary mb-0" for="edit-tx-split-cat-{{ $si }}">Categoria {{ $si + 1 }}</label>
+                                            <select
+                                                id="edit-tx-split-cat-{{ $si }}"
+                                                name="category_allocations[{{ $si }}][category_id]"
+                                                class="form-select mt-1 js-tx-split-cat"
+                                            >
+                                                <option value="" {{ old('category_allocations.'.$si.'.category_id', $catIdDefault) ? '' : 'selected' }}>Selecione…</option>
+                                                @foreach($categories as $c)
+                                                    <option
+                                                        value="{{ $c->id }}"
+                                                        data-type="{{ $c->type }}"
+                                                        {{ (string) old('category_allocations.'.$si.'.category_id', $catIdDefault) === (string) $c->id ? 'selected' : '' }}
+                                                    >
+                                                        {{ $c->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-sm-6 col-md-4">
+                                            <label class="form-label small text-secondary mb-0" for="edit-tx-split-amt-{{ $si }}">Valor (R$)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0.01"
+                                                name="category_allocations[{{ $si }}][amount]"
+                                                id="edit-tx-split-amt-{{ $si }}"
+                                                class="form-control mt-1 js-tx-split-amount"
+                                                value="{{ old('category_allocations.'.$si.'.amount', $amtDefault) }}"
+                                                placeholder="0,00"
+                                            >
+                                        </div>
+                                        <div class="col-12 col-sm-6 col-md-2 col-lg-auto d-flex align-items-end justify-content-sm-end justify-content-md-start">
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-danger btn-sm js-tx-remove-alloc-row w-100 w-sm-auto"
+                                                aria-label="Remover esta categoria"
+                                            >
+                                                Remover
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endfor
+                            </div>
+                            <x-input-error :messages="$errors->get('category_allocations')" class="mt-2" />
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -97,7 +183,7 @@
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
             'category_allocations', 'recurring_template_id',
         ]);
-        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token'));
+        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations'));
         $txAllocVisibleRows = 1;
         for ($r = 0; $r < 5; $r++) {
             $ov = old('category_allocations.'.$r.'.category_id');
@@ -181,6 +267,7 @@
                                                     <option value="{{ $account->id }}" {{ (string) old('account_id') === (string) $account->id ? 'selected' : '' }}>{{ $account->name }}</option>
                                                 @endforeach
                                             </select>
+                                            <p class="form-text mb-0" id="tx-account-meta" aria-live="polite"></p>
                                             <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
                                         </div>
                                     @else
@@ -213,6 +300,7 @@
                                                     </label>
                                                     <select id="tx-account-id" class="form-select mt-1"></select>
                                                     <p class="form-text mb-0 d-none text-warning" id="tx-no-account-hint">Nenhuma conta permite esta forma. Ajuste em Gerenciar contas.</p>
+                                                    <p class="form-text mb-0" id="tx-account-meta" aria-live="polite"></p>
                                                     <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
                                                 </div>
                                             </div>

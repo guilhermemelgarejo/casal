@@ -61,12 +61,16 @@ trait PreparesTransactionModalPayload
             'regular' => $regularAccounts->map(fn (Account $a) => [
                 'id' => $a->id,
                 'name' => $a->name,
+                'balance_label' => number_format((float) $a->balance, 2, ',', '.'),
                 'methods' => $a->getEffectivePaymentMethods(),
             ])->values()->all(),
             'cards' => $cardAccounts->map(fn (Account $a) => [
                 'id' => $a->id,
                 'name' => $a->name,
                 'limit_tracked' => $a->tracksCreditCardLimit(),
+                'limit_total_label' => $a->tracksCreditCardLimit()
+                    ? number_format((float) $a->credit_card_limit_total, 2, ',', '.')
+                    : null,
                 'limit_available_label' => $a->tracksCreditCardLimit()
                     ? number_format((float) $a->credit_card_limit_available, 2, ',', '.')
                     : null,
@@ -88,12 +92,21 @@ trait PreparesTransactionModalPayload
                 ->with(['accountModel', 'categorySplits', 'creditCardStatementsPaidFor'])
                 ->first();
             if ($editTx) {
+                $editAllocRows = [];
+                $editTx->loadMissing('categorySplits.category');
+                foreach ($editTx->categorySplits()->orderBy('id')->get() as $sp) {
+                    $editAllocRows[] = [
+                        'category_id' => (int) $sp->category_id,
+                        'amount' => number_format((float) $sp->amount, 2, '.', ''),
+                    ];
+                }
                 $editTransactionModalMeta = [
                     'id' => $editTx->id,
                     'action' => route('transactions.update', $editTx),
                     'amount' => old('amount', $editTx->amount),
                     'description' => old('description', $editTx->baseDescriptionWithoutInstallmentSuffix()),
                     'edit' => TransactionListingPresentation::transactionAmountEditMeta($editTx),
+                    'category_allocations' => $editAllocRows,
                 ];
             }
         }

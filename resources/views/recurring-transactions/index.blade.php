@@ -8,7 +8,7 @@
         <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-md-between gap-3">
             <div class="min-w-0">
                 <h2 class="h5 mb-0 tx-page-title">Lançamentos recorrentes</h2>
-                <p class="small text-secondary mb-0 mt-1">Modelos para despesas e receitas fixas. O lembrete aparece <strong class="fw-medium text-body">desde o 1.º dia do mês</strong> até registar em <strong class="fw-medium text-body">Lançamentos</strong> — nada é gravado sozinho.</p>
+                <p class="small text-secondary mb-0 mt-1">Modelos para despesas e receitas fixas. Você pode criar o lançamento do mês em <strong class="fw-medium text-body">Lançamentos</strong> — nada é gravado sozinho.</p>
             </div>
             <button
                 type="button"
@@ -46,13 +46,6 @@
                     <span class="pt-1">{{ session('error') }}</span>
                 </div>
             @endif
-
-            @include('partials.rt-reminder-panel', [
-                'reminders' => $pendingReminders,
-                'invoiceReminders' => $creditCardInvoiceReminders ?? collect(),
-                'month' => now()->month,
-                'year' => now()->year,
-            ])
 
             <div class="card border-0 shadow-sm overflow-hidden tx-index-card mb-4">
                 <div class="tx-index-head px-4 py-3">
@@ -323,6 +316,7 @@
                 const rawEditMap = window.__RT_EDIT_BY_ID__;
                 const editById =
                     rawEditMap && typeof rawEditMap === 'object' && !Array.isArray(rawEditMap) ? rawEditMap : {};
+                const amountInput = document.getElementById('rt-amount');
 
                 function setFundingUi() {
                     const funding = fundingEl.value;
@@ -388,6 +382,88 @@
                     });
                 }
 
+                function parseMoneyToCents(raw) {
+                    const input = String(raw || '').trim();
+                    if (input === '') return null;
+
+                    const lastComma = input.lastIndexOf(',');
+                    const lastDot = input.lastIndexOf('.');
+                    let normalized = input.replace(/\s+/g, '');
+
+                    if (lastComma !== -1 && lastDot !== -1) {
+                        const commaIsDecimal = lastComma > lastDot;
+                        if (commaIsDecimal) {
+                            normalized = normalized.replace(/\./g, '').replace(',', '.');
+                        } else {
+                            normalized = normalized.replace(/,/g, '');
+                        }
+                    } else if (lastComma !== -1) {
+                        normalized = normalized.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        normalized = normalized.replace(/,/g, '');
+                    }
+
+                    const n = Number.parseFloat(normalized);
+                    if (!Number.isFinite(n) || n <= 0) return null;
+                    return Math.round(n * 100);
+                }
+
+                function formatCentsToMoneyBr(cents) {
+                    const v = (Math.round(cents) / 100).toFixed(2);
+                    return v.replace('.', ',');
+                }
+
+                function distributeAmountToCategories(totalCents) {
+                    if (totalCents == null || totalCents < 1) return;
+                    const rows = Array.from(document.querySelectorAll('.rt-cat-row'));
+                    const mapped = rows
+                        .map((row) => {
+                            const cat = row.querySelector('.rt-cat-select');
+                            const amt = row.querySelector('.rt-cat-amount');
+                            const amtCents = amt ? parseMoneyToCents(amt.value) : null;
+                            return { row, cat, amt, amtCents };
+                        })
+                        .filter((x) => x.amt);
+
+                    if (mapped.length < 1) return;
+
+                    const selected = mapped.filter((x) => x.cat && String(x.cat.value || '').trim() !== '');
+
+                    if (selected.length < 1) {
+                        const target = mapped[0]?.amt;
+                        if (target) target.value = formatCentsToMoneyBr(totalCents);
+                        return;
+                    }
+
+                    if (selected.length === 1) {
+                        selected[0].amt.value = formatCentsToMoneyBr(totalCents);
+                        return;
+                    }
+
+                    const filled = selected.filter((x) => x.amtCents != null && x.amtCents > 0);
+                    const sumFilled = filled.reduce((acc, x) => acc + (x.amtCents || 0), 0);
+                    if (sumFilled < 1) {
+                        const base = Math.floor(totalCents / selected.length);
+                        const rem = totalCents - base * selected.length;
+                        selected.forEach((x, idx) => {
+                            const c = base + (idx === selected.length - 1 ? rem : 0);
+                            x.amt.value = formatCentsToMoneyBr(c);
+                        });
+                        return;
+                    }
+
+                    let allocated = 0;
+                    for (let i = 0; i < selected.length; i += 1) {
+                        const isLast = i === selected.length - 1;
+                        const rowCents = selected[i].amtCents || 0;
+                        const newCents = isLast
+                            ? totalCents - allocated
+                            : Math.floor((totalCents * rowCents) / sumFilled);
+                        allocated += newCents;
+                        if (selected[i].amt) selected[i].amt.value = formatCentsToMoneyBr(newCents);
+                    }
+                }
+
                 function openNew() {
                     form.action = storeUrl;
                     methodWrap.innerHTML = '';
@@ -429,6 +505,17 @@
                 typeSelect.addEventListener('change', () => {
                     filterCategoryOptions();
                 });
+
+                if (amountInput) {
+                    const onAmountChange = () => {
+                        const cents = parseMoneyToCents(amountInput.value);
+                        if (cents == null) return;
+                        distributeAmountToCategories(cents);
+                    };
+                    amountInput.addEventListener('input', onAmountChange);
+                    amountInput.addEventListener('change', onAmountChange);
+                    amountInput.addEventListener('blur', onAmountChange);
+                }
 
                 document.addEventListener('click', (ev) => {
                     const btn = ev.target.closest('.btn-rt-edit');

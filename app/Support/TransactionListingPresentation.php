@@ -107,6 +107,7 @@ class TransactionListingPresentation
 
                 $rows[] = [
                     'id' => $t->id,
+                    'type' => (string) $t->type,
                     'registered_by_name' => $t->user?->firstGivenName(),
                     'parcel_label' => ($idx + 1).'/'.$total,
                     'description' => $t->description,
@@ -117,6 +118,15 @@ class TransactionListingPresentation
                     'amount' => (float) $t->amount,
                     'amount_form' => number_format((float) $t->amount, 2, '.', ''),
                     'amount_str' => number_format((float) $t->amount, 2, ',', '.'),
+                    'category_allocations' => $t->categorySplits()
+                        ->orderBy('id')
+                        ->get()
+                        ->map(fn ($sp) => [
+                            'category_id' => (int) $sp->category_id,
+                            'amount' => number_format((float) $sp->amount, 2, '.', ''),
+                        ])
+                        ->values()
+                        ->all(),
                     'update_url' => route('transactions.update', $t),
                     'destroy_url' => route('transactions.destroy', $t),
                     'edit' => self::transactionAmountEditMeta($t),

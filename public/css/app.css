@@ -2505,6 +2505,7 @@ form.dashboard-toolbar .dashboard-toolbar-month {
 .recurring-page .rt-item-card__cats-label {
     font-size: 0.65rem;
     letter-spacing: 0.06em;
+    margin-top: 0.75rem;
 }
 
 .recurring-page .rt-item-card__chips {
