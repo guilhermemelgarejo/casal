@@ -87,9 +87,8 @@ class RegularAccountBalanceDisplayTest extends TestCase
             'reference_year' => 2026,
         ], [['category_id' => $cat->id, 'amount' => '40.00']]);
 
-        $response = $this->actingAs($user)->get(route('transactions.index', [
-            'month' => 4,
-            'year' => 2026,
+        $response = $this->actingAs($user)->get(route('dashboard', [
+            'period' => '2026-04',
             'account_id' => $account->id,
         ]));
 

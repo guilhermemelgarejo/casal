@@ -634,6 +634,14 @@ body {
     background-color: rgba(var(--bs-primary-rgb), 0.04);
 }
 
+/* Lista de lançamentos: receitas com fundo verde muito claro */
+.list-group-item.tx-list-row-item.tx-list-row-item--income {
+    background-color: rgba(var(--bs-success-rgb), 0.06);
+}
+.list-group-item.tx-list-row-item.tx-list-row-item--income:hover {
+    background-color: rgba(var(--bs-success-rgb), 0.1);
+}
+
 .transactions-page .tx-empty-state {
     border: 2px dashed var(--bs-border-color);
     border-radius: var(--bs-border-radius-xl);
@@ -1624,12 +1632,12 @@ body .modal .modal-header.tx-modal-head--danger {
 
 form.dashboard-toolbar {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+    overflow-x: visible;
     background: var(--bs-body-bg);
     border: 1px solid var(--bs-border-color-translucent);
     border-radius: var(--bs-border-radius-xl);
@@ -1638,9 +1646,16 @@ form.dashboard-toolbar {
 
 form.dashboard-toolbar .dashboard-toolbar-month {
     border-radius: var(--bs-border-radius-lg);
-    min-width: 9.5rem;
+    min-width: 0;
+    max-width: 100%;
     width: auto;
-    flex: 0 0 auto;
+    flex: 1 1 9.5rem;
+}
+
+form.dashboard-toolbar .dashboard-toolbar-account {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 10rem;
 }
 
 .dashboard-kpi-card {

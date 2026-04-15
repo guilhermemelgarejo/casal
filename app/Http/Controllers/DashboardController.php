@@ -6,10 +6,13 @@ use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\RecurringTransaction;
 use App\Support\CreditCardInvoiceReminders;
+use App\Support\PaymentMethods;
 use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
@@ -19,11 +22,44 @@ class DashboardController extends Controller
     {
         $couple = Auth::user()->couple;
 
-        $period = $request->get('period', date('Y-m'));
+        $validated = $request->validate([
+            'period' => ['nullable', 'string', 'regex:/^\d{4}\-\d{2}$/'],
+            'month' => 'nullable|integer|min:1|max:12',
+            'year' => 'nullable|integer|min:2000|max:2100',
+            'account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where('couple_id', $couple->id),
+            ],
+            'prefill_recurring' => [
+                'nullable',
+                'integer',
+                Rule::exists('recurring_transactions', 'id')->where('couple_id', $couple->id),
+            ],
+        ]);
+
+        $period = (string) ($validated['period'] ?? '');
+        if ($period === '') {
+            $monthFromQuery = isset($validated['month']) ? (int) $validated['month'] : (int) date('m');
+            $yearFromQuery = isset($validated['year']) ? (int) $validated['year'] : (int) date('Y');
+            $period = sprintf('%04d-%02d', $yearFromQuery, $monthFromQuery);
+        }
 
         $parts = explode('-', $period);
-        $year = intval($parts[0] ?? date('Y'));
-        $month = intval($parts[1] ?? date('m'));
+        $year = (int) ($parts[0] ?? date('Y'));
+        $month = (int) ($parts[1] ?? date('m'));
+
+        $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
+        $filteredRegularAccountBalance = null;
+        if ($filterAccountId !== null) {
+            $filteredAcc = Account::query()
+                ->where('couple_id', $couple->id)
+                ->whereKey($filterAccountId)
+                ->first();
+            if ($filteredAcc && ! $filteredAcc->isCreditCard()) {
+                $filteredRegularAccountBalance = (float) $filteredAcc->balance;
+            }
+        }
 
         $statsTransactions = $couple->transactions()
             ->whereMatchesDashboardKpiPeriod($month, $year)
@@ -35,13 +71,14 @@ class DashboardController extends Controller
             ->with(['user', 'accountModel', 'categorySplits.category', 'creditCardStatementsPaidFor'])
             ->whereMatchesTransactionsListingPeriod($month, $year)
             ->whereCreditCardInstallmentVisibleInList()
-            ->latest()
-            ->paginate(20)
-            ->appends(['period' => $period]);
+            ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get();
 
-        $installmentGroups = TransactionListingPresentation::installmentGroupsForPage($couple->id, $transactions->getCollection());
+        $installmentGroups = TransactionListingPresentation::installmentGroupsForPage($couple->id, $transactions);
         $installmentGroupsModalPayload = TransactionListingPresentation::installmentGroupsModalPayload($installmentGroups);
-        $creditCardPurchaseRowMeta = TransactionListingPresentation::creditCardPurchaseRowMetaForPage($transactions->getCollection(), $installmentGroups);
+        $creditCardPurchaseRowMeta = TransactionListingPresentation::creditCardPurchaseRowMetaForPage($transactions, $installmentGroups);
         $transactionDeleteMeta = [];
         $transactionAmountEditMeta = [];
         foreach ($transactions as $txRow) {
@@ -76,8 +113,34 @@ class DashboardController extends Controller
             $now
         );
 
+        $modalPayload = $this->transactionModalPayload();
+        /** @var Collection<int, Account> $regularAccounts */
+        $regularAccounts = $modalPayload['regularAccounts'] ?? collect();
+        $canCreateAccountTransfer = $regularAccounts->count() >= 2;
+        $transferPaymentMethods = PaymentMethods::forRegularAccounts();
+
         $txRecurringPrefill = null;
         $txRecurringPrefillBlockedReason = null;
+        $prefillRecurringId = isset($validated['prefill_recurring']) ? (int) $validated['prefill_recurring'] : null;
+        if ($prefillRecurringId !== null) {
+            $rt = RecurringTransaction::query()
+                ->where('couple_id', $couple->id)
+                ->whereKey($prefillRecurringId)
+                ->with('categorySplits')
+                ->first();
+            if ($rt !== null) {
+                $anchor = Carbon::createFromDate($year, $month, 1);
+                $payload = $rt->toTransactionPrefillPayload($anchor);
+                $txFormMode = $modalPayload['txFormMode'] ?? 'regular_only';
+                if ($txFormMode === 'regular_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_CREDIT_CARD) {
+                    $txRecurringPrefillBlockedReason = 'Este modelo usa cartão de crédito. Cadastre um cartão em Gerenciar contas para abrir o formulário já pré-preenchido.';
+                } elseif ($txFormMode === 'cards_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_ACCOUNT) {
+                    $txRecurringPrefillBlockedReason = 'Este modelo usa conta à ordem. Cadastre uma conta em Gerenciar contas para abrir o formulário já pré-preenchido.';
+                } else {
+                    $txRecurringPrefill = $payload;
+                }
+            }
+        }
 
         return view('dashboard', array_merge(
             compact(
@@ -89,6 +152,8 @@ class DashboardController extends Controller
                 'period',
                 'month',
                 'year',
+                'filterAccountId',
+                'filteredRegularAccountBalance',
                 'showAlert',
                 'thresholdPercentage',
                 'thresholdAmount',
@@ -99,9 +164,11 @@ class DashboardController extends Controller
                 'recurringReminders',
                 'creditCardInvoiceReminders',
                 'txRecurringPrefill',
-                'txRecurringPrefillBlockedReason'
+                'txRecurringPrefillBlockedReason',
+                'canCreateAccountTransfer',
+                'transferPaymentMethods'
             ),
-            $this->transactionModalPayload()
+            $modalPayload
         ));
     }
 }

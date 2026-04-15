@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\CreditCardStatement;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
-use App\Support\CreditCardInvoiceReminders;
 use App\Support\PaymentMethods;
 use App\Support\TransactionCategorySplitDistribution;
 use App\Support\TransactionListingPresentation;
@@ -23,144 +21,9 @@ use Illuminate\Validation\ValidationException;
 
 class TransactionController extends Controller
 {
-    use PreparesTransactionModalPayload;
-
     private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING = 'credit_limit_overflow_pending';
 
     private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE = 'credit_limit_overflow_pending_tx_update';
-
-    public function index(Request $request)
-    {
-        $now = Carbon::now();
-        $couple = Auth::user()->couple;
-
-        $validated = $request->validate([
-            'month' => 'nullable|integer|min:1|max:12',
-            'year' => 'nullable|integer|min:2000|max:2100',
-            'account_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('accounts', 'id')->where('couple_id', $couple->id),
-            ],
-            'prefill_recurring' => [
-                'nullable',
-                'integer',
-                Rule::exists('recurring_transactions', 'id')->where('couple_id', $couple->id),
-            ],
-        ]);
-
-        $selectedMonth = (int) ($validated['month'] ?? $now->month);
-        $selectedYear = (int) ($validated['year'] ?? $now->year);
-        $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
-
-        $filteredRegularAccountBalance = null;
-        if ($filterAccountId !== null) {
-            $filteredAcc = Account::query()
-                ->where('couple_id', $couple->id)
-                ->whereKey($filterAccountId)
-                ->first();
-            if ($filteredAcc && ! $filteredAcc->isCreditCard()) {
-                $filteredRegularAccountBalance = (float) $filteredAcc->balance;
-            }
-        }
-
-        $transactions = $couple->transactions()
-            ->with(['user', 'accountModel', 'categorySplits.category', 'creditCardStatementsPaidFor'])
-            ->whereMatchesTransactionsListingPeriod($selectedMonth, $selectedYear)
-            ->whereCreditCardInstallmentVisibleInList()
-            ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
-            ->latest()
-            ->paginate(20);
-
-        $installmentGroups = TransactionListingPresentation::installmentGroupsForPage($couple->id, $transactions->getCollection());
-        $installmentGroupsModalPayload = TransactionListingPresentation::installmentGroupsModalPayload($installmentGroups);
-        $creditCardPurchaseRowMeta = TransactionListingPresentation::creditCardPurchaseRowMetaForPage($transactions->getCollection(), $installmentGroups);
-        $transactionDeleteMeta = [];
-        $transactionAmountEditMeta = [];
-        foreach ($transactions as $txRow) {
-            $transactionDeleteMeta[$txRow->id] = TransactionListingPresentation::transactionDeleteMeta($txRow, $installmentGroups);
-            $transactionAmountEditMeta[$txRow->id] = TransactionListingPresentation::transactionAmountEditMeta($txRow);
-        }
-
-        $appendQuery = [
-            'month' => $selectedMonth,
-            'year' => $selectedYear,
-        ];
-        if ($filterAccountId !== null) {
-            $appendQuery['account_id'] = $filterAccountId;
-        }
-        $prefillRecurringId = isset($validated['prefill_recurring']) ? (int) $validated['prefill_recurring'] : null;
-        if ($prefillRecurringId !== null) {
-            $appendQuery['prefill_recurring'] = $prefillRecurringId;
-        }
-        $transactions->appends($appendQuery);
-
-        $modalPayload = $this->transactionModalPayload();
-        /** @var Collection<int, Account> $regularAccounts */
-        $regularAccounts = $modalPayload['regularAccounts'] ?? collect();
-        $canCreateAccountTransfer = $regularAccounts->count() >= 2;
-        $transferPaymentMethods = PaymentMethods::forRegularAccounts();
-
-        $txRecurringPrefill = null;
-        $txRecurringPrefillBlockedReason = null;
-        if ($prefillRecurringId !== null) {
-            $rt = RecurringTransaction::query()
-                ->where('couple_id', $couple->id)
-                ->whereKey($prefillRecurringId)
-                ->with('categorySplits')
-                ->first();
-            if ($rt !== null) {
-                $anchor = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
-                $payload = $rt->toTransactionPrefillPayload($anchor);
-                $txFormMode = $modalPayload['txFormMode'] ?? 'regular_only';
-                if ($txFormMode === 'regular_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_CREDIT_CARD) {
-                    $txRecurringPrefillBlockedReason = 'Este modelo usa cartão de crédito. Cadastre um cartão em Gerenciar contas para abrir o formulário já pré-preenchido.';
-                } elseif ($txFormMode === 'cards_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_ACCOUNT) {
-                    $txRecurringPrefillBlockedReason = 'Este modelo usa conta à ordem. Cadastre uma conta em Gerenciar contas para abrir o formulário já pré-preenchido.';
-                } else {
-                    $txRecurringPrefill = $payload;
-                }
-            }
-        }
-
-        $recurringReminders = $couple->recurringTransactions()
-            ->where('is_active', true)
-            ->with('account')
-            ->get()
-            ->filter(fn (RecurringTransaction $r) => $r->shouldShowReminder($now))
-            ->values();
-
-        $cardAccounts = $couple->accounts()
-            ->where('kind', Account::KIND_CREDIT_CARD)
-            ->orderBy('name')
-            ->get();
-        $creditCardInvoiceReminders = CreditCardInvoiceReminders::openStatementsForCouple(
-            (int) $couple->id,
-            $cardAccounts,
-            $now
-        );
-
-        return view('transactions.index', array_merge(
-            compact(
-                'transactions',
-                'selectedMonth',
-                'selectedYear',
-                'filterAccountId',
-                'filteredRegularAccountBalance',
-                'transactionDeleteMeta',
-                'transactionAmountEditMeta',
-                'installmentGroupsModalPayload',
-                'creditCardPurchaseRowMeta',
-                'txRecurringPrefill',
-                'txRecurringPrefillBlockedReason',
-                'recurringReminders',
-                'creditCardInvoiceReminders',
-                'canCreateAccountTransfer',
-                'transferPaymentMethods'
-            ),
-            $modalPayload
-        ));
-    }
 
     public function creditLimitPrecheckUpdate(Request $request, Transaction $transaction)
     {
@@ -871,32 +734,23 @@ class TransactionController extends Controller
             $isDashboard = $trimPath === '/dashboard' || str_ends_with($trimPath, '/dashboard');
 
             if ($isDashboard && $month !== null && $year !== null) {
-                return redirect()->route('dashboard', [
-                    'period' => sprintf('%04d-%02d', $year, $month),
-                ])->with($flash);
-            }
-
-            $isTransactions = str_contains($path, 'transactions');
-
-            if ($isTransactions && $month !== null && $year !== null) {
                 $params = array_filter(
                     [
-                        'month' => $month,
-                        'year' => $year,
+                        'period' => sprintf('%04d-%02d', $year, $month),
                         'account_id' => $accountId,
                     ],
                     fn ($v) => $v !== null && $v !== ''
                 );
 
-                return redirect()->route('transactions.index', $params)->with($flash);
+                return redirect()->route('dashboard', $params)->with($flash);
             }
+
         }
 
         $d = Carbon::parse((string) $request->input('date'));
 
-        return redirect()->route('transactions.index', [
-            'month' => (int) $d->month,
-            'year' => (int) $d->year,
+        return redirect()->route('dashboard', [
+            'period' => sprintf('%04d-%02d', (int) $d->year, (int) $d->month),
         ])->with($flash);
     }
 

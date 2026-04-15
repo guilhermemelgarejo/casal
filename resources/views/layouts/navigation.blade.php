@@ -28,11 +28,6 @@
                     </x-nav-link>
                 </li>
                 <li class="nav-item">
-                    <x-nav-link :href="route('transactions.index')" :active="request()->routeIs('transactions.*')">
-                        Lançamentos
-                    </x-nav-link>
-                </li>
-                <li class="nav-item">
                     <x-nav-link :href="route('recurring-transactions.index')" :active="request()->routeIs('recurring-transactions.*')">
                         Recorrentes
                     </x-nav-link>

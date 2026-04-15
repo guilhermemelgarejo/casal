@@ -60,13 +60,13 @@ class TransactionCreditCardListingPurchaseDateTest extends TestCase
             'installment_parent_id' => $parent->id,
         ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        $apr = $this->actingAs($user)->get(route('transactions.index', ['month' => 4, 'year' => 2026]));
+        $apr = $this->actingAs($user)->get(route('dashboard', ['period' => '2026-04']));
         $apr->assertOk();
         $apr->assertSee('TV', false);
         $apr->assertSee('100,00', false);
         $apr->assertSee('em 2x', false);
 
-        $may = $this->actingAs($user)->get(route('transactions.index', ['month' => 5, 'year' => 2026]));
+        $may = $this->actingAs($user)->get(route('dashboard', ['period' => '2026-05']));
         $may->assertOk();
         $may->assertDontSee('TV', false);
     }

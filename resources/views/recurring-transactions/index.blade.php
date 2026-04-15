@@ -8,7 +8,7 @@
         <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-md-between gap-3">
             <div class="min-w-0">
                 <h2 class="h5 mb-0 tx-page-title">Lançamentos recorrentes</h2>
-                <p class="small text-secondary mb-0 mt-1">Modelos para despesas e receitas fixas. Você pode criar o lançamento do mês em <strong class="fw-medium text-body">Lançamentos</strong> — nada é gravado sozinho.</p>
+                    <p class="small text-secondary mb-0 mt-1">Modelos para despesas e receitas fixas. Você pode criar o lançamento do mês no <strong class="fw-medium text-body">Painel</strong> — nada é gravado sozinho.</p>
             </div>
             <button
                 type="button"
@@ -52,7 +52,7 @@
                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
                         <div class="min-w-0">
                             <h3 class="h5 mb-1 fw-semibold">Seus modelos</h3>
-                            <p class="small text-secondary mb-0">O <strong class="fw-medium text-body">dia do mês</strong> sugere a data ao abrir Lançamentos; em meses curtos usa-se o último dia útil.</p>
+                            <p class="small text-secondary mb-0">O <strong class="fw-medium text-body">dia do mês</strong> sugere a data ao abrir o Painel; em meses curtos usa-se o último dia útil.</p>
                         </div>
                         @if($rtTotal > 0)
                             <div class="d-flex flex-wrap gap-2 justify-content-end flex-shrink-0" role="group" aria-label="Resumo dos modelos">
@@ -137,7 +137,7 @@
                                         </div>
                                         <div class="rt-item-card__toolbar d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
                                             @if(!$item->hasGeneratedForCalendarMonth(now()->year, now()->month))
-                                                <a href="{{ route('transactions.index', ['prefill_recurring' => $item->id, 'month' => now()->month, 'year' => now()->year]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3">Criar lançamento</a>
+                                                <a href="{{ route('dashboard', ['prefill_recurring' => $item->id, 'period' => now()->format('Y-m')]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3">Criar lançamento</a>
                                             @endif
                                             <button
                                                 type="button"

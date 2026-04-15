@@ -1,5 +1,5 @@
 {{--
-    Lembretes: modelos recorrentes + faturas de cartão em aberto (painel, Lançamentos, /recorrentes).
+    Lembretes: modelos recorrentes + faturas de cartão em aberto (painel e /recorrentes).
     Obrigatório: $reminders (collection de RecurringTransaction), $month (int), $year (int).
     Opcional: $invoiceReminders (collection de arrays — ver CreditCardInvoiceReminders::openStatementsForCouple);
     $title, $description (HTML); $manageUrl (omissão = /recorrentes; vazio oculta), $manageLabel;
@@ -27,7 +27,7 @@
         } elseif ($hasInvoices) {
             $description = 'Cartões com fatura não quitada ou com pagamento parcial. Itens <strong class="fw-medium text-body">vencidos</strong> aparecem primeiro.';
         } else {
-            $description = 'Ainda sem lançamento vinculado ao modelo no mês civil atual. Abra <strong class="fw-medium text-body">Lançamentos</strong> para pré-preencher e confirmar.';
+            $description = 'Ainda sem lançamento vinculado ao modelo no mês civil atual. Use o <strong class="fw-medium text-body">Painel</strong> para pré-preencher e confirmar.';
         }
     }
 
@@ -84,7 +84,7 @@
                                                         <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
                                                     </span>
                                                     <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
-                                                    <a href="{{ route('transactions.index', ['prefill_recurring' => $rec->id, 'month' => $month, 'year' => $year]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta">Criar lançamento</a>
+                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta">Criar lançamento</a>
                                                 </div>
                                             </li>
                                         @endforeach

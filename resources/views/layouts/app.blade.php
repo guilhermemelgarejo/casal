@@ -58,10 +58,10 @@
                             'title' => 'Categorias',
                             'body' => 'Já criámos categorias iniciais (Alimentação, Moradia, …). Podem acrescentar as vossas em Nova categoria ou usar as existentes nos lançamentos.',
                             'prevUrl' => route('accounts.index'),
-                            'nextUrl' => route('transactions.index'),
+                            'nextUrl' => route('dashboard'),
                         ],
                         [
-                            'route' => 'transactions.index',
+                            'route' => 'dashboard',
                             'selector' => '#onboarding-tx-actions',
                             'title' => 'Primeiro lançamento',
                             'body' => 'Use + Receita ou + Despesa para registar valores. Escolham conta, categorias e valores — o painel e o orçamento atualizam a partir daqui.',

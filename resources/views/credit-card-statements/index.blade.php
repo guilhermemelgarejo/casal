@@ -35,7 +35,7 @@
                             </div>
                             <h3 class="h5 mb-2">Nenhum cartão cadastrado</h3>
                             <p class="small text-secondary mb-4 mx-auto cc-picker-empty-text">
-                                Cadastre um <strong>cartão de crédito</strong> em <a href="{{ route('accounts.index') }}">Contas</a> e registe compras em <a href="{{ route('transactions.index') }}">Lançamentos</a> para ver as faturas aqui.
+                                Cadastre um <strong>cartão de crédito</strong> em <a href="{{ route('accounts.index') }}">Contas</a> e registe compras no <a href="{{ route('dashboard') }}">Painel</a> para ver as faturas aqui.
                             </p>
                             <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4">Ir para Contas</a>
                         </div>
@@ -93,7 +93,7 @@
                         @if ($filterCardId !== null)
                             @if ($invoiceCycles->isEmpty())
                         <div class="alert alert-info mb-0">
-                            Não há faturas com despesas neste cartão. Registre compras em <a href="{{ route('transactions.index') }}">Lançamentos</a> com este cartão ou escolha outro cartão.
+                            Não há faturas com despesas neste cartão. Registre compras no <a href="{{ route('dashboard') }}">Painel</a> com este cartão ou escolha outro cartão.
                         </div>
                             @else
                         <div class="vstack gap-3">
@@ -181,7 +181,7 @@
                                                                     <ul class="list-unstyled mb-0 mt-2">
                                                                         @foreach ($meta->paymentTransactions as $ptx)
                                                                             <li>
-                                                                                <a href="{{ route('transactions.index', ['month' => $ptx->reference_month, 'year' => $ptx->reference_year]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
+                                                                                <a href="{{ route('dashboard', ['period' => sprintf('%04d-%02d', $ptx->reference_year, $ptx->reference_month)]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
                                                                                 — R$ {{ number_format((float) $ptx->amount, 2, ',', '.') }}
                                                                             </li>
                                                                         @endforeach
@@ -196,7 +196,7 @@
                                                                 <ul class="list-unstyled mb-0 mt-2">
                                                                     @foreach ($meta->paymentTransactions as $ptx)
                                                                         <li>
-                                                                            <a href="{{ route('transactions.index', ['month' => $ptx->reference_month, 'year' => $ptx->reference_year]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
+                                                                            <a href="{{ route('dashboard', ['period' => sprintf('%04d-%02d', $ptx->reference_year, $ptx->reference_month)]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
                                                                             — R$ {{ number_format((float) $ptx->amount, 2, ',', '.') }}
                                                                         </li>
                                                                     @endforeach
@@ -347,7 +347,7 @@
                                                     <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                                                 </div>
                                             </div>
-                                            <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente em <a href="{{ route('transactions.index') }}">Lançamentos</a>.</p>
+                                            <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente no <a href="{{ route('dashboard') }}">Painel</a>.</p>
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -445,7 +445,7 @@
                         </div>
 
                         <p class="small text-secondary mt-3 mb-0">
-                            <a href="{{ route('transactions.index') }}">Lançamentos</a> — em faturas normais, o total é calculado pelos itens do cartão. Em fatura <strong>avulsa</strong>, o total pode ser ajustado até existir um pagamento.
+                            <a href="{{ route('dashboard') }}">Painel</a> — em faturas normais, o total é calculado pelos itens do cartão. Em fatura <strong>avulsa</strong>, o total pode ser ajustado até existir um pagamento.
                         </p>
 
                         @php

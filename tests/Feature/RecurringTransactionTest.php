@@ -306,9 +306,8 @@ class RecurringTransactionTest extends TestCase
         $this->travelTo(Carbon::create(2026, 4, 10, 10, 0, 0, config('app.timezone')));
 
         try {
-            $html = $this->actingAs($user)->get(route('transactions.index', [
-                'month' => 4,
-                'year' => 2026,
+            $html = $this->actingAs($user)->get(route('dashboard', [
+                'period' => '2026-04',
             ]))->assertOk()->getContent();
 
             $this->assertStringContainsString('rt-reminder-card', $html);
@@ -343,10 +342,9 @@ class RecurringTransactionTest extends TestCase
             ['category_id' => $category->id, 'amount' => '39.90'],
         ]);
 
-        $html = $this->actingAs($user)->get(route('transactions.index', [
+        $html = $this->actingAs($user)->get(route('dashboard', [
             'prefill_recurring' => $rt->id,
-            'month' => 4,
-            'year' => 2026,
+            'period' => '2026-04',
         ]))->assertOk()->getContent();
 
         $rt->load('categorySplits');
@@ -377,9 +375,8 @@ class RecurringTransactionTest extends TestCase
             ['category_id' => $category->id, 'amount' => '50.00'],
         ]);
 
-        $from = route('transactions.index', [
-            'month' => 7,
-            'year' => 2026,
+        $from = route('dashboard', [
+            'period' => '2026-07',
             'prefill_recurring' => $rt->id,
             'account_id' => $account->id,
         ]);
@@ -403,8 +400,7 @@ class RecurringTransactionTest extends TestCase
         $response->assertSessionHas('success');
         $location = (string) $response->headers->get('Location');
         $this->assertStringNotContainsString('prefill_recurring', $location);
-        $this->assertStringContainsString('month=7', $location);
-        $this->assertStringContainsString('year=2026', $location);
+        $this->assertStringContainsString('period=2026-07', $location);
         $this->assertStringContainsString('account_id='.$account->id, $location);
     }
 

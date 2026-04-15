@@ -60,9 +60,8 @@ class TransactionInstallmentDeleteMetaTest extends TestCase
             'installment_parent_id' => $parent->id,
         ], [['category_id' => $category->id, 'amount' => '50.00']]);
 
-        $response = $this->actingAs($user)->get(route('transactions.index', [
-            'month' => 4,
-            'year' => 2026,
+        $response = $this->actingAs($user)->get(route('dashboard', [
+            'period' => '2026-04',
         ]));
 
         $response->assertOk();

@@ -89,7 +89,7 @@ class CreditCardInvoiceReminderPanelTest extends TestCase
             $this->assertStringContainsString('statement-cycle-'.$card->id.'-2026-3', $html);
 
             $this->actingAs($user)
-                ->get(route('transactions.index', ['month' => 4, 'year' => 2026]))
+                ->get(route('dashboard', ['period' => '2026-04']))
                 ->assertOk()
                 ->assertSee('Faturas em aberto', false)
                 ->assertSee('Visa Lembrete', false);

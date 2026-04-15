@@ -65,9 +65,8 @@ class TransactionIndexFilterTest extends TestCase
             'reference_year' => 2026,
         ], [['category_id' => $category->id, 'amount' => '20.00']]);
 
-        $response = $this->actingAs($user)->get(route('transactions.index', [
-            'month' => 4,
-            'year' => 2026,
+        $response = $this->actingAs($user)->get(route('dashboard', [
+            'period' => '2026-04',
             'account_id' => $accA->id,
         ]));
 
@@ -89,7 +88,7 @@ class TransactionIndexFilterTest extends TestCase
             'color' => '#333333',
         ]);
 
-        $response = $this->actingAs($user)->get(route('transactions.index', [
+        $response = $this->actingAs($user)->get(route('dashboard', [
             'account_id' => $foreignAccount->id,
         ]));
 

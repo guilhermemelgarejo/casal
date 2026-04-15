@@ -61,7 +61,7 @@ class TransactionCategoryUpdateTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->from(route('transactions.index', ['month' => now()->month, 'year' => now()->year]))
+            ->from(route('dashboard', ['period' => now()->format('Y-m')]))
             ->put(route('transactions.update', $tx), [
                 'description' => 'Teste',
                 'amount' => '100.00',

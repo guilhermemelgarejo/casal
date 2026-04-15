@@ -45,7 +45,7 @@
                     >
                         Editar
                     </button>
-                    <form class="d-inline" action="{{ route('accounts.destroy', $account) }}" method="POST" data-confirm-title="Excluir conta" data-confirm="Excluir esta conta? Lançamentos vinculados ficarão sem conta." data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
+                    <form class="d-inline" action="{{ route('accounts.destroy', $account) }}" method="POST" data-confirm-title="Excluir conta" data-confirm="Excluir esta conta? Movimentações vinculadas ficarão sem conta." data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-sm accounts-item-card__btn-delete" title="Excluir conta">

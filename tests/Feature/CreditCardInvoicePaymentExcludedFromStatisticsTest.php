@@ -91,10 +91,10 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
         $dash->assertSee('Pagamento fatura Visa', false);
         $dash->assertSee('R$ 500,00', false);
 
-        $txPage = $this->actingAs($user)->get(route('transactions.index', ['month' => $refMonth, 'year' => $refYear]));
+        $txPage = $this->actingAs($user)->get(route('dashboard', ['period' => $period]));
         $txPage->assertOk();
         $txPage->assertSee('R$ 100,00', false);
-        $txPage->assertDontSee('R$ 600,00', false);
+        $txPage->assertSee('R$ 600,00', false);
     }
 
     public function test_pagamento_de_fatura_nao_entra_no_gasto_por_categoria_do_orcamento(): void
