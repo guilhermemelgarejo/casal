@@ -112,7 +112,7 @@ class TransactionController extends Controller
 
         try {
             $request->validate([
-                'amount' => ['required', 'numeric', 'min:0.01'],
+                'amount' => ['required', 'numeric'],
                 'description' => ['required', 'string', 'max:'.$descriptionMax],
                 'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
                 'category_allocations' => 'nullable|array|max:5',
@@ -133,15 +133,18 @@ class TransactionController extends Controller
         );
 
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
-        $newAmountCents = (int) round(((float) $amountNormalized) * 100);
-        if ($newAmountCents < 1) {
+        $raw = (float) $amountNormalized;
+        $isRefund = $transaction->refund_of_transaction_id !== null;
+        $signed = $isRefund ? (-1 * abs($raw)) : abs($raw);
+        $newAmountCentsAbs = (int) round(abs($signed) * 100);
+        if ($newAmountCentsAbs < 1) {
             return back()
                 ->withErrors(['amount' => 'Valor inválido.'])
                 ->withInput()
                 ->with('edit_transaction_id', $transaction->id);
         }
 
-        $newAmountFormatted = number_format($newAmountCents / 100, 2, '.', '');
+        $newAmountFormatted = number_format($signed, 2, '.', '');
         $oldAmountFormatted = number_format((float) $transaction->amount, 2, '.', '');
         $amountChanged = $oldAmountFormatted !== $newAmountFormatted;
 
@@ -169,7 +172,7 @@ class TransactionController extends Controller
         if ($hasCategoryAllocations) {
             $allocParsed = $this->parseCategoryAllocations(
                 $request,
-                $newAmountCents,
+                $newAmountCentsAbs,
                 (string) $transaction->type,
                 (int) Auth::user()->couple_id
             );
@@ -181,16 +184,27 @@ class TransactionController extends Controller
             }
 
             $allocPairs = $allocParsed['pairs'];
+            $splitSign = $signed < 0 ? -1 : 1;
             $splitRows = array_map(
                 fn ($p) => [
                     'category_id' => (int) $p['category_id'],
-                    'amount' => number_format(((int) $p['cents']) / 100, 2, '.', ''),
+                    'amount' => number_format((((int) $p['cents']) * $splitSign) / 100, 2, '.', ''),
                 ],
                 $allocParsed['pairs']
             );
         } elseif ($amountChanged) {
             try {
-                $splitRows = $this->categorySplitRowsScaledToAmount($transaction, $newAmountCents);
+                $scaled = $this->categorySplitRowsScaledToAmount($transaction, $newAmountCentsAbs);
+                $splitSign = $signed < 0 ? -1 : 1;
+                $splitRows = array_map(function (array $r) use ($splitSign) {
+                    $amt = (float) str_replace(',', '.', (string) ($r['amount'] ?? '0'));
+                    $abs = abs($amt);
+
+                    return [
+                        'category_id' => (int) $r['category_id'],
+                        'amount' => number_format($abs * $splitSign, 2, '.', ''),
+                    ];
+                }, $scaled);
             } catch (ValidationException $e) {
                 return back()->withErrors($e->errors())->withInput()->with('edit_transaction_id', $transaction->id);
             }
@@ -230,8 +244,19 @@ class TransactionController extends Controller
                             return;
                         }
                         foreach ($group as $tx) {
-                            $txAmountCents = (int) round(((float) str_replace(',', '.', (string) $tx->amount)) * 100);
-                            $rowsForTx = $this->categorySplitRowsFromRatiosForAmountCents($ratios, $txAmountCents);
+                            $txAmtRaw = (float) str_replace(',', '.', (string) $tx->amount);
+                            $txSign = $txAmtRaw < 0 ? -1 : 1;
+                            $txAmountCentsAbs = (int) round(abs($txAmtRaw) * 100);
+                            $rowsForTxAbs = $this->categorySplitRowsFromRatiosForAmountCents($ratios, $txAmountCentsAbs);
+                            $rowsForTx = array_map(function (array $r) use ($txSign) {
+                                $amt = (float) str_replace(',', '.', (string) ($r['amount'] ?? '0'));
+                                $abs = abs($amt);
+
+                                return [
+                                    'category_id' => (int) $r['category_id'],
+                                    'amount' => number_format($abs * $txSign, 2, '.', ''),
+                                ];
+                            }, $rowsForTxAbs);
                             $tx->syncCategorySplits($rowsForTx);
                         }
                     }
@@ -538,6 +563,8 @@ class TransactionController extends Controller
             'account_id' => 'required|exists:accounts,id',
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
+            'is_refund' => ['nullable', 'boolean'],
+            'refund_of_transaction_id' => ['nullable', 'integer', 'exists:transactions,id'],
             'payment_method' => ['nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
             'installments' => 'nullable|integer|min:1|max:12',
             'type' => 'required|in:income,expense',
@@ -552,12 +579,14 @@ class TransactionController extends Controller
             ],
         ]);
 
+        $isRefund = (bool) $request->boolean('is_refund');
+
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
-        $amountCents = (int) round(((float) $amountNormalized) * 100);
+        $amountCentsAbs = (int) round(((float) $amountNormalized) * 100);
 
         $allocParsed = $this->parseCategoryAllocations(
             $request,
-            $amountCents,
+            $amountCentsAbs,
             (string) $request->type,
             (int) Auth::user()->couple_id
         );
@@ -570,6 +599,19 @@ class TransactionController extends Controller
             return back()->withErrors($resolved['errors'])->withInput();
         }
         $ctx = $resolved;
+
+        if ($isRefund) {
+            if (! $ctx['isCredit'] || (string) $request->type !== 'expense') {
+                return back()->withErrors([
+                    'amount' => 'Estorno é permitido apenas para despesas no cartão de crédito.',
+                ])->withInput();
+            }
+            if ((int) $ctx['installments'] !== 1) {
+                return back()->withErrors([
+                    'installments' => 'Estorno não pode ser parcelado. Registre como um único lançamento (você pode lançar vários estornos se necessário).',
+                ])->withInput();
+            }
+        }
 
         if ($ctx['isCredit'] && $request->type === 'expense') {
             $refBase = $ctx['referenceBase'];
@@ -601,17 +643,38 @@ class TransactionController extends Controller
             }
         }
 
-        $limitRedirect = $this->rejectCreditCardLimitIfUnconfirmed($request, $ctx, $allocParsed['pairs']);
+        $limitRedirect = $isRefund
+            ? null
+            : $this->rejectCreditCardLimitIfUnconfirmed($request, $ctx, $allocParsed['pairs']);
         if ($limitRedirect !== null) {
             return $limitRedirect;
         }
 
         $installmentParentId = null;
         $pairs = $allocParsed['pairs'];
+        $refundOfId = null;
+        if ($isRefund && $request->filled('refund_of_transaction_id')) {
+            $origin = Transaction::query()
+                ->where('couple_id', Auth::user()->couple_id)
+                ->whereKey((int) $request->input('refund_of_transaction_id'))
+                ->first();
+            if (! $origin) {
+                return back()->withErrors([
+                    'refund_of_transaction_id' => 'Compra original não encontrada.',
+                ])->withInput();
+            }
+            $origin->loadMissing('accountModel');
+            if (! $origin->accountModel?->isCreditCard() || (int) $origin->account_id !== (int) $request->account_id || (string) $origin->type !== 'expense') {
+                return back()->withErrors([
+                    'refund_of_transaction_id' => 'A compra original deve ser uma despesa no mesmo cartão.',
+                ])->withInput();
+            }
+            $refundOfId = $origin->installmentRootId();
+        }
         $recurringTemplateId = $request->filled('recurring_template_id')
             ? (int) $request->input('recurring_template_id')
             : null;
-        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs, $recurringTemplateId) {
+        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs, $recurringTemplateId, $isRefund, $refundOfId) {
             $installments = $ctx['installments'];
             $baseCents = $ctx['baseCents'];
             $remainderCents = $ctx['remainderCents'];
@@ -619,6 +682,7 @@ class TransactionController extends Controller
             $referenceBase = $ctx['referenceBase'];
             $baseDescription = $ctx['baseDescription'];
             $paymentMethod = $ctx['paymentMethod'];
+            $sign = $isRefund ? -1 : 1;
 
             $parcelCentsList = [];
             for ($j = 0; $j < $installments; $j++) {
@@ -634,7 +698,7 @@ class TransactionController extends Controller
             for ($i = 0; $i < $installments; $i++) {
                 $parcelIndex = $i + 1;
                 $cents = $parcelCentsList[$i];
-                $parcelAmount = number_format($cents / 100, 2, '.', '');
+                $parcelAmount = number_format(($cents * $sign) / 100, 2, '.', '');
 
                 $ref = $referenceBase->copy()->addMonths($i);
                 $data = [
@@ -651,6 +715,10 @@ class TransactionController extends Controller
                     'reference_month' => (int) $ref->month,
                     'reference_year' => (int) $ref->year,
                 ];
+
+                if ($refundOfId !== null) {
+                    $data['refund_of_transaction_id'] = $refundOfId;
+                }
 
                 if ($installments === 1 && $recurringTemplateId !== null && $parcelIndex === 1) {
                     $data['recurring_transaction_id'] = $recurringTemplateId;
@@ -670,7 +738,7 @@ class TransactionController extends Controller
                 foreach ($perParcelSplits[$i] as $line) {
                     $splitRows[] = [
                         'category_id' => $line['category_id'],
-                        'amount' => number_format($line['cents'] / 100, 2, '.', ''),
+                        'amount' => number_format(($line['cents'] * $sign) / 100, 2, '.', ''),
                     ];
                 }
                 $created->syncCategorySplits($splitRows);
@@ -774,6 +842,7 @@ class TransactionController extends Controller
                 'date' => 'required|date',
                 'reference_month' => 'nullable|integer|min:1|max:12',
                 'reference_year' => 'nullable|integer|min:2000|max:2100',
+                'is_refund' => ['nullable', 'boolean'],
                 'recurring_template_id' => [
                     'nullable',
                     'integer',
@@ -811,6 +880,10 @@ class TransactionController extends Controller
             ], 422);
         }
         $ctx = $resolved;
+
+        if ($request->boolean('is_refund')) {
+            return response()->json(['overflow' => false]);
+        }
 
         if (! $ctx['isCredit'] || $request->type !== 'expense') {
             return response()->json(['overflow' => false]);
@@ -1087,6 +1160,128 @@ class TransactionController extends Controller
         $transaction->delete();
 
         return back()->with('success', 'Lançamento excluído!');
+    }
+
+    /**
+     * Pula 1 mês da fatura para um parcelamento no cartão, deslocando as parcelas
+     * a partir da parcela clicada (mantém a quantidade total).
+     */
+    public function skipInstallmentMonth(Request $request, Transaction $transaction)
+    {
+        if ($transaction->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        $transaction->loadMissing('accountModel');
+        if ($transaction->type !== 'expense' || ! $transaction->accountModel?->isCreditCard()) {
+            return back()->with('error', 'Ação indisponível para este lançamento.');
+        }
+
+        $coupleId = (int) $transaction->couple_id;
+        $rootId = $transaction->installmentRootId();
+
+        $group = Transaction::query()
+            ->where('couple_id', $coupleId)
+            ->where(function ($q) use ($rootId) {
+                $q->where('id', $rootId)
+                    ->orWhere('installment_parent_id', $rootId);
+            })
+            ->get();
+
+        if ($group->count() <= 1) {
+            return back()->with('error', 'Ação disponível apenas para parcelamentos.');
+        }
+
+        $sorted = $group->sortBy(fn (Transaction $t) => [($t->date?->timestamp ?? 0), $t->id])->values();
+        $idx = $sorted->search(fn (Transaction $t) => (int) $t->id === (int) $transaction->id);
+        if ($idx === false || $idx < 0) {
+            return back()->with('error', 'Parcela não encontrada no parcelamento.');
+        }
+
+        $affected = $sorted->slice($idx)->values();
+        if ($affected->isEmpty()) {
+            return back()->with('error', 'Nada para atualizar.');
+        }
+
+        // Bloqueio por ciclo atual (inclui fatura parcialmente paga).
+        foreach ($affected as $t) {
+            $refMonth = (int) ($t->reference_month ?? $t->date->month);
+            $refYear = (int) ($t->reference_year ?? $t->date->year);
+
+            $stmt = CreditCardStatement::query()
+                ->where('couple_id', $coupleId)
+                ->where('account_id', (int) $t->account_id)
+                ->where('reference_month', $refMonth)
+                ->where('reference_year', $refYear)
+                ->first();
+
+            if ($stmt && $stmt->blocksEditingCardExpenses()) {
+                return back()->with(
+                    'error',
+                    'Não é possível pular mês: este parcelamento cai em um ciclo de fatura com pagamento registrado ou quitado (parcialmente paga também bloqueia).'
+                );
+            }
+        }
+
+        // Bloqueio por destino:
+        // - não permitir cair em fatura avulsa;
+        // - não permitir editar ciclos que já tenham pagamentos/quitada.
+        $destCycles = $affected->map(function (Transaction $t) {
+            $refMonth = (int) ($t->reference_month ?? $t->date->month);
+            $refYear = (int) ($t->reference_year ?? $t->date->year);
+            $ref = Carbon::createFromDate($refYear, $refMonth, 1)->addMonth();
+
+            return [
+                'account_id' => (int) $t->account_id,
+                'reference_month' => (int) $ref->month,
+                'reference_year' => (int) $ref->year,
+            ];
+        });
+
+        $uniqueDest = $destCycles
+            ->groupBy(fn ($x) => $x['account_id'].'-'.$x['reference_year'].'-'.$x['reference_month'])
+            ->map(fn ($list) => $list->first());
+
+        foreach ($uniqueDest as $item) {
+            $stmt = CreditCardStatement::query()
+                ->where('couple_id', $coupleId)
+                ->where('account_id', (int) $item['account_id'])
+                ->where('reference_month', (int) $item['reference_month'])
+                ->where('reference_year', (int) $item['reference_year'])
+                ->first();
+
+            if (! $stmt) {
+                continue;
+            }
+
+            if ($stmt->is_avulsa) {
+                return back()->with(
+                    'error',
+                    'Não é possível pular mês: a cobrança cairia em um ciclo com fatura avulsa para este cartão.'
+                );
+            }
+
+            if ($stmt->blocksEditingCardExpenses()) {
+                return back()->with(
+                    'error',
+                    'Não é possível pular mês: o ciclo de destino da fatura já possui pagamento registrado/está quitado (inclui parcial).'
+                );
+            }
+        }
+
+        DB::transaction(function () use ($affected) {
+            foreach ($affected as $t) {
+                $refMonth = (int) ($t->reference_month ?? $t->date->month);
+                $refYear = (int) ($t->reference_year ?? $t->date->year);
+
+                $ref = Carbon::createFromDate($refYear, $refMonth, 1)->addMonth();
+                $t->reference_month = (int) $ref->month;
+                $t->reference_year = (int) $ref->year;
+                $t->save();
+            }
+        });
+
+        return back()->with('success', 'Mês da compra pulado com sucesso.');
     }
 
     /**

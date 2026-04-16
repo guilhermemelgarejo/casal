@@ -167,6 +167,7 @@ class Transaction extends Model
         'reference_month',
         'reference_year',
         'installment_parent_id',
+        'refund_of_transaction_id',
         'recurring_transaction_id',
         'internal_transfer_group_id',
     ];
@@ -230,6 +231,22 @@ class Transaction extends Model
     public function installmentChildren()
     {
         return $this->hasMany(self::class, 'installment_parent_id');
+    }
+
+    /**
+     * Se este lançamento for um estorno no cartão, aponta para a compra original.
+     */
+    public function refundOf()
+    {
+        return $this->belongsTo(self::class, 'refund_of_transaction_id');
+    }
+
+    /**
+     * Estornos vinculados a esta compra (normalmente o root do parcelamento).
+     */
+    public function refunds()
+    {
+        return $this->hasMany(self::class, 'refund_of_transaction_id');
     }
 
     /**

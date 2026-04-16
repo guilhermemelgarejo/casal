@@ -22,3 +22,13 @@
 @if (file_exists($swalCss))
     <link href="{{ asset('vendor/sweetalert2/sweetalert2.min.css') }}?v={{ filemtime($swalCss) }}" rel="stylesheet">
 @endif
+@php
+    $fpCss = public_path('vendor/flatpickr/flatpickr.min.css');
+    $fpMsCss = public_path('vendor/flatpickr/plugins/monthSelect/style.css');
+@endphp
+@if (file_exists($fpCss))
+    <link href="{{ asset('vendor/flatpickr/flatpickr.min.css') }}?v={{ filemtime($fpCss) }}" rel="stylesheet">
+@endif
+@if (file_exists($fpMsCss))
+    <link href="{{ asset('vendor/flatpickr/plugins/monthSelect/style.css') }}?v={{ filemtime($fpMsCss) }}" rel="stylesheet">
+@endif

@@ -7,38 +7,62 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
-            <div>
+        <div class="dashboard-header-intro">
+            <div class="dashboard-header-text">
                 <h2 class="h5 mb-0 dashboard-title">Painel</h2>
-                <p class="small text-secondary mb-0 mt-1"><span class="text-body fw-medium">{{ $periodLabel }}</span></p>
+                <p class="small text-secondary mb-0 mt-1 dashboard-header-period"><span class="text-body fw-medium">{{ $periodLabel }}</span></p>
             </div>
 
-            <form action="{{ route('dashboard') }}" method="GET" class="dashboard-toolbar ms-lg-auto min-w-0 w-100 w-lg-auto">
-                <label class="small text-secondary mb-0 align-middle flex-shrink-0 d-none d-sm-inline me-sm-1" for="dashboard-period">Período</label>
-                <input id="dashboard-period" type="month" name="period" value="{{ $period }}" class="form-control form-control-sm dashboard-toolbar-month" title="Mês de referência" aria-label="Mês de referência">
-
-                <label class="small text-secondary mb-0 align-middle flex-shrink-0 d-none d-md-inline me-md-1 ms-md-2" for="dashboard-account">Conta</label>
-                <select id="dashboard-account" name="account_id" class="form-select form-select-sm dashboard-toolbar-account" aria-label="Filtrar por conta">
-                    <option value="" {{ ($filterAccountId ?? null) === null ? 'selected' : '' }}>Todas</option>
-                    @foreach($accountsSortedForFilter as $acc)
-                        <option value="{{ $acc->id }}" {{ (int) ($filterAccountId ?? 0) === (int) $acc->id ? 'selected' : '' }}>
-                            @if($acc->isCreditCard())
-                                {{ $acc->name }} (cartão)
-                            @else
-                                {{ $acc->name }}
-                            @endif
-                        </option>
-                    @endforeach
-                </select>
-
-                <x-primary-button type="submit" class="btn-sm rounded-pill px-3 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="me-1" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    Filtrar
-                </x-primary-button>
-
-                @if(request()->has('period') || request()->has('account_id'))
-                    <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-shrink-0" title="Voltar ao mês atual">Limpar</a>
-                @endif
+            <form action="{{ route('dashboard') }}" method="GET" class="dashboard-filter-form" id="dashboard-filter-form">
+                <div class="dashboard-filter-shell" role="search" aria-label="Filtrar lançamentos do painel">
+                    <div class="dashboard-filter-controls">
+                        <div class="dashboard-filter-group">
+                            <label for="dashboard-period" class="dashboard-filter-tag">Mês</label>
+                            <input
+                                id="dashboard-period"
+                                type="text"
+                                name="period"
+                                value="{{ $period }}"
+                                class="form-control form-control-sm dashboard-filter-month"
+                                data-duozen-flatpickr="month"
+                                autocomplete="off"
+                                title="Mês de referência"
+                                aria-label="Mês de referência"
+                            >
+                        </div>
+                        <span class="dashboard-filter-divider d-none d-sm-inline" aria-hidden="true"></span>
+                        <div class="dashboard-filter-group dashboard-filter-group--account">
+                            <label for="dashboard-account" class="dashboard-filter-tag">Conta</label>
+                            <select
+                                id="dashboard-account"
+                                name="account_id"
+                                class="form-select form-select-sm dashboard-filter-select"
+                                aria-label="Conta para filtrar"
+                            >
+                                <option value="" {{ ($filterAccountId ?? null) === null ? 'selected' : '' }}>Todas</option>
+                                @foreach($accountsSortedForFilter as $acc)
+                                    <option value="{{ $acc->id }}" {{ (int) ($filterAccountId ?? 0) === (int) $acc->id ? 'selected' : '' }}>
+                                        @if($acc->isCreditCard())
+                                            {{ $acc->name }} (cartão)
+                                        @else
+                                            {{ $acc->name }}
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    @if(request()->has('period') || request()->has('account_id'))
+                        <div class="dashboard-filter-reset">
+                            <a href="{{ route('dashboard') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Limpar filtros</a>
+                        </div>
+                    @endif
+                </div>
+                <noscript>
+                    <div class="mt-2">
+                        <x-primary-button type="submit" class="btn-sm">Aplicar filtros</x-primary-button>
+                    </div>
+                </noscript>
             </form>
         </div>
     </x-slot>
@@ -289,9 +313,11 @@
                                 <x-text-input
                                     id="transfer_date_dash"
                                     name="date"
-                                    type="date"
+                                    type="text"
+                                    data-duozen-flatpickr="date"
                                     class="mt-1"
                                     required
+                                    autocomplete="off"
                                     value="{{ old('_form') === 'account-transfer' ? old('date', now()->toDateString()) : now()->toDateString() }}"
                                 />
                                 <x-input-error :messages="$errors->get('date')" class="mt-2" />

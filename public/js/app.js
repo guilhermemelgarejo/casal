@@ -11,6 +11,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const hasFlatpickr = typeof flatpickr !== 'undefined';
+    const hasMonthSelectPlugin = typeof monthSelectPlugin !== 'undefined';
+    const flatpickrLocalePt = hasFlatpickr && flatpickr.l10ns && flatpickr.l10ns.pt ? 'pt' : null;
+
+    if (hasFlatpickr && hasMonthSelectPlugin) {
+        document.querySelectorAll('[data-duozen-flatpickr="month"]').forEach((el) => {
+            if (el._flatpickr) {
+                return;
+            }
+            let defaultMonth = null;
+            if (el.value && /^\d{4}-\d{2}$/.test(el.value)) {
+                const [y, m] = el.value.split('-').map((v) => parseInt(v, 10));
+                defaultMonth = new Date(y, m - 1, 1);
+            }
+            flatpickr(el, {
+                locale: flatpickrLocalePt || 'default',
+                altInput: true,
+                altFormat: 'F \\d\\e Y',
+                allowInput: false,
+                disableMobile: true,
+                clickOpens: true,
+                defaultDate: defaultMonth,
+                plugins: [
+                    new monthSelectPlugin({
+                        shorthand: true,
+                        dateFormat: 'Y-m',
+                    }),
+                ],
+                onChange() {
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                },
+            });
+        });
+    }
+
+    if (hasFlatpickr) {
+        document.querySelectorAll('[data-duozen-flatpickr="date"]').forEach((el) => {
+            if (el._flatpickr) {
+                return;
+            }
+            flatpickr(el, {
+                locale: flatpickrLocalePt || 'default',
+                dateFormat: 'Y-m-d',
+                allowInput: false,
+                disableMobile: true,
+                defaultDate: el.value || undefined,
+            });
+        });
+    }
+
+    /**
+     * Modais que fazem input.value = … em runtime devem chamar isto para atualizar o Flatpickr.
+     * @param {HTMLInputElement|null} el
+     * @param {string} [dateStr] — Y-m-d ou vazio para limpar
+     */
+    window.duozenFlatpickrSetDate = (el, dateStr) => {
+        if (!el) {
+            return;
+        }
+        const fp = el._flatpickr;
+        if (!fp) {
+            el.value = dateStr || '';
+            return;
+        }
+        if (!dateStr) {
+            fp.clear();
+            return;
+        }
+        fp.setDate(dateStr, false, 'Y-m-d');
+    };
+
     const catForm = document.getElementById('category-form');
     const catModal = document.getElementById('modalCategoryForm');
     if (catForm && catModal && bs?.Modal) {
@@ -824,6 +895,51 @@ document.addEventListener('DOMContentLoaded', () => {
         handleTxDeleteFormSubmit(e, form);
     });
 
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('form.js-tx-skip-month-form');
+        if (!form) {
+            return;
+        }
+
+        e.preventDefault();
+
+        const msg =
+            form.getAttribute('data-confirm') ||
+            'Pular mês desta parcela e das parcelas seguintes em +1 mês?';
+
+        const proceed = () => {
+            form.submit();
+        };
+
+        if (typeof Swal === 'undefined') {
+            if (window.confirm(msg)) {
+                proceed();
+            }
+            return;
+        }
+
+        Swal.fire({
+            title: 'Pular mês',
+            text: msg,
+            icon: 'warning',
+            showCancelButton: true,
+            focusCancel: true,
+            confirmButtonText: 'Pular',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
+            customClass: {
+                confirmButton: 'btn btn-primary px-3',
+                cancelButton: 'btn btn-outline-secondary px-4',
+            },
+            buttonsStyling: false,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                proceed();
+            }
+        });
+    });
+
     const escapeHtmlTx = (s) =>
         String(s)
             .replace(/&/g, '&amp;')
@@ -838,12 +954,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const svgTxLock =
         '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>';
 
+    const svgTxSkipMonth =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.3 1.3a1 1 0 011.4 0l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4-1.4l3.3-3.3H3a1 1 0 110-2h11.6l-3.3-3.3a1 1 0 010-1.4z" clip-rule="evenodd"/><path d="M6 5a2 2 0 00-2 2v9a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H6V7h3a1 1 0 100-2H6z"/></svg>';
+
     const fillInstallmentGroupModal = (rootId) => {
         const payload = window.__txInstallmentGroups || {};
         const group = payload[String(rootId)];
         const tbody = document.getElementById('tbody-installment-summary');
         const descEl = document.querySelector('.js-tx-inst-summary-desc');
         const totalValueEl = document.querySelector('.js-tx-inst-total-value');
+        const refundTotalEl = document.querySelector('.js-tx-inst-refund-total');
         const purchaseDateEl = document.querySelector('.js-tx-inst-purchase-date');
         if (!tbody || !group || !descEl) {
             return;
@@ -861,6 +981,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const firstRow = Array.isArray(group.rows) && group.rows.length ? group.rows[0] : null;
             const d = firstRow && firstRow.date ? String(firstRow.date).trim() : '';
             purchaseDateEl.textContent = d ? `Data da compra · ${d}` : '';
+        }
+        if (refundTotalEl) {
+            const rt = group.refund_total_str != null ? String(group.refund_total_str) : '';
+            const rf = group.refund_total != null ? Number(group.refund_total) : 0;
+            refundTotalEl.textContent = rf > 0.004 && rt ? `Estornado · R$ ${rt}` : '';
         }
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const paidMsg =
@@ -882,6 +1007,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const allocEnc = encodeURIComponent(
                     JSON.stringify(Array.isArray(row.category_allocations) ? row.category_allocations : []),
                 );
+                const skipAllowed = row.skip_month?.allowed === true;
+                const skipUrl = escapeHtmlTx(row.skip_url || '');
 
                 let actions = '';
                 if (!edit.canEditAmount) {
@@ -894,6 +1021,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const txType = escapeHtmlTx(row.type || '');
                     actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-precheck="${precheck}" data-tx-peer-count="${peerCount}" data-tx-root-id="${escapeHtmlTx(String(group.rootId || rootId))}" data-tx-type="${txType}" data-tx-allocations="${allocEnc}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
                 }
+
+                if (skipAllowed && skipUrl) {
+                    actions += `<form action="${skipUrl}" method="POST" class="d-inline js-tx-skip-month-form ms-1" data-confirm="Pular mês desta parcela e das parcelas seguintes em +1 mês?"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><button type="submit" class="btn btn-link text-warning btn-sm p-0" aria-label="Pular mês" data-bs-toggle="tooltip" title="Pular mês: desloca esta parcela e as seguintes em +1 mês">${svgTxSkipMonth}</button></form>`;
+                }
+
                 if (del.paidInvoice) {
                     actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked ms-1" data-tx-blocked-msg="${escapeHtmlTx(paidMsg)}" title="Exclusão bloqueada" aria-label="Exclusão bloqueada">${svgTxLock}</button>`;
                 } else {
@@ -921,6 +1053,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>`;
             })
             .join('');
+
+        // Os botões/elementos da modal são renderizados dinamicamente.
+        // Como o tooltip é inicializado no DOMContentLoaded apenas para elementos existentes,
+        // precisamos inicializar novamente para os elementos recém-inseridos.
+        if (bs?.Tooltip) {
+            tbody.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                bs.Tooltip.getOrCreateInstance(el, { container: 'body' });
+            });
+        }
     };
 
     const installmentGroupModalEl = document.getElementById('modalInstallmentGroupSummary');
@@ -997,6 +1138,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const referenceMonth = document.getElementById('reference_month');
     const referenceYear = document.getElementById('reference_year');
     const creditSection = document.getElementById('tx-section-credit');
+    const refundCheck = document.getElementById('tx-refund-check');
+    const refundHidden = document.getElementById('tx-is-refund');
+    const refundOfHidden = document.getElementById('tx-refund-of-transaction-id');
+    const refundLinkedHint = document.getElementById('tx-refund-linked-hint');
+    const refundLinkedLabel = document.getElementById('tx-refund-linked-label');
+    const refundClearBtn = document.getElementById('tx-refund-clear');
 
     if (txForm) {
         const mode = txForm.dataset.txFormMode || 'regular_only';
@@ -1041,6 +1188,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 referenceYear.disabled = !isCredit;
             }
         };
+
+        const isRefundEnabled = () => !!refundCheck && refundCheck.checked;
+
+        const syncRefundUi = () => {
+            if (!refundHidden || !refundCheck) {
+                return;
+            }
+            refundHidden.value = isRefundEnabled() ? '1' : '0';
+            if (!isRefundEnabled()) {
+                if (refundOfHidden) {
+                    refundOfHidden.value = '';
+                }
+                if (refundLinkedHint) {
+                    refundLinkedHint.classList.add('d-none');
+                }
+                if (refundLinkedLabel) {
+                    refundLinkedLabel.textContent = '';
+                }
+                return;
+            }
+            // Estorno: forçamos 1 parcela.
+            if (installmentsSelect) {
+                installmentsSelect.value = '1';
+            }
+        };
+
+        if (refundCheck) {
+            refundCheck.addEventListener('change', () => {
+                syncRefundUi();
+            });
+        }
+
+        refundClearBtn?.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (refundOfHidden) refundOfHidden.value = '';
+            if (refundLinkedLabel) refundLinkedLabel.textContent = '';
+            if (refundLinkedHint) refundLinkedHint.classList.add('d-none');
+        });
 
         const fillSelect = (sel, items, selectedId) => {
             sel.innerHTML = '';
@@ -1199,10 +1384,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rel = ev.relatedTarget;
                 const preset = rel?.getAttribute?.('data-tx-open-preset');
                 const titleEl = document.getElementById('modalNewTransactionLabel');
+                const refundOf = rel?.getAttribute?.('data-tx-refund-of');
+                const refundAccountId = rel?.getAttribute?.('data-tx-refund-account-id');
+                const refundLabel = rel?.getAttribute?.('data-tx-refund-label');
+
+                if (refundOf) {
+                    if (titleEl) {
+                        titleEl.textContent = 'Novo estorno';
+                    }
+                    if (typeSelect) {
+                        typeSelect.value = 'expense';
+                        typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (mode === 'cards_only') {
+                        if (accountSel && refundAccountId) {
+                            accountSel.value = String(refundAccountId);
+                        }
+                        syncInstallments(true);
+                        syncAccountMeta();
+                    } else if (paymentFlow) {
+                        paymentFlow.value = '__credit__';
+                        paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (accountSel && refundAccountId) {
+                            accountSel.value = String(refundAccountId);
+                        }
+                        syncInstallments(true);
+                        syncAccountMeta();
+                    }
+                    if (installmentsSelect) {
+                        installmentsSelect.value = '1';
+                    }
+                    if (refundCheck) {
+                        refundCheck.checked = true;
+                    }
+                    if (refundOfHidden) {
+                        refundOfHidden.value = String(refundOf);
+                    }
+                    if (refundLinkedLabel) {
+                        refundLinkedLabel.textContent = refundLabel ? String(refundLabel) : `#${refundOf}`;
+                    }
+                    if (refundLinkedHint) {
+                        refundLinkedHint.classList.remove('d-none');
+                    }
+                    // Sugestão de descrição.
+                    const desc = document.getElementById('description');
+                    if (desc && refundLabel) {
+                        desc.value = `Estorno: ${refundLabel}`;
+                    }
+                    syncRefundUi();
+                    return;
+                }
+
                 if (preset !== 'income' && preset !== 'expense') {
                     if (titleEl) {
                         titleEl.textContent = 'Novo lançamento';
                     }
+                    // Garante que estorno não “vaze” entre aberturas.
+                    if (refundCheck) refundCheck.checked = false;
+                    syncRefundUi();
                     return;
                 }
                 if (titleEl) {
@@ -1230,6 +1469,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     syncAccountMeta();
                 }
+                if (refundCheck) refundCheck.checked = false;
+                syncRefundUi();
             });
         }
 
@@ -1290,6 +1531,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tmplInput) {
                 tmplInput.value = '';
             }
+            if (refundCheck) {
+                refundCheck.checked = false;
+            }
+            if (refundOfHidden) {
+                refundOfHidden.value = '';
+            }
+            if (refundLinkedHint) {
+                refundLinkedHint.classList.add('d-none');
+            }
+            if (refundLinkedLabel) {
+                refundLinkedLabel.textContent = '';
+            }
+            syncRefundUi();
 
             const limitToken = txForm.querySelector('input[name="credit_limit_confirm_token"]');
             if (limitToken) {
@@ -1482,6 +1736,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Estorno não precisa de verificação de limite (reduz utilização).
+            if (refundHidden?.value === '1') {
+                return;
+            }
+
             if (!precheckUrl) {
                 return;
             }
@@ -1586,5 +1845,18 @@ document.addEventListener('DOMContentLoaded', () => {
         delete window.__txOpenInstallmentModalRoot;
     } catch {
         window.__txOpenInstallmentModalRoot = undefined;
+    }
+
+    const dashboardFilterForm = document.getElementById('dashboard-filter-form');
+    if (dashboardFilterForm) {
+        const submitDashboardFilter = () => {
+            if (typeof dashboardFilterForm.requestSubmit === 'function') {
+                dashboardFilterForm.requestSubmit();
+            } else {
+                dashboardFilterForm.submit();
+            }
+        };
+        dashboardFilterForm.querySelector('#dashboard-period')?.addEventListener('change', submitDashboardFilter);
+        dashboardFilterForm.querySelector('#dashboard-account')?.addEventListener('change', submitDashboardFilter);
     }
 });

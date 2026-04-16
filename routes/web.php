@@ -35,6 +35,8 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
     Route::put('/transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
     Route::delete('/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+    Route::post('/transactions/{transaction}/skip-installment-month', [TransactionController::class, 'skipInstallmentMonth'])
+        ->name('transactions.skip-installment-month');
 
     Route::get('/recorrentes', [RecurringTransactionController::class, 'index'])->name('recurring-transactions.index');
     Route::post('/recorrentes', [RecurringTransactionController::class, 'store'])->name('recurring-transactions.store');

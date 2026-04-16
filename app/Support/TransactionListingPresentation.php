@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\CreditCardStatement;
 use App\Models\Transaction;
 use Illuminate\Support\Collection;
 
@@ -15,11 +16,41 @@ class TransactionListingPresentation
      *
      * @param  Collection<int, Transaction>  $pageTransactions
      * @param  Collection<string, Collection<int, Transaction>>  $installmentGroups
-     * @return array<int, array{purchase_total: float, purchase_total_str: string, installment_count: int, base_description: string}>
+     * @return array<int, array{
+     *     purchase_total: float,
+     *     purchase_total_str: string,
+     *     installment_count: int,
+     *     base_description: string,
+     *     refund_total: float,
+     *     refund_total_str: string
+     * }>
      */
     public static function creditCardPurchaseRowMetaForPage(Collection $pageTransactions, Collection $installmentGroups): array
     {
         $out = [];
+
+        $refundTotalsByRoot = collect();
+        if ($pageTransactions->isNotEmpty()) {
+            $coupleId = (int) $pageTransactions->first()->couple_id;
+            $rootIds = $pageTransactions
+                ->filter(function (Transaction $t) {
+                    $t->loadMissing('accountModel');
+                    return $t->type === 'expense' && $t->accountModel?->isCreditCard();
+                })
+                ->map(fn (Transaction $t) => $t->installmentRootId())
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($rootIds !== []) {
+                $refundTotalsByRoot = Transaction::query()
+                    ->where('couple_id', $coupleId)
+                    ->whereIn('refund_of_transaction_id', $rootIds)
+                    ->selectRaw('refund_of_transaction_id, SUM(amount) as refund_sum')
+                    ->groupBy('refund_of_transaction_id')
+                    ->pluck('refund_sum', 'refund_of_transaction_id');
+            }
+        }
 
         foreach ($pageTransactions as $t) {
             $t->loadMissing('accountModel');
@@ -31,12 +62,16 @@ class TransactionListingPresentation
             $group = $installmentGroups->get($rootKey) ?? collect([$t]);
             $purchaseTotal = (float) $group->sum(fn (Transaction $x) => (float) $x->amount);
             $count = $group->count();
+            $refundSum = (float) ($refundTotalsByRoot->get((int) $t->installmentRootId(), 0) ?? 0);
+            $refundTotal = abs($refundSum);
 
             $out[$t->id] = [
                 'purchase_total' => $purchaseTotal,
                 'purchase_total_str' => number_format($purchaseTotal, 2, ',', '.'),
                 'installment_count' => $count,
                 'base_description' => $t->baseDescriptionWithoutInstallmentSuffix(),
+                'refund_total' => $refundTotal,
+                'refund_total_str' => number_format($refundTotal, 2, ',', '.'),
             ];
         }
 
@@ -71,11 +106,40 @@ class TransactionListingPresentation
      * Dados para modais de parcelamento (cartão) na listagem de lançamentos.
      *
      * @param  Collection<string, Collection<int, Transaction>>  $installmentGroups
-     * @return array<string, array{rootId: int, baseDescription: string, total_amount: float, total_amount_str: string, rows: list<array<string, mixed>>}>
+     * @return array<string, array{
+     *     rootId: int,
+     *     baseDescription: string,
+     *     total_amount: float,
+     *     total_amount_str: string,
+     *     refund_total: float,
+     *     refund_total_str: string,
+     *     rows: list<array<string, mixed>>
+     * }>
      */
     public static function installmentGroupsModalPayload(Collection $installmentGroups): array
     {
         $out = [];
+
+        $refundTotalsByRoot = collect();
+        if ($installmentGroups->isNotEmpty()) {
+            /** @var Transaction|null $any */
+            $any = $installmentGroups->first()?->first();
+            $coupleId = $any ? (int) $any->couple_id : null;
+            $rootIds = $installmentGroups
+                ->keys()
+                ->map(fn ($k) => (int) $k)
+                ->filter(fn (int $x) => $x > 0)
+                ->values()
+                ->all();
+            if ($coupleId !== null && $rootIds !== []) {
+                $refundTotalsByRoot = Transaction::query()
+                    ->where('couple_id', $coupleId)
+                    ->whereIn('refund_of_transaction_id', $rootIds)
+                    ->selectRaw('refund_of_transaction_id, SUM(amount) as refund_sum')
+                    ->groupBy('refund_of_transaction_id')
+                    ->pluck('refund_sum', 'refund_of_transaction_id');
+            }
+        }
 
         foreach ($installmentGroups as $rootKey => $group) {
             if ($group->count() <= 1) {
@@ -91,6 +155,26 @@ class TransactionListingPresentation
 
             $total = $sorted->count();
             $baseDescription = $first->baseDescriptionWithoutInstallmentSuffix();
+
+            // “Pular mês” só pode ser aplicado se TODAS as parcelas afetadas (da parcela clicada até o fim)
+            // estiverem em ciclos sem pagamento registrado/quitado (inclui parcial).
+            $blockedFlags = $sorted->map(function (Transaction $x): bool {
+                if ($x->type !== 'expense' || $x->account_id === null) {
+                    return false;
+                }
+
+                $refMonth = (int) ($x->reference_month ?? $x->date->month);
+                $refYear = (int) ($x->reference_year ?? $x->date->year);
+
+                $stmt = CreditCardStatement::query()
+                    ->where('couple_id', (int) $x->couple_id)
+                    ->where('account_id', (int) $x->account_id)
+                    ->where('reference_month', $refMonth)
+                    ->where('reference_year', $refYear)
+                    ->first();
+
+                return $stmt ? $stmt->blocksEditingCardExpenses() : false;
+            })->values()->all();
 
             $rows = [];
             foreach ($sorted as $idx => $t) {
@@ -129,18 +213,26 @@ class TransactionListingPresentation
                         ->all(),
                     'update_url' => route('transactions.update', $t),
                     'destroy_url' => route('transactions.destroy', $t),
+                    'skip_month' => [
+                        'allowed' => ! in_array(true, array_slice($blockedFlags, (int) $idx), true),
+                    ],
+                    'skip_url' => route('transactions.skip-installment-month', $t),
                     'edit' => self::transactionAmountEditMeta($t),
                     'delete' => self::transactionDeleteMeta($t, $installmentGroups),
                 ];
             }
 
             $purchaseTotal = (float) $sorted->sum(fn (Transaction $t) => (float) $t->amount);
+            $refundSum = (float) ($refundTotalsByRoot->get((int) $rootKey, 0) ?? 0);
+            $refundTotal = abs($refundSum);
 
             $out[(string) $rootKey] = [
                 'rootId' => (int) $rootKey,
                 'baseDescription' => $baseDescription,
                 'total_amount' => $purchaseTotal,
                 'total_amount_str' => number_format($purchaseTotal, 2, ',', '.'),
+                'refund_total' => $refundTotal,
+                'refund_total_str' => number_format($refundTotal, 2, ',', '.'),
                 'rows' => $rows,
             ];
         }

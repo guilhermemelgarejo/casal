@@ -66,11 +66,25 @@
                     <span class="text-muted">—</span>
                 @endif
             </div>
-            <div class="fw-bold text-nowrap {{ $transaction->type === 'income' ? 'text-success' : 'text-danger' }}">
+            @php
+                $amtRaw = (float) $transaction->amount;
+                $isCreditCardRefund = $transaction->type === 'expense' && $amtRaw < -0.004;
+                $amtAbsStr = number_format(abs($amtRaw), 2, ',', '.');
+            @endphp
+            <div class="fw-bold text-nowrap {{ $transaction->type === 'income' || $isCreditCardRefund ? 'text-success' : 'text-danger' }}">
                 @if($ccRowMeta !== null)
                     {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ $ccRowMeta['purchase_total_str'] }}@if($ccRowMeta['installment_count'] > 1)<span class="small fw-normal text-muted"> em {{ $ccRowMeta['installment_count'] }}x</span>@endif
+                    @if(($ccRowMeta['refund_total'] ?? 0) > 0.004)
+                        <div class="small fw-semibold text-success">Estornado: R$ {{ $ccRowMeta['refund_total_str'] }}</div>
+                    @endif
                 @else
-                    {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ number_format($transaction->amount, 2, ',', '.') }}
+                    @if($transaction->type === 'income')
+                        + R$ {{ number_format($amtRaw, 2, ',', '.') }}
+                    @elseif($isCreditCardRefund)
+                        + R$ {{ $amtAbsStr }}
+                    @else
+                        - R$ {{ $amtAbsStr }}
+                    @endif
                 @endif
             </div>
             <div class="tx-cell-actions">
@@ -83,6 +97,21 @@
                         data-tx-root-id="{{ $transaction->installmentRootId() }}"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="3.75" cy="5.5" r="1.35"/><circle cx="3.75" cy="10" r="1.35"/><circle cx="3.75" cy="14.5" r="1.35"/><path d="M7 4.75h10.25a.75.75 0 010 1.5H7a.75.75 0 010-1.5zm0 4.5h10.25a.75.75 0 010 1.5H7a.75.75 0 010-1.5zm0 4.5h10.25a.75.75 0 010 1.5H7a.75.75 0 010-1.5z"/></svg>
+                    </button>
+                @endif
+                @if($transaction->type === 'expense' && $transaction->accountModel?->isCreditCard() && (float) $transaction->amount > 0.004)
+                    <button
+                        type="button"
+                        class="btn btn-link text-success btn-sm p-0 js-tx-open-refund"
+                        title="Registrar estorno"
+                        aria-label="Registrar estorno"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalNewTransaction"
+                        data-tx-refund-of="{{ $transaction->installmentRootId() }}"
+                        data-tx-refund-account-id="{{ (int) $transaction->account_id }}"
+                        data-tx-refund-label="{{ e($ccRowMeta['base_description'] ?? $transaction->baseDescriptionWithoutInstallmentSuffix()) }}"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>
                     </button>
                 @endif
                 @if (! $hideListEditForCcInstallments)

@@ -10,6 +10,7 @@
                     <div class="tx-modal-installment-total px-4 py-3 mb-3 text-center">
                         <div class="small text-secondary fw-semibold text-uppercase mb-1">Total da compra</div>
                         <div class="h4 mb-1 fw-bold text-danger text-nowrap js-tx-inst-total-value" aria-live="polite">—</div>
+                        <div class="small text-success fw-semibold js-tx-inst-refund-total" aria-live="polite"></div>
                         <div class="small text-muted js-tx-inst-purchase-date" aria-live="polite"></div>
                     </div>
                     <p class="small text-muted mb-3">Todas as parcelas deste parcelamento no cartão. Em <strong>Fatura</strong>, abra o ciclo correspondente em Faturas cartão. Use as ações para alterar o valor ou excluir cada lançamento.</p>
@@ -181,7 +182,7 @@
         $openNewTransactionModal = ! session('edit_transaction_id') && $errors->hasAny([
             'funding', 'account_id', 'description', 'amount', 'payment_method',
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
-            'category_allocations', 'recurring_template_id',
+            'category_allocations', 'recurring_template_id', 'refund_of_transaction_id',
         ]);
         $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations'));
         $txAllocVisibleRows = 1;
@@ -227,6 +228,8 @@
                     >
                         @csrf
                         <input type="hidden" name="recurring_template_id" id="tx-recurring-template-id" value="{{ old('recurring_template_id', '') }}">
+                        <input type="hidden" name="is_refund" id="tx-is-refund" value="{{ old('is_refund', '0') }}">
+                        <input type="hidden" name="refund_of_transaction_id" id="tx-refund-of-transaction-id" value="{{ old('refund_of_transaction_id', '') }}">
                         <div class="modal-body overflow-auto" style="max-height: calc(100vh - 12rem);">
                             @php
                                 $isCreditRender = $txFormMode === 'cards_only' || $fundingOld === 'credit_card' || $paymentFlowOld === '__credit__';
@@ -332,7 +335,7 @@
                                         </div>
                                         <div class="col-6">
                                             <x-input-label for="date" value="Data" />
-                                            <x-text-input id="date" name="date" type="date" class="mt-1" value="{{ old('date', date('Y-m-d')) }}" required />
+                                            <x-text-input id="date" name="date" type="text" data-duozen-flatpickr="date" class="mt-1" autocomplete="off" value="{{ old('date', date('Y-m-d')) }}" required />
                                             <x-input-error :messages="$errors->get('date')" class="mt-2" />
                                         </div>
                                     </div>
@@ -380,6 +383,27 @@
                                                 <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
                                             </div>
                                         </div>
+                                    </div>
+
+                                    <hr class="my-3">
+                                    <div id="tx-refund-ui" class="vstack gap-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="1" id="tx-refund-check" {{ old('is_refund') ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="tx-refund-check">
+                                                Estorno no cartão (crédito)
+                                            </label>
+                                            <div class="form-text">
+                                                Informe o valor como positivo. O lançamento será gravado como crédito (valor negativo) na fatura.
+                                            </div>
+                                        </div>
+                                        <div class="small text-secondary d-none" id="tx-refund-linked-hint">
+                                            Compra vinculada: <span class="fw-semibold text-body" id="tx-refund-linked-label"></span>
+                                            <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="tx-refund-clear">Limpar</button>
+                                        </div>
+                                        <div class="small text-secondary d-none" id="tx-refund-manual-id-hint">
+                                            ID da compra (opcional): <span class="text-body fw-semibold" id="tx-refund-manual-id"></span>
+                                        </div>
+                                        <x-input-error :messages="$errors->get('refund_of_transaction_id')" class="mt-2" />
                                     </div>
                                 </div>
 

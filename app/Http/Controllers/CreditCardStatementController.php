@@ -107,6 +107,8 @@ class CreditCardStatementController extends Controller
                         'ref_label' => sprintf('%02d/%d', (int) $t->reference_month, (int) $t->reference_year),
                         'amount' => (float) $t->amount,
                         'amount_str' => number_format((float) $t->amount, 2, ',', '.'),
+                        'amount_abs_str' => number_format(abs((float) $t->amount), 2, ',', '.'),
+                        'is_credit' => (float) $t->amount < -0.004,
                         'transactions_url' => route('dashboard', [
                             'period' => sprintf('%04d-%02d', (int) $t->date->year, (int) $t->date->month),
                             'account_id' => (int) $t->account_id,

@@ -338,7 +338,7 @@
                                                 </p>
                                                 <div>
                                                     <x-input-label for="payStatementPaidDate" value="Data do pagamento" />
-                                                    <input type="date" id="payStatementPaidDate" name="paid_date" class="form-control mt-1" required value="{{ old('paid_date', now()->format('Y-m-d')) }}">
+                                                    <input type="text" id="payStatementPaidDate" name="paid_date" data-duozen-flatpickr="date" class="form-control mt-1" required autocomplete="off" value="{{ old('paid_date', now()->format('Y-m-d')) }}">
                                                     <x-input-error :messages="$errors->get('paid_date')" class="mt-2" />
                                                 </div>
                                                 <div>
@@ -378,7 +378,7 @@
                                                 </div>
 
                                                 <x-input-label for="editStatementDue" value="Vencimento" />
-                                                <input type="date" name="due_date" id="editStatementDue" class="form-control mt-1" value="{{ old('due_date') }}">
+                                                <input type="text" name="due_date" id="editStatementDue" data-duozen-flatpickr="date" class="form-control mt-1" autocomplete="off" value="{{ old('due_date') }}">
                                                 <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
                                             </div>
                                             <p class="small text-secondary mt-3 mb-0 d-none" id="editStatementLockedHint">
@@ -430,7 +430,7 @@
                                                 </div>
                                                 <div class="col-12">
                                                     <x-input-label for="avulsaDue" value="Vencimento (opcional)" />
-                                                    <input type="date" id="avulsaDue" name="due_date" class="form-control mt-1" value="{{ old('due_date') }}">
+                                                    <input type="text" id="avulsaDue" name="due_date" data-duozen-flatpickr="date" class="form-control mt-1" autocomplete="off" value="{{ old('due_date') }}">
                                                     <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
                                                 </div>
                                             </div>
@@ -580,8 +580,9 @@
                                                 tr.appendChild(td('small text-nowrap text-secondary', row.ref_label));
 
                                                 const tdAmt = document.createElement('td');
-                                                tdAmt.className = 'text-end small fw-semibold text-nowrap text-body';
-                                                tdAmt.textContent = 'R$ ' + (row.amount_str || '');
+                                                const isCredit = !!row.is_credit;
+                                                tdAmt.className = 'text-end small fw-semibold text-nowrap ' + (isCredit ? 'text-success' : 'text-body');
+                                                tdAmt.textContent = (isCredit ? '+ ' : '') + 'R$ ' + (isCredit ? (row.amount_abs_str || row.amount_str || '') : (row.amount_abs_str || row.amount_str || ''));
                                                 tr.appendChild(tdAmt);
 
                                                 const tdLink = document.createElement('td');
@@ -615,7 +616,11 @@
                                                 editSubtitleEl.textContent = btn.getAttribute('data-edit-subtitle') || '';
                                             }
                                             if (editDueInput) {
-                                                editDueInput.value = btn.getAttribute('data-edit-due') || '';
+                                                const dueRaw = btn.getAttribute('data-edit-due') || '';
+                                                editDueInput.value = dueRaw;
+                                                if (typeof window.duozenFlatpickrSetDate === 'function') {
+                                                    window.duozenFlatpickrSetDate(editDueInput, dueRaw);
+                                                }
                                             }
 
                                             const isAvulsa = (btn.getAttribute('data-edit-is-avulsa') || '') === '1';
@@ -663,6 +668,9 @@
                                             const ddef = btn.getAttribute('data-pay-date-default');
                                             if (payDateInput && ddef) {
                                                 payDateInput.value = ddef;
+                                                if (typeof window.duozenFlatpickrSetDate === 'function') {
+                                                    window.duozenFlatpickrSetDate(payDateInput, ddef);
+                                                }
                                             }
                                             if (payAccSelect) {
                                                 payAccSelect.value = '';

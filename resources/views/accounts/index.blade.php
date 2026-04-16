@@ -278,9 +278,11 @@
                                 <x-text-input
                                     id="transfer_date"
                                     name="date"
-                                    type="date"
+                                    type="text"
+                                    data-duozen-flatpickr="date"
                                     class="mt-1"
                                     required
+                                    autocomplete="off"
                                     value="{{ old('_form') === 'account-transfer' ? old('date', now()->toDateString()) : now()->toDateString() }}"
                                 />
                                 <x-input-error :messages="$errors->get('date')" class="mt-2" />
