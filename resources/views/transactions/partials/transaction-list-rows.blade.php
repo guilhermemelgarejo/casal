@@ -59,7 +59,13 @@
             <div class="d-flex flex-wrap gap-1 align-items-center">
                 @forelse($transaction->categorySplits as $sp)
                     @if($sp->category)
-                        <span class="badge rounded-pill text-white" style="background-color: {{ $sp->category->color ?? '#ccc' }}">{{ $sp->category->name }}</span>
+                        <span
+                            class="badge rounded-pill text-white"
+                            style="background-color: {{ $sp->category->color ?? '#ccc' }}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="Valor: R$ {{ number_format((float) $sp->amount, 2, ',', '.') }}"
+                        >{{ $sp->category->name }}</span>
                     @endif
                 @empty
                     <span class="text-secondary small">—</span>
