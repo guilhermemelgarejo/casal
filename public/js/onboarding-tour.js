@@ -8,9 +8,36 @@
         return;
     }
 
-    const step = cfg.steps.find(function (s) {
-        return s.route === cfg.route;
-    });
+    function resolveOnboardingStep() {
+        const routeName = cfg.route;
+        const params = new URLSearchParams(window.location.search);
+        const onRoute = cfg.steps.filter(function (s) {
+            return s.route === routeName;
+        });
+        let i;
+        for (i = 0; i < onRoute.length; i++) {
+            const s = onRoute[i];
+            const wq = s.whenQuery;
+            if (wq && typeof wq === 'object' && Object.keys(wq).length) {
+                const ok = Object.keys(wq).every(function (key) {
+                    return params.get(key) === String(wq[key]);
+                });
+                if (ok) {
+                    return s;
+                }
+            }
+        }
+        for (i = 0; i < onRoute.length; i++) {
+            const s = onRoute[i];
+            const wq = s.whenQuery;
+            if (!wq || typeof wq !== 'object' || !Object.keys(wq).length) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    const step = resolveOnboardingStep();
     if (!step) {
         return;
     }
