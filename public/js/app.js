@@ -1435,6 +1435,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                const copyEnc = rel?.getAttribute?.('data-tx-copy-prefill');
+                if (copyEnc) {
+                    let copyPrefill = null;
+                    try {
+                        copyPrefill = JSON.parse(decodeURIComponent(copyEnc));
+                    } catch {
+                        copyPrefill = null;
+                    }
+                    if (copyPrefill && typeof copyPrefill === 'object') {
+                        if (titleEl) {
+                            titleEl.textContent = 'Copiar para novo lançamento';
+                        }
+                        if (refundCheck) {
+                            refundCheck.checked = false;
+                        }
+                        syncRefundUi();
+                        applyRecurringPrefill(copyPrefill);
+                        return;
+                    }
+                }
+
                 if (preset !== 'income' && preset !== 'expense') {
                     if (titleEl) {
                         titleEl.textContent = 'Novo lançamento';
@@ -1622,7 +1643,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 amt.value = prefill.amount;
             }
             if (dateIn && prefill.date) {
-                dateIn.value = prefill.date;
+                if (typeof window.duozenFlatpickrSetDate === 'function') {
+                    window.duozenFlatpickrSetDate(dateIn, prefill.date);
+                } else {
+                    dateIn.value = prefill.date;
+                }
             }
             if (tmplInput) {
                 tmplInput.value =
@@ -1656,11 +1681,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncInstallments(fund === 'credit_card' || paymentFlow.value === '__credit__');
                 syncAccountMeta();
             }
-            if (referenceMonth && referenceYear && prefill.date && isCreditUi()) {
-                const d = new Date(`${prefill.date}T12:00:00`);
-                if (!Number.isNaN(d.getTime())) {
-                    referenceMonth.value = String(d.getMonth() + 1);
-                    referenceYear.value = String(d.getFullYear());
+            if (referenceMonth && referenceYear && isCreditUi()) {
+                if (
+                    prefill.reference_month != null &&
+                    prefill.reference_year != null &&
+                    String(prefill.reference_month) !== '' &&
+                    String(prefill.reference_year) !== ''
+                ) {
+                    referenceMonth.value = String(parseInt(String(prefill.reference_month), 10));
+                    referenceYear.value = String(parseInt(String(prefill.reference_year), 10));
+                } else if (prefill.date) {
+                    const d = new Date(`${prefill.date}T12:00:00`);
+                    if (!Number.isNaN(d.getTime())) {
+                        referenceMonth.value = String(d.getMonth() + 1);
+                        referenceYear.value = String(d.getFullYear());
+                    }
                 }
             }
             const wrap = document.getElementById('tx-category-allocations-wrap');
@@ -1701,6 +1736,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     txFilterSplitCats(false);
                 }
                 syncTxAllocRemoveButtons();
+            }
+            if (installmentsSelect && prefill.installments != null && String(prefill.installments) !== '') {
+                const ins = Math.max(1, Math.min(12, parseInt(String(prefill.installments), 10) || 1));
+                installmentsSelect.value = String(ins);
             }
         };
 

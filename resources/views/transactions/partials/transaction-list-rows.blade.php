@@ -34,6 +34,7 @@
             ->map(fn ($sp) => ['category_id' => (int) $sp->category_id, 'amount' => number_format((float) $sp->amount, 2, '.', '')])
             ->values()
             ->all();
+        $txCopyPrefill = \App\Support\TransactionListingPresentation::transactionCopyPrefillPayload($transaction);
     @endphp
     <div
         id="dashboard-tx-{{ $transaction->id }}"
@@ -130,7 +131,21 @@
                         data-tx-refund-account-id="{{ (int) $transaction->account_id }}"
                         data-tx-refund-label="{{ e($ccRowMeta['base_description'] ?? $transaction->baseDescriptionWithoutInstallmentSuffix()) }}"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>
+                        {{-- Estorno: seta em arco (reverter / devolução), distinta de “adicionar” (+) --}}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/></svg>
+                    </button>
+                @endif
+                @if ($txCopyPrefill !== null)
+                    <button
+                        type="button"
+                        class="btn btn-link text-secondary btn-sm p-0"
+                        title="Copiar para novo lançamento"
+                        aria-label="Copiar para novo lançamento"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalNewTransaction"
+                        data-tx-copy-prefill="{{ rawurlencode(json_encode($txCopyPrefill, JSON_UNESCAPED_UNICODE)) }}"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 2a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm8 12H6V4h4v3a1 1 0 001 1h3v6zM4 4a2 2 0 012-2h4.586a2 2 0 011.414.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /></svg>
                     </button>
                 @endif
                 @if (! $hideListEditForCcInstallments)

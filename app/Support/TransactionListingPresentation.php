@@ -321,4 +321,72 @@ class TransactionListingPresentation
             'precheckUrl' => $needsPrecheck ? route('transactions.credit-limit-precheck-update', $t) : null,
         ];
     }
+
+    /**
+     * Dados para pré-preencher o formulário de novo lançamento a partir de um existente (atalho "Copiar").
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function transactionCopyPrefillPayload(Transaction $t): ?array
+    {
+        if ($t->internal_transfer_group_id) {
+            return null;
+        }
+
+        if ($t->isCreditCardInvoicePaymentTransaction()) {
+            return null;
+        }
+
+        $t->loadMissing(['categorySplits', 'accountModel']);
+
+        if ($t->categorySplits->isEmpty()) {
+            return null;
+        }
+
+        $account = $t->accountModel;
+        if ($account === null) {
+            return null;
+        }
+
+        $isCard = $account->isCreditCard();
+        if (! $isCard && ! $t->payment_method) {
+            return null;
+        }
+
+        $amountAbs = abs((float) $t->amount);
+
+        $splits = [];
+        foreach ($t->categorySplits as $sp) {
+            $splits[] = [
+                'category_id' => (int) $sp->category_id,
+                'amount' => number_format(abs((float) $sp->amount), 2, '.', ''),
+            ];
+        }
+
+        $payload = [
+            'type' => $t->type,
+            'description' => $t->baseDescriptionWithoutInstallmentSuffix(),
+            'amount' => number_format($amountAbs, 2, '.', ''),
+            'date' => $t->date->toDateString(),
+            'funding' => $isCard ? 'credit_card' : 'account',
+            'account_id' => (int) $t->account_id,
+            'installments' => 1,
+            'splits' => $splits,
+        ];
+
+        if (! $isCard) {
+            $payload['payment_method'] = (string) $t->payment_method;
+        }
+
+        if ($isCard && $t->reference_month !== null && $t->reference_year !== null) {
+            $payload['reference_month'] = (int) $t->reference_month;
+            $payload['reference_year'] = (int) $t->reference_year;
+        }
+
+        if ($t->recurring_transaction_id) {
+            $payload['recurring_template_id'] = (int) $t->recurring_transaction_id;
+        }
+
+        return $payload;
+    }
 }
