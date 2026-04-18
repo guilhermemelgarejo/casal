@@ -619,9 +619,10 @@
                                             }
                                             if (editDueInput) {
                                                 const dueRaw = btn.getAttribute('data-edit-due') || '';
-                                                editDueInput.value = dueRaw;
                                                 if (typeof window.duozenFlatpickrSetDate === 'function') {
                                                     window.duozenFlatpickrSetDate(editDueInput, dueRaw);
+                                                } else {
+                                                    editDueInput.value = dueRaw;
                                                 }
                                             }
 
@@ -669,9 +670,10 @@
                                             }
                                             const ddef = btn.getAttribute('data-pay-date-default');
                                             if (payDateInput && ddef) {
-                                                payDateInput.value = ddef;
                                                 if (typeof window.duozenFlatpickrSetDate === 'function') {
                                                     window.duozenFlatpickrSetDate(payDateInput, ddef);
+                                                } else {
+                                                    payDateInput.value = ddef;
                                                 }
                                             }
                                             if (payAccSelect) {
@@ -693,7 +695,14 @@
                                         if (editSubtitleEl) {
                                             editSubtitleEl.textContent = {!! json_encode($openEditSubtitleJs) !!};
                                         }
-                                        if (editDueInput) editDueInput.value = {!! json_encode(old('due_date', '')) !!};
+                                        if (editDueInput) {
+                                            const dueOld = {!! json_encode(old('due_date', '')) !!};
+                                            if (typeof window.duozenFlatpickrSetDate === 'function') {
+                                                window.duozenFlatpickrSetDate(editDueInput, dueOld);
+                                            } else {
+                                                editDueInput.value = dueOld;
+                                            }
+                                        }
                                         // Em reabertura por erro, tentamos manter o total (se aplicável).
                                         const totalWrap = document.getElementById('editStatementTotalWrap');
                                         const totalInput = document.getElementById('editStatementTotal');

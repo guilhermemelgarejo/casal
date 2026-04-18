@@ -53,7 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             flatpickr(el, {
                 locale: flatpickrLocalePt || 'default',
+                altInput: true,
+                altFormat: 'd/m/Y',
                 dateFormat: 'Y-m-d',
+                altInputClass: el.className.trim() || 'form-control',
                 allowInput: false,
                 disableMobile: true,
                 defaultDate: el.value || undefined,
@@ -1546,8 +1549,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (dateIn) {
                 const d = txForm.dataset.txDefaultDate;
-                dateIn.value =
+                const dateStr =
                     (d && String(d).trim()) || new Date().toISOString().slice(0, 10);
+                if (typeof window.duozenFlatpickrSetDate === 'function') {
+                    window.duozenFlatpickrSetDate(dateIn, dateStr);
+                } else {
+                    dateIn.value = dateStr;
+                }
             }
             if (tmplInput) {
                 tmplInput.value = '';
