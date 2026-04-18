@@ -590,6 +590,8 @@
                                                 const a = document.createElement('a');
                                                 a.className = 'btn btn-sm btn-outline-primary rounded-pill px-3';
                                                 a.href = url;
+                                                a.target = '_blank';
+                                                a.rel = 'noopener noreferrer';
                                                 a.textContent = 'Abrir';
                                                 tdLink.appendChild(a);
                                                 tr.appendChild(tdLink);

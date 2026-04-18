@@ -112,6 +112,7 @@ class CreditCardStatementController extends Controller
                         'transactions_url' => route('dashboard', [
                             'period' => sprintf('%04d-%02d', (int) $t->date->year, (int) $t->date->month),
                             'account_id' => (int) $t->account_id,
+                            'focus_transaction' => (int) $t->installmentRootId(),
                         ]),
                     ])->values()->all());
 

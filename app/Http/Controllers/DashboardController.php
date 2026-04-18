@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\RecurringTransaction;
+use App\Models\Transaction;
 use App\Support\CreditCardInvoiceReminders;
 use App\Support\PaymentMethods;
 use App\Support\TransactionListingPresentation;
@@ -35,6 +36,11 @@ class DashboardController extends Controller
                 'nullable',
                 'integer',
                 Rule::exists('recurring_transactions', 'id')->where('couple_id', $couple->id),
+            ],
+            'focus_transaction' => [
+                'nullable',
+                'integer',
+                Rule::exists('transactions', 'id')->where('couple_id', $couple->id),
             ],
         ]);
 
@@ -67,7 +73,7 @@ class DashboardController extends Controller
             ->latest('date')
             ->get();
 
-        $transactions = $couple->transactions()
+        $transactionsForPeriod = $couple->transactions()
             ->with(['user', 'accountModel', 'categorySplits.category', 'creditCardStatementsPaidFor'])
             ->whereMatchesTransactionsListingPeriod($month, $year)
             ->whereCreditCardInstallmentVisibleInList()
@@ -75,6 +81,36 @@ class DashboardController extends Controller
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get();
+
+        $focusTransactionId = isset($validated['focus_transaction']) ? (int) $validated['focus_transaction'] : null;
+        $transactions = $transactionsForPeriod;
+        if ($focusTransactionId !== null) {
+            $focused = $transactionsForPeriod->firstWhere('id', $focusTransactionId);
+            if ($focused instanceof Transaction) {
+                $transactions = collect([$focused]);
+            } else {
+                $maybeParcel = Transaction::query()
+                    ->where('couple_id', $couple->id)
+                    ->whereKey($focusTransactionId)
+                    ->with('accountModel')
+                    ->first();
+                if ($maybeParcel instanceof Transaction
+                    && $maybeParcel->type === 'expense'
+                    && $maybeParcel->accountModel?->isCreditCard()
+                    && $maybeParcel->installment_parent_id !== null) {
+                    $rootId = $maybeParcel->installmentRootId();
+                    $focusedRoot = $transactionsForPeriod->firstWhere('id', $rootId);
+                    if ($focusedRoot instanceof Transaction) {
+                        $transactions = collect([$focusedRoot]);
+                        $focusTransactionId = $rootId;
+                    } else {
+                        $focusTransactionId = null;
+                    }
+                } else {
+                    $focusTransactionId = null;
+                }
+            }
+        }
 
         $installmentGroups = TransactionListingPresentation::installmentGroupsForPage($couple->id, $transactions);
         $installmentGroupsModalPayload = TransactionListingPresentation::installmentGroupsModalPayload($installmentGroups);
@@ -153,6 +189,7 @@ class DashboardController extends Controller
                 'month',
                 'year',
                 'filterAccountId',
+                'focusTransactionId',
                 'filteredRegularAccountBalance',
                 'showAlert',
                 'thresholdPercentage',

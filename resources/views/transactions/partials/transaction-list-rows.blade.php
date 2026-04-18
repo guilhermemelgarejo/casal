@@ -35,7 +35,20 @@
             ->values()
             ->all();
     @endphp
-    <div @class(['list-group-item', 'px-3', 'py-2', 'border-start-0', 'border-end-0', 'tx-list-row-item', 'tx-list-row-item--income' => $transaction->type === 'income']) role="listitem">
+    <div
+        id="dashboard-tx-{{ $transaction->id }}"
+        @class([
+            'list-group-item',
+            'px-3',
+            'py-2',
+            'border-start-0',
+            'border-end-0',
+            'tx-list-row-item',
+            'tx-list-row-item--income' => $transaction->type === 'income',
+            'tx-list-row-item--focused' => (int) ($focusTransactionId ?? 0) === (int) $transaction->id,
+        ])
+        role="listitem"
+    >
         <div class="tx-list-row-grid">
             <div class="text-secondary small text-nowrap">{{ $transaction->date->format('d/m/Y') }}</div>
             <div class="tx-cell-truncate">

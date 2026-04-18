@@ -70,4 +70,62 @@ class TransactionCreditCardListingPurchaseDateTest extends TestCase
         $may->assertOk();
         $may->assertDontSee('TV', false);
     }
+
+    public function test_focus_transaction_com_id_de_parcela_filha_mostra_apenas_a_raiz_visivel(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Loja',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $parent = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'TV (Parcela 1/2)',
+            'amount' => '50.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 5,
+            'reference_year' => 2026,
+            'installment_parent_id' => null,
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $child = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'TV (Parcela 2/2)',
+            'amount' => '50.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 6,
+            'reference_year' => 2026,
+            'installment_parent_id' => $parent->id,
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $response = $this->actingAs($user)->get(route('dashboard', [
+            'period' => '2026-04',
+            'account_id' => $card->id,
+            'focus_transaction' => $child->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('A mostrar apenas o lançamento aberto a partir da fatura', false);
+        $response->assertSee('id="dashboard-tx-'.$parent->id.'"', false);
+    }
 }

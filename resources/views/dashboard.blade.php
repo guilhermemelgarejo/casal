@@ -52,7 +52,7 @@
                             </select>
                         </div>
                     </div>
-                    @if(request()->has('period') || request()->has('account_id'))
+                    @if(request()->has('period') || request()->has('account_id') || request()->has('focus_transaction'))
                         <div class="dashboard-filter-reset">
                             <a href="{{ route('dashboard') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Limpar filtros</a>
                         </div>
@@ -192,6 +192,12 @@
                         <div class="min-w-0">
                             <h3 class="h5 mb-1 fw-semibold">Lançamentos do período</h3>
                             <p class="small text-secondary mb-0">No cartão, o mês do painel filtra pela <strong class="fw-medium text-body">data da compra</strong>; parcelas aparecem numa linha com o total.</p>
+                            @if (! empty($focusTransactionId))
+                                <p class="small text-primary mb-0 mt-2">
+                                    A mostrar apenas o lançamento aberto a partir da fatura.
+                                    <a href="{{ route('dashboard', array_filter(['period' => $period, 'account_id' => $filterAccountId])) }}" class="fw-semibold">Ver todos os lançamentos deste filtro</a>.
+                                </p>
+                            @endif
                         </div>
                         <div class="d-flex flex-wrap gap-2 justify-content-end flex-shrink-0" id="onboarding-tx-actions" role="group" aria-label="Ações">
                             @if (($canCreateAccountTransfer ?? false) === true)
@@ -367,6 +373,19 @@
                         bootstrap.Modal.getOrCreateInstance(transferModal).show();
                     }
                 })();
+            </script>
+        @endpush
+    @endif
+
+    @if (! empty($focusTransactionId))
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const row = document.getElementById('dashboard-tx-{{ (int) $focusTransactionId }}');
+                    if (row) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
             </script>
         @endpush
     @endif
