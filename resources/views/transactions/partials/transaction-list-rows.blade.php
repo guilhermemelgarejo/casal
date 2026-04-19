@@ -112,6 +112,8 @@
                     <button
                         type="button"
                         class="btn btn-link btn-sm p-0 text-secondary js-tx-open-installment-summary"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
                         title="Parcelas da compra"
                         aria-label="Parcelas da compra"
                         data-tx-root-id="{{ $transaction->installmentRootId() }}"
@@ -123,7 +125,7 @@
                     <button
                         type="button"
                         class="btn btn-link text-success btn-sm p-0 js-tx-open-refund"
-                        title="Registrar estorno"
+                        title="Abrir formulário para registrar estorno desta compra no cartão"
                         aria-label="Registrar estorno"
                         data-bs-toggle="modal"
                         data-bs-target="#modalNewTransaction"
@@ -139,7 +141,7 @@
                     <button
                         type="button"
                         class="btn btn-link text-secondary btn-sm p-0"
-                        title="Copiar para novo lançamento"
+                        title="Abrir novo lançamento com os mesmos dados (categorias, conta, etc.)"
                         aria-label="Copiar para novo lançamento"
                         data-bs-toggle="modal"
                         data-bs-target="#modalNewTransaction"
@@ -153,6 +155,8 @@
                         <button
                             type="button"
                             class="btn btn-link text-secondary btn-sm p-0 js-tx-edit-blocked"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
                             title="Edição do valor não permitida"
                             aria-label="Edição do valor não permitida"
                             data-tx-blocked-msg="{{ $editMeta['blockedMessage'] ?? 'Não é possível editar o valor deste lançamento.' }}"
@@ -163,7 +167,7 @@
                         <button
                             type="button"
                             class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open"
-                            title="Alterar lançamento"
+                            title="Alterar descrição, valor ou categorias deste lançamento"
                             aria-label="Alterar descrição ou valor do lançamento"
                             data-bs-toggle="modal"
                             data-bs-target="#modalEditTransactionAmount"
@@ -182,6 +186,8 @@
                     <button
                         type="button"
                         class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
                         title="Exclusão bloqueada: fatura deste período já paga"
                         aria-label="Exclusão bloqueada: lançamento em ciclo de fatura de cartão já pago"
                         data-tx-blocked-msg="{{ $blockedMsg }}"
@@ -198,7 +204,14 @@
                         @csrf
                         @method('DELETE')
                         <input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope">
-                        <button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir">
+                        <button
+                            type="submit"
+                            class="btn btn-link text-danger btn-sm p-0"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="Excluir este lançamento"
+                            aria-label="Excluir este lançamento"
+                        >
                             <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
                         </button>
                     </form>

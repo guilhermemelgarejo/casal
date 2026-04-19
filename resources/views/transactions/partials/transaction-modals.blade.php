@@ -32,7 +32,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar o resumo das parcelas" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@
                         <div>
                             <div class="d-flex align-items-center justify-content-between gap-2">
                                 <div class="fw-semibold">Categorias e valores</div>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="edit-tx-add-cat-row">Adicionar categoria</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="edit-tx-add-cat-row" data-bs-toggle="tooltip" data-bs-placement="top" title="Mostrar mais uma linha de categoria (até 5)">Adicionar categoria</button>
                             </div>
                             <p class="small text-secondary mb-2 mt-1">Até 5 linhas. A soma deve ser igual ao valor total.</p>
                             <div id="edit-tx-category-allocations-wrap" data-tx-alloc-root="1">
@@ -158,6 +158,9 @@
                                             <button
                                                 type="button"
                                                 class="btn btn-outline-danger btn-sm js-tx-remove-alloc-row w-100 w-sm-auto"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Remover esta linha de categoria do lançamento"
                                                 aria-label="Remover esta categoria"
                                             >
                                                 Remover
@@ -170,8 +173,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                        <x-primary-button class="rounded-pill px-4">Salvar</x-primary-button>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem guardar alterações" data-bs-dismiss="modal">Cancelar</button>
+                        <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar descrição, valor e categorias">Salvar</x-primary-button>
                     </div>
                 </form>
             </div>
@@ -209,8 +212,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Fechar</button>
-                        <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4">Ir para contas</a>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar o formulário" data-bs-dismiss="modal">Fechar</button>
+                        <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Cadastrar conta ou cartão para poder lançar">Ir para contas</a>
                     </div>
                 @else
                     <form
@@ -398,7 +401,7 @@
                                         </div>
                                         <div class="small text-secondary d-none" id="tx-refund-linked-hint">
                                             Compra vinculada: <span class="fw-semibold text-body" id="tx-refund-linked-label"></span>
-                                            <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="tx-refund-clear">Limpar</button>
+                                            <button type="button" class="btn btn-link btn-sm p-0 ms-2" id="tx-refund-clear" data-bs-toggle="tooltip" data-bs-placement="top" title="Desvincular o estorno da compra original">Limpar</button>
                                         </div>
                                         <div class="small text-secondary d-none" id="tx-refund-manual-id-hint">
                                             ID da compra (opcional): <span class="text-body fw-semibold" id="tx-refund-manual-id"></span>
@@ -449,6 +452,9 @@
                                                     <button
                                                         type="button"
                                                         class="btn btn-outline-danger btn-sm js-tx-remove-alloc-row w-100 w-sm-auto"
+                                                        data-bs-toggle="tooltip"
+                                                        data-bs-placement="top"
+                                                        title="Remover esta linha de categoria do lançamento"
                                                         aria-label="Remover esta categoria"
                                                     >
                                                         Remover
@@ -458,7 +464,7 @@
                                         @endfor
                                     </div>
                                     <div class="d-flex flex-wrap gap-2 mb-1">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="tx-add-cat-row">Adicionar categoria</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="tx-add-cat-row" data-bs-toggle="tooltip" data-bs-placement="top" title="Mostrar mais uma linha de categoria (até 5)">Adicionar categoria</button>
                                     </div>
                                     <x-input-error :messages="$errors->get('category_allocations')" class="mt-2" />
                                 </section>
@@ -466,8 +472,8 @@
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                            <x-primary-button class="rounded-pill px-4">Salvar lançamento</x-primary-button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem criar lançamento" data-bs-dismiss="modal">Cancelar</button>
+                            <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registar o lançamento no painel">Salvar lançamento</x-primary-button>
                         </div>
                     </form>
                 @endif

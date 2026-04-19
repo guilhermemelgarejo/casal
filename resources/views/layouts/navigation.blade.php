@@ -11,6 +11,7 @@
         <button
             class="navbar-toggler app-navbar-toggler border-0 shadow-sm"
             type="button"
+            title="Abrir ou fechar o menu em ecrãs pequenos"
             data-bs-toggle="collapse"
             data-bs-target="#mainNavbar"
             aria-controls="mainNavbar"
@@ -74,6 +75,7 @@
                         <button
                             type="button"
                             class="btn app-navbar-user-btn dropdown-toggle d-flex align-items-center gap-2"
+                            title="Menu da conta: perfil, assinatura e sair"
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
                         >
@@ -103,7 +105,7 @@
                         <li>
                             <form method="POST" action="{{ route('logout') }}" class="d-inline w-100">
                                 @csrf
-                                <button type="submit" class="dropdown-item text-danger rounded-2">
+                                <button type="submit" class="dropdown-item text-danger rounded-2" title="Terminar sessão">
                                     Sair
                                 </button>
                             </form>
@@ -135,7 +137,7 @@
                 @endif
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button type="submit" class="nav-link btn btn-link text-start w-100 py-2 px-3 rounded-3 text-danger text-decoration-none">
+                    <button type="submit" class="nav-link btn btn-link text-start w-100 py-2 px-3 rounded-3 text-danger text-decoration-none" title="Terminar sessão">
                         Sair
                     </button>
                 </form>

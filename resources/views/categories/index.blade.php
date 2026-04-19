@@ -20,6 +20,7 @@
                 type="button"
                 class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0"
                 id="btn-new-category"
+                title="Criar uma nova categoria de receita ou despesa"
                 data-bs-toggle="modal"
                 data-bs-target="#modalCategoryForm"
             >
@@ -198,11 +199,11 @@
                     </div>
 
                     <div class="modal-footer flex-wrap gap-2 justify-content-between border-top">
-                        <x-secondary-button type="button" id="category-cancel-edit" class="rounded-pill px-4 {{ $catFormMode === 'category-update' ? '' : 'd-none' }}">
+                        <x-secondary-button type="button" id="category-cancel-edit" class="rounded-pill px-4 {{ $catFormMode === 'category-update' ? '' : 'd-none' }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Descartar edição e fechar o formulário">
                             Cancelar
                         </x-secondary-button>
                         <div class="ms-auto">
-                            <x-primary-button type="submit" class="rounded-pill px-4">
+                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar a categoria com os dados indicados">
                                 <span id="category-submit-label">{{ $catFormMode === 'category-update' ? 'Atualizar' : 'Salvar' }}</span>
                             </x-primary-button>
                         </div>

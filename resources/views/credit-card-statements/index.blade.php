@@ -37,7 +37,7 @@
                             <p class="small text-secondary mb-4 mx-auto cc-picker-empty-text">
                                 Cadastre um <strong>cartão de crédito</strong> em <a href="{{ route('accounts.index') }}">Contas</a> e registe compras no <a href="{{ route('dashboard') }}">Painel</a> para ver as faturas aqui.
                             </p>
-                            <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4">Ir para Contas</a>
+                            <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Cadastrar um cartão de crédito em Contas">Ir para Contas</a>
                         </div>
                     @else
                         @if ($filterCardId === null)
@@ -69,10 +69,11 @@
                                             <button
                                                 type="button"
                                                 class="btn btn-sm btn-primary rounded-pill px-3"
+                                                title="Criar fatura manual para um período sem compras no cartão"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#newAvulsaStatementModal"
                                             >Cadastrar fatura avulsa</button>
-                                            <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 align-self-start">Voltar à escolha</a>
+                                            <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 align-self-start" data-bs-toggle="tooltip" data-bs-placement="top" title="Voltar à grelha de escolha de cartão">Voltar à escolha</a>
                                         </div>
                                     </div>
                                     <div class="cc-picker-grid cc-picker-grid--toolbar justify-content-center">
@@ -212,6 +213,7 @@
                                                                 <button
                                                                     type="button"
                                                                     class="btn btn-sm btn-outline-secondary text-nowrap"
+                                                                    title="Registar um pagamento parcial ou total desta fatura"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#payStatementModal"
                                                                     data-pay-action="{{ route('credit-card-statements.attach-payment', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
@@ -224,6 +226,7 @@
                                                             <button
                                                                 type="button"
                                                                 class="btn btn-sm btn-outline-primary text-nowrap"
+                                                                title="Alterar vencimento ou dados da fatura avulsa"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#editStatementModal"
                                                                 data-edit-action="{{ route('credit-card-statements.update', [$cycle->account, $cycle->reference_year, $cycle->reference_month]) }}"
@@ -246,13 +249,14 @@
                                                                 >
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Excluir</button>
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="tooltip" data-bs-placement="top" title="Eliminar esta fatura avulsa">Excluir</button>
                                                                 </form>
                                                             @endif
                                                             @unless ($meta?->is_avulsa)
                                                                 <button
                                                                     type="button"
                                                                     class="btn btn-sm btn-outline-secondary text-nowrap"
+                                                                    title="Ver lançamentos que compõem esta fatura"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#statementItemsModal"
                                                                     data-statement-subtitle="{{ $cycleSubtitle }}"
@@ -295,7 +299,7 @@
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Fechar</button>
+                                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar a lista de itens" data-bs-dismiss="modal">Fechar</button>
                                     </div>
                                 </div>
                             </div>
@@ -350,8 +354,8 @@
                                             <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente no <a href="{{ route('dashboard') }}">Painel</a>.</p>
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                            <x-primary-button type="submit" class="rounded-pill px-4">Criar lançamento</x-primary-button>
+                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem registar pagamento" data-bs-dismiss="modal">Cancelar</button>
+                                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registar o pagamento desta fatura como lançamento">Criar lançamento</x-primary-button>
                                         </div>
                                     </form>
                                 </div>
@@ -386,8 +390,8 @@
                                             </p>
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                            <x-primary-button type="submit" class="rounded-pill px-4">Salvar</x-primary-button>
+                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem guardar alterações" data-bs-dismiss="modal">Cancelar</button>
+                                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar vencimento e dados da fatura">Salvar</x-primary-button>
                                         </div>
                                     </form>
                                 </div>
@@ -436,8 +440,8 @@
                                             </div>
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                            <x-primary-button type="submit" class="rounded-pill px-4">Cadastrar</x-primary-button>
+                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem criar fatura" data-bs-dismiss="modal">Cancelar</button>
+                                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar a fatura avulsa com o total indicado">Cadastrar</x-primary-button>
                                         </div>
                                     </form>
                                 </div>

@@ -61,7 +61,7 @@
                                     </span>
                                 @endif
                             </p>
-                            <a href="{{ route('billing.portal') }}" class="btn btn-primary rounded-pill px-4">
+                            <a href="{{ route('billing.portal') }}" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir o portal seguro do Stripe para cartão, faturas e cancelamento">
                                 Gerir cartão e faturamento (Stripe)
                             </a>
                         </div>
@@ -95,7 +95,7 @@
                         </div>
                         <form action="{{ route('billing.checkout') }}" method="POST">
                             @csrf
-                            <x-primary-button type="submit" class="rounded-pill px-4">
+                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao Stripe Checkout para registar o cartão e iniciar o período de teste">
                                 Registrar cartão e ativar teste
                             </x-primary-button>
                         </form>

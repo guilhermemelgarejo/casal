@@ -58,10 +58,10 @@
                             <h3 class="rt-reminder-card__title mb-0">{{ $title }}</h3>
                             <div class="rt-reminder-card__head-actions">
                                 @if($hasRecurring && $manageUrl)
-                                    <a href="{{ $manageUrl }}" class="btn btn-sm rounded-pill rt-reminder-btn rt-reminder-btn--header @if($reminderPanelHasOverdue) btn-outline-danger @else btn-outline-primary @endif">{{ $manageLabel }}</a>
+                                    <a href="{{ $manageUrl }}" class="btn btn-sm rounded-pill rt-reminder-btn rt-reminder-btn--header @if($reminderPanelHasOverdue) btn-outline-danger @else btn-outline-primary @endif" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir a página de modelos recorrentes">{{ $manageLabel }}</a>
                                 @endif
                                 @if($hasInvoices && $invoiceManageUrl)
-                                    <a href="{{ $invoiceManageUrl }}" class="btn btn-sm rounded-pill rt-reminder-btn rt-reminder-btn--header @if($reminderPanelHasOverdue) btn-outline-danger @else btn-outline-primary @endif">{{ $invoiceManageLabel }}</a>
+                                    <a href="{{ $invoiceManageUrl }}" class="btn btn-sm rounded-pill rt-reminder-btn rt-reminder-btn--header @if($reminderPanelHasOverdue) btn-outline-danger @else btn-outline-primary @endif" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir faturas de cartão">{{ $invoiceManageLabel }}</a>
                                 @endif
                             </div>
                         </div>
@@ -84,7 +84,7 @@
                                                         <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
                                                     </span>
                                                     <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
-                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta">Criar lançamento</a>
+                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
                                                 </div>
                                             </li>
                                         @endforeach
@@ -111,7 +111,7 @@
                                                         @endif
                                                     </span>
                                                     <span class="rt-reminder-list__amount">R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}</span>
-                                                    <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta">Ver fatura</a>
+                                                    <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir o cartão e o período desta fatura">Ver fatura</a>
                                                 </div>
                                             </li>
                                         @endforeach

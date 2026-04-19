@@ -1015,7 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let actions = '';
                 if (!edit.canEditAmount) {
-                    actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-edit-blocked" data-tx-blocked-msg="${editBlockedMsg}" title="Edição não permitida" aria-label="Edição não permitida">${svgTxPencil}</button>`;
+                    actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-edit-blocked" data-bs-toggle="tooltip" data-bs-placement="top" data-tx-blocked-msg="${editBlockedMsg}" title="Edição não permitida" aria-label="Edição não permitida">${svgTxPencil}</button>`;
                 } else {
                     const descBase = escapeHtmlTx(
                         row.description_edit_base != null ? String(row.description_edit_base) : String(row.description || ''),
@@ -1026,18 +1026,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (skipAllowed && skipUrl) {
-                    actions += `<form action="${skipUrl}" method="POST" class="d-inline js-tx-skip-month-form ms-1" data-confirm="Pular mês desta parcela e das parcelas seguintes em +1 mês?"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><button type="submit" class="btn btn-link text-warning btn-sm p-0" aria-label="Pular mês" data-bs-toggle="tooltip" title="Pular mês: desloca esta parcela e as seguintes em +1 mês">${svgTxSkipMonth}</button></form>`;
+                    actions += `<form action="${skipUrl}" method="POST" class="d-inline js-tx-skip-month-form ms-1" data-confirm="Pular mês desta parcela e das parcelas seguintes em +1 mês?"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><button type="submit" class="btn btn-link text-warning btn-sm p-0" aria-label="Pular mês" data-bs-toggle="tooltip" data-bs-placement="top" title="Pular mês: desloca esta parcela e as seguintes em +1 mês">${svgTxSkipMonth}</button></form>`;
                 }
 
                 if (del.paidInvoice) {
-                    actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked ms-1" data-tx-blocked-msg="${escapeHtmlTx(paidMsg)}" title="Exclusão bloqueada" aria-label="Exclusão bloqueada">${svgTxLock}</button>`;
+                    actions += `<button type="button" class="btn btn-link text-secondary btn-sm p-0 js-tx-delete-blocked ms-1" data-bs-toggle="tooltip" data-bs-placement="top" data-tx-blocked-msg="${escapeHtmlTx(paidMsg)}" title="Exclusão bloqueada" aria-label="Exclusão bloqueada">${svgTxLock}</button>`;
                 } else {
-                    actions += `<form action="${destroyUrl}" method="POST" class="d-inline js-tx-delete-form ms-1" data-tx-delete-meta="${delMetaEnc}"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><input type="hidden" name="_method" value="DELETE"><input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope"><button type="submit" class="btn btn-link text-danger btn-sm p-0" title="Excluir" aria-label="Excluir">${svgTxTrash}</button></form>`;
+                    actions += `<form action="${destroyUrl}" method="POST" class="d-inline js-tx-delete-form ms-1" data-tx-delete-meta="${delMetaEnc}"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><input type="hidden" name="_method" value="DELETE"><input type="hidden" name="installment_scope" value="single" class="js-tx-installment-scope"><button type="submit" class="btn btn-link text-danger btn-sm p-0" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir este lançamento" aria-label="Excluir este lançamento">${svgTxTrash}</button></form>`;
                 }
 
                 const faturaCell =
                     statementUrl !== ''
-                        ? `<td><a href="${statementUrl}" class="btn btn-sm btn-link py-0 px-1">Ver fatura</a></td>`
+                        ? `<td><a href="${statementUrl}" class="btn btn-sm btn-link py-0 px-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir esta fatura em Faturas de cartão">Ver fatura</a></td>`
                         : '<td class="small text-secondary">—</td>';
 
                 const regBy =

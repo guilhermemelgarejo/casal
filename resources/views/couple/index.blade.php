@@ -98,23 +98,23 @@
                                     </div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                                    <a href="{{ route('dashboard') }}" class="btn btn-primary rounded-pill px-3">
+                                    <a href="{{ route('dashboard') }}" class="btn btn-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir o painel financeiro">
                                         Ir para o painel
                                     </a>
                                     @if (!empty($canReplayOnboardingTour))
                                         <form action="{{ route('onboarding.restart') }}" method="POST" class="d-inline">
                                             @csrf
-                                            <button type="submit" class="btn btn-outline-primary rounded-pill px-3">
+                                            <button type="submit" class="btn btn-outline-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Reiniciar o tour de introdução no painel">
                                                 Ver tour novamente
                                             </button>
                                         </form>
                                     @endif
-                                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
+                                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" title="Editar nome do casal, renda e alerta de gastos" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
                                         Configurações
                                     </button>
                                     <form action="{{ route('couple.leave') }}" method="POST" data-confirm-title="Sair do casal" data-confirm="Tem certeza de que deseja sair do casal?" data-confirm-accept="Sim, sair" data-confirm-cancel="Cancelar" data-confirm-icon="question">
                                         @csrf
-                                        <button type="submit" class="btn btn-outline-danger rounded-pill px-3">
+                                        <button type="submit" class="btn btn-outline-danger rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Sair deste casal (confirmação será pedida)">
                                             Sair do casal
                                         </button>
                                     </form>
@@ -157,10 +157,10 @@
                             </div>
 
                             <div class="modal-footer">
-                                <x-secondary-button type="button" data-bs-dismiss="modal" class="rounded-pill px-4">
+                                <x-secondary-button type="button" data-bs-dismiss="modal" class="rounded-pill px-4" title="Fechar sem guardar">
                                     Cancelar
                                 </x-secondary-button>
-                                <x-primary-button class="rounded-pill px-4">
+                                <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar nome, renda e limiar de alerta">
                                     Salvar alterações
                                 </x-primary-button>
                             </div>
@@ -181,7 +181,7 @@
                                             @csrf
                                             <div class="input-group">
                                                 <input id="email" name="email" type="email" class="form-control rounded-start-3" placeholder="E-mail do parceiro(a)" value="{{ old('email') }}" required />
-                                                <button type="submit" class="btn btn-primary rounded-end-pill px-4">Enviar</button>
+                                                <button type="submit" class="btn btn-primary rounded-end-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Enviar convite por e-mail">Enviar</button>
                                             </div>
                                             <x-input-error :messages="$errors->get('email')" class="mt-2" />
                                         </form>
@@ -195,7 +195,7 @@
                                             $whatsappUrl = "https://wa.me/?text=" . urlencode($whatsappMessage);
                                         @endphp
                                         <div class="d-flex flex-wrap gap-2">
-                                            <a href="{{ $whatsappUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-success rounded-pill px-4">
+                                            <a href="{{ $whatsappUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-success rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Partilhar o convite no WhatsApp">
                                                 WhatsApp
                                             </a>
 
@@ -203,6 +203,9 @@
                                                 type="button"
                                                 class="btn btn-dark rounded-pill px-4"
                                                 id="copy-invite-link"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Copiar o link de registo com o código de convite"
                                                 data-clipboard-text="{{ $inviteLink }}"
                                                 data-copied-text="Copiado!"
                                             >
@@ -236,7 +239,7 @@
                                         <x-input-error :messages="$errors->get('billing_owner_user_id')" class="mt-2" />
                                     </div>
                                     <div class="col-md-4">
-                                        <button type="submit" class="btn btn-primary rounded-pill px-4 w-100 w-md-auto">
+                                        <button type="submit" class="btn btn-primary rounded-pill px-4 w-100 w-md-auto" data-bs-toggle="tooltip" data-bs-placement="top" title="Definir outro membro como responsável pela assinatura no DuoZen">
                                             Transferir responsabilidade
                                         </button>
                                     </div>

@@ -42,6 +42,9 @@
                         <button
                             type="button"
                             class="btn btn-link btn-sm p-0 text-decoration-none cat-item-card__link-edit"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="top"
+                            title="Editar nome, tipo ou cor desta categoria"
                             data-edit-category='@json($editCat)'
                         >
                             Editar
@@ -50,7 +53,7 @@
                         <form class="cat-item-card__delete-form" action="{{ route('categories.destroy', $category) }}" method="POST" data-confirm-title="Excluir categoria" data-confirm="Deseja excluir esta categoria?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="btn btn-link btn-sm cat-item-card__link-delete p-0 text-danger text-decoration-none" title="Excluir categoria">
+                            <button type="submit" class="btn btn-link btn-sm cat-item-card__link-delete p-0 text-danger text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir esta categoria">
                                 Excluir
                             </button>
                         </form>
@@ -105,7 +108,7 @@
                         aria-label="Meta mensal em reais"
                         inputmode="decimal"
                     />
-                    <button type="submit" class="btn btn-sm btn-primary cat-item-card__budget-submit px-3 flex-shrink-0">Salvar</button>
+                    <button type="submit" class="btn btn-sm btn-primary cat-item-card__budget-submit px-3 flex-shrink-0" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar a meta de orçamento deste mês para a categoria">Salvar</button>
                 </form>
                 @if ($isBudgetErrorRow)
                     <x-input-error :messages="$errors->get('category_id')" class="mt-1 small" />

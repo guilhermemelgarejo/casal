@@ -13,6 +13,7 @@
             <button
                 type="button"
                 class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0 js-rt-open-new"
+                title="Criar modelo de lançamento recorrente"
                 data-bs-toggle="modal"
                 data-bs-target="#modalRecurringForm"
                 id="btnRtNew"
@@ -83,7 +84,7 @@
                     </div>
                     <p class="fw-semibold text-body mb-1">Nenhum modelo ainda</p>
                     <p class="small text-secondary mb-4 mx-auto" style="max-width: 22rem;">Crie o primeiro para aluguel, assinaturas ou salários — depois use o lembrete para lançar no mês.</p>
-                    <button type="button" class="btn btn-primary rounded-pill px-4 js-rt-open-new" data-bs-toggle="modal" data-bs-target="#modalRecurringForm">
+                    <button type="button" class="btn btn-primary rounded-pill px-4 js-rt-open-new" title="Criar modelo de lançamento recorrente" data-bs-toggle="modal" data-bs-target="#modalRecurringForm">
                         Criar primeiro modelo
                     </button>
                 </div>
@@ -137,17 +138,20 @@
                                         </div>
                                         <div class="rt-item-card__toolbar d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
                                             @if(!$item->hasGeneratedForCalendarMonth(now()->year, now()->month))
-                                                <a href="{{ route('dashboard', ['prefill_recurring' => $item->id, 'period' => now()->format('Y-m')]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3">Criar lançamento</a>
+                                                <a href="{{ route('dashboard', ['prefill_recurring' => $item->id, 'period' => now()->format('Y-m')]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
                                             @endif
                                             <button
                                                 type="button"
                                                 class="btn btn-sm rt-item-card__btn-edit rounded-pill px-3 btn-rt-edit"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Alterar valor, dia, conta ou categorias do modelo"
                                                 data-rt-edit-id="{{ $item->id }}"
                                             >Editar</button>
                                             <form method="POST" action="{{ route('recurring-transactions.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remover este modelo? Lançamentos já gerados não serão apagados.');">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3">Excluir</button>
+                                                <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Remover este modelo (lançamentos já criados mantêm-se)">Excluir</button>
                                             </form>
                                         </div>
                                     </div>
@@ -285,8 +289,8 @@
                         </div>
 
                         <div class="modal-footer border-0 px-0 pb-0 pt-2">
-                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="rt-submit-btn">Guardar</button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" title="Fechar sem guardar" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="rt-submit-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar ou atualizar o modelo recorrente">Guardar</button>
                         </div>
                     </form>
                 </div>
