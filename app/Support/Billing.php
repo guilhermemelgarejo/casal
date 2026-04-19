@@ -25,7 +25,7 @@ class Billing
     }
 
     /**
-     * Persiste ou atualiza a subscrição local a partir do objeto Stripe (p.ex. após Checkout).
+     * Persiste ou atualiza a assinatura local a partir do objeto Stripe (p.ex. após Checkout).
      * Idempotente com o webhook customer.subscription.*.
      */
     public static function syncSubscriptionFromStripeSubscription(User $user, StripeSubscription $stripe): void

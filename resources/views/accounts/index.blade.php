@@ -20,7 +20,7 @@
                         type="button"
                         class="btn btn-outline-primary rounded-pill px-4 py-2 flex-shrink-0"
                         id="btn-account-transfer"
-                        title="Registar transferência entre contas correntes"
+                        title="Registrar transferência entre contas correntes"
                         data-bs-toggle="modal"
                         data-bs-target="#modalAccountTransfer"
                     >
@@ -190,7 +190,7 @@
 
                     <div class="modal-footer flex-wrap gap-2 border-top">
                         <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem cadastrar" data-bs-dismiss="modal">Cancelar</button>
-                        <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar a nova conta ou cartão">Cadastrar</x-primary-button>
+                        <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar a nova conta ou cartão">Cadastrar</x-primary-button>
                     </div>
                 </form>
             </div>
@@ -318,7 +318,7 @@
 
                         <div class="modal-footer flex-wrap gap-2 border-top">
                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem transferir" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registar a transferência entre as contas escolhidas">Confirmar transferência</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar a transferência entre as contas escolhidas">Confirmar transferência</button>
                         </div>
                     </form>
                 </div>

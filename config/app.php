@@ -61,7 +61,7 @@ return [
     |
     | Here you may specify the default timezone for your application, which
     | will be used by the PHP date and date-time functions. Define APP_TIMEZONE
-    | no .env (ex.: America/Sao_Paulo) para alinhar datas com o utilizador.
+    | no .env (ex.: America/Sao_Paulo) para alinhar datas com o usuário.
     |
     */
 

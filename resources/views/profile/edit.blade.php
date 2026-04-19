@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div>
             <h2 class="h5 mb-0 profile-page-title">Perfil</h2>
-            <p class="small text-secondary mb-0 mt-1">Dados da conta, senha e opção de excluir o utilizador. Alterações aplicam-se só a si.</p>
+            <p class="small text-secondary mb-0 mt-1">Dados da conta, senha e opção de excluir o usuário. Alterações aplicam-se só a você.</p>
         </div>
     </x-slot>
 

@@ -203,7 +203,7 @@
                             Cancelar
                         </x-secondary-button>
                         <div class="ms-auto">
-                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar a categoria com os dados indicados">
+                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar a categoria com os dados indicados">
                                 <span id="category-submit-label">{{ $catFormMode === 'category-update' ? 'Atualizar' : 'Salvar' }}</span>
                             </x-primary-button>
                         </div>

@@ -20,7 +20,7 @@ class Category extends Model
     public const SYSTEM_KEY_INTERNAL_TRANSFER_INCOME = 'internal_transfer_income';
 
     /**
-     * Nome por omissão ao criar o casal (texto mostrado na UI).
+     * Nome padrão ao criar o casal (texto mostrado na UI).
      */
     public const NAME_CREDIT_CARD_INVOICE_PAYMENT = 'Pagamento fatura cartão';
 
@@ -115,7 +115,7 @@ class Category extends Model
     }
 
     /**
-     * Categorias que o utilizador pode escolher em orçamento e no formulário de Lançamentos.
+     * Categorias que o usuário pode escolher em orçamento e no formulário de Lançamentos.
      */
     public function scopeExcludingCreditCardInvoicePayment(Builder $query): Builder
     {

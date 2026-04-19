@@ -204,7 +204,7 @@
                                 <button
                                     type="button"
                                     class="btn btn-outline-primary rounded-pill px-3"
-                                    title="Registar transferência entre contas correntes (despesa na origem e receita no destino)"
+                                    title="Registrar transferência entre contas correntes (despesa na origem e receita no destino)"
                                     data-bs-toggle="modal"
                                     data-bs-target="#modalAccountTransfer"
                                 >
@@ -214,7 +214,7 @@
                             <button
                                 type="button"
                                 class="btn btn-outline-success rounded-pill px-3"
-                                title="Registar uma receita no período selecionado"
+                                title="Registrar uma receita no período selecionado"
                                 data-bs-toggle="modal"
                                 data-bs-target="#modalNewTransaction"
                                 data-tx-open-preset="income"
@@ -224,7 +224,7 @@
                             <button
                                 type="button"
                                 class="btn btn-outline-danger rounded-pill px-3"
-                                title="Registar uma despesa no período selecionado"
+                                title="Registrar uma despesa no período selecionado"
                                 data-bs-toggle="modal"
                                 data-bs-target="#modalNewTransaction"
                                 data-tx-open-preset="expense"
@@ -361,7 +361,7 @@
 
                         <div class="modal-footer flex-wrap gap-2 border-top">
                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem transferir" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registar a transferência entre as contas escolhidas">Confirmar transferência</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar a transferência entre as contas escolhidas">Confirmar transferência</button>
                         </div>
                     </form>
                 </div>

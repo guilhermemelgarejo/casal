@@ -1163,7 +1163,7 @@ class TransactionController extends Controller
     }
 
     /**
-     * Pula 1 mês da fatura para um parcelamento no cartão, deslocando as parcelas
+     * Pula 1 mês da fatura para um parcelamento no cartão, adiando as parcelas
      * a partir da parcela clicada (mantém a quantidade total).
      */
     public function skipInstallmentMonth(Request $request, Transaction $transaction)

@@ -67,7 +67,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Casal com acesso: algum membro tem subscrição Stripe válida (inclui período de teste com trial).
+     * Casal com acesso: algum membro tem assinatura Stripe válida (inclui período de teste com trial).
      */
     public function coupleHasBillingAccess(): bool
     {

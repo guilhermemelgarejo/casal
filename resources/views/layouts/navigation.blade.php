@@ -11,7 +11,7 @@
         <button
             class="navbar-toggler app-navbar-toggler border-0 shadow-sm"
             type="button"
-            title="Abrir ou fechar o menu em ecrãs pequenos"
+            title="Abrir ou fechar o menu em telas pequenas"
             data-bs-toggle="collapse"
             data-bs-target="#mainNavbar"
             aria-controls="mainNavbar"

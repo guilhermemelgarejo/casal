@@ -173,8 +173,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem guardar alterações" data-bs-dismiss="modal">Cancelar</button>
-                        <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar descrição, valor e categorias">Salvar</x-primary-button>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem salvar alterações" data-bs-dismiss="modal">Cancelar</button>
+                        <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar descrição, valor e categorias">Salvar</x-primary-button>
                     </div>
                 </form>
             </div>
@@ -473,7 +473,7 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem criar lançamento" data-bs-dismiss="modal">Cancelar</button>
-                            <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registar o lançamento no painel">Salvar lançamento</x-primary-button>
+                            <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar o lançamento no painel">Salvar lançamento</x-primary-button>
                         </div>
                     </form>
                 @endif

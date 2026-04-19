@@ -71,7 +71,7 @@ class BillingController extends Controller
         $sessionId = $request->query('session_id');
         if (! is_string($sessionId) || $sessionId === '') {
             return redirect()->route('billing.index')
-                ->with('error', 'Falta identificar a sessão de pagamento. Se o cartão já foi aceite, abra outra vez a página Assinatura ou aguarde a confirmação por webhook.');
+                ->with('error', 'Falta identificar a sessão de pagamento. Se o cartão já foi aceito, abra novamente a página Assinatura ou aguarde a confirmação por webhook.');
         }
 
         $user = $request->user();
@@ -85,7 +85,7 @@ class BillingController extends Controller
 
             if ($session->mode !== 'subscription' || empty($session->subscription)) {
                 return redirect()->route('billing.index')
-                    ->with('error', 'Esta sessão não corresponde a uma subscrição.');
+                    ->with('error', 'Esta sessão não corresponde a uma assinatura.');
             }
 
             $subscriptionId = is_string($session->subscription)
@@ -99,14 +99,14 @@ class BillingController extends Controller
             Billing::syncSubscriptionFromStripeSubscription($user, $stripeSubscription);
             $user->updateDefaultPaymentMethodFromStripe();
         } catch (ApiErrorException $e) {
-            Log::error('Falha ao sincronizar subscrição após Stripe Checkout', [
+            Log::error('Falha ao sincronizar assinatura após Stripe Checkout', [
                 'user_id' => $user->id,
                 'session_id' => $sessionId,
                 'message' => $e->getMessage(),
             ]);
 
             return redirect()->route('billing.index')
-                ->with('error', 'Não foi possível confirmar a assinatura com o Stripe. Tente de novo ou verifique a ligação e o webhook.');
+                ->with('error', 'Não foi possível confirmar a assinatura com o Stripe. Tente de novo ou verifique a conexão com a internet e o webhook.');
         }
 
         return redirect()->route('dashboard')

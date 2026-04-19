@@ -131,7 +131,7 @@
                     @endif
 
                     <div class="d-flex flex-wrap gap-2 pt-1">
-                        <x-primary-button type="submit" class="rounded-pill" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar alterações a nome, cor, vencimento ou limite">Salvar alterações</x-primary-button>
+                        <x-primary-button type="submit" class="rounded-pill" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar alterações de nome, cor, vencimento ou limite">Salvar alterações</x-primary-button>
                         <button type="button" class="btn btn-outline-secondary rounded-pill" title="Fechar o formulário sem sair da página" data-bs-toggle="collapse" data-bs-target="#edit-account-{{ $account->id }}">Fechar</button>
                     </div>
                 </form>

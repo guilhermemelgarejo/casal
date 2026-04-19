@@ -49,7 +49,7 @@
                     @if ($isSubscriber)
                         <div class="billing-card-head billing-card-head--success">
                             <h3 class="h5 mb-1 fw-semibold">Plano ativo</h3>
-                            <p class="small text-secondary mb-0">O casal tem subscrição válida nesta conta.</p>
+                            <p class="small text-secondary mb-0">O casal tem assinatura válida nesta conta.</p>
                         </div>
                         <div class="billing-card-body">
                             <p class="mb-3 text-body">
@@ -62,13 +62,13 @@
                                 @endif
                             </p>
                             <a href="{{ route('billing.portal') }}" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir o portal seguro do Stripe para cartão, faturas e cancelamento">
-                                Gerir cartão e faturamento (Stripe)
+                                Gerenciar cartão e faturamento (Stripe)
                             </a>
                         </div>
                     @else
                         <div class="billing-card-head billing-card-head--info">
                             <h3 class="h5 mb-1 fw-semibold">Acesso pelo parceiro</h3>
-                            <p class="small text-secondary mb-0">Não precisa registar cartão outra vez.</p>
+                            <p class="small text-secondary mb-0">Não precisa cadastrar o cartão de novo.</p>
                         </div>
                         <div class="billing-card-body">
                             <p class="mb-0 text-secondary">
@@ -95,7 +95,7 @@
                         </div>
                         <form action="{{ route('billing.checkout') }}" method="POST">
                             @csrf
-                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao Stripe Checkout para registar o cartão e iniciar o período de teste">
+                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao Stripe Checkout para cadastrar o cartão e iniciar o período de teste">
                                 Registrar cartão e ativar teste
                             </x-primary-button>
                         </form>

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 trait PreparesTransactionModalPayload
 {
     /**
-     * Dados partilhados pelos modais de novo lançamento / edição rápida (Lançamentos e Painel).
+     * Dados compartilhados pelos modais de novo lançamento / edição rápida (Lançamentos e Painel).
      *
      * @return array<string, mixed>
      */

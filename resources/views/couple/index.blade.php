@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div>
             <h2 class="h5 mb-0 couple-page-title">Gerenciar casal</h2>
-            <p class="small text-secondary mb-0 mt-1">Crie ou entre num espaço partilhado, convide o parceiro e ajuste nome, renda e alerta de gastos.</p>
+            <p class="small text-secondary mb-0 mt-1">Crie ou entre em um espaço compartilhado, convide o parceiro e ajuste nome, renda e alerta de gastos.</p>
         </div>
     </x-slot>
 
@@ -54,7 +54,7 @@
                         <div class="card border-0 shadow-sm overflow-hidden couple-choice-card h-100">
                             <div class="couple-choice-head couple-choice-head--join px-4 py-3">
                                 <h3 class="h5 mb-1 fw-semibold">Entrar num casal existente</h3>
-                                <p class="small text-secondary mb-0">Use o código que o parceiro partilhou no registo ou por mensagem.</p>
+                                <p class="small text-secondary mb-0">Use o código que o parceiro compartilhou no cadastro ou por mensagem.</p>
                             </div>
                             <div class="card-body p-4">
                                 <form action="{{ route('couple.join') }}" method="POST" class="vstack gap-3">
@@ -150,17 +150,17 @@
                                     <div>
                                         <x-input-label for="spending_alert_threshold" value="Alerta de gastos (%)" />
                                         <x-text-input id="spending_alert_threshold" name="spending_alert_threshold" type="number" step="0.01" class="mt-1" value="{{ $couple->spending_alert_threshold }}" required />
-                                        <p class="form-text mb-0">Aviso no painel quando os gastos atingirem esta percentagem da renda mensal.</p>
+                                        <p class="form-text mb-0">Aviso no painel quando os gastos atingirem essa porcentagem da renda mensal.</p>
                                         <x-input-error :messages="$errors->get('spending_alert_threshold')" class="mt-2" />
                                     </div>
                                 </div>
                             </div>
 
                             <div class="modal-footer">
-                                <x-secondary-button type="button" data-bs-dismiss="modal" class="rounded-pill px-4" title="Fechar sem guardar">
+                                <x-secondary-button type="button" data-bs-dismiss="modal" class="rounded-pill px-4" title="Fechar sem salvar">
                                     Cancelar
                                 </x-secondary-button>
-                                <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar nome, renda e limiar de alerta">
+                                <x-primary-button class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar nome, renda e limite do alerta de gastos">
                                     Salvar alterações
                                 </x-primary-button>
                             </div>
@@ -171,7 +171,7 @@
                         <div class="card border-0 shadow-sm overflow-hidden couple-invite-card">
                             <div class="couple-invite-head px-4 py-3">
                                 <h3 class="h5 mb-1 fw-semibold">Convidar parceiro(a)</h3>
-                                <p class="small text-secondary mb-0">Até dois membros por casal. Envie e-mail ou partilhe o link.</p>
+                                <p class="small text-secondary mb-0">Até dois membros por casal. Envie e-mail ou compartilhe o link.</p>
                             </div>
                             <div class="card-body p-4">
                                 <div class="row g-4">
@@ -188,14 +188,14 @@
                                     </div>
 
                                     <div class="col-md-6">
-                                        <p class="small fw-semibold text-secondary text-uppercase mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Partilhar link</p>
+                                        <p class="small fw-semibold text-secondary text-uppercase mb-2" style="font-size: 0.65rem; letter-spacing: 0.05em;">Compartilhar link</p>
                                         @php
                                             $inviteLink = route('register', ['invite_code' => $couple->invite_code]);
                                             $whatsappMessage = "Olá! Vamos gerenciar nossas finanças juntos? Use meu código de convite: " . $couple->invite_code . " ou clique no link para se cadastrar: " . $inviteLink;
                                             $whatsappUrl = "https://wa.me/?text=" . urlencode($whatsappMessage);
                                         @endphp
                                         <div class="d-flex flex-wrap gap-2">
-                                            <a href="{{ $whatsappUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-success rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Partilhar o convite no WhatsApp">
+                                            <a href="{{ $whatsappUrl }}" target="_blank" rel="noopener noreferrer" class="btn btn-success rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Compartilhar o convite no WhatsApp">
                                                 WhatsApp
                                             </a>
 
@@ -205,7 +205,7 @@
                                                 id="copy-invite-link"
                                                 data-bs-toggle="tooltip"
                                                 data-bs-placement="top"
-                                                title="Copiar o link de registo com o código de convite"
+                                                title="Copiar o link de cadastro com o código de convite"
                                                 data-clipboard-text="{{ $inviteLink }}"
                                                 data-copied-text="Copiado!"
                                             >
@@ -222,7 +222,7 @@
                         <div class="card border-0 shadow-sm overflow-hidden couple-invite-card">
                             <div class="couple-invite-head px-4 py-3">
                                 <h3 class="h5 mb-1 fw-semibold">Responsável pela assinatura</h3>
-                                <p class="small text-secondary mb-0">Quem sai do casal enquanto ainda é responsável pela assinatura precisa transferir esse papel ao parceiro(a). Isto atualiza quem aparece como titular no DuoZen; o cartão e a subscrição no Stripe continuam na conta de quem ativou o plano até cancelar ou alterar no portal.</p>
+                                <p class="small text-secondary mb-0">Quem sai do casal enquanto ainda é responsável pela assinatura precisa transferir esse papel ao parceiro(a). Isso atualiza quem aparece como titular no DuoZen; o cartão e a assinatura no Stripe continuam na conta de quem ativou o plano até cancelar ou alterar no portal.</p>
                             </div>
                             <div class="card-body p-4">
                                 <form action="{{ route('couple.transfer-billing-owner') }}" method="POST" class="row g-3 align-items-end">

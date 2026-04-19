@@ -312,7 +312,7 @@ class RecurringTransactionTest extends TestCase
 
             $this->assertStringContainsString('rt-reminder-card', $html);
             $this->assertStringContainsString('Lembretes deste mês', $html);
-            $this->assertStringContainsString('Gerir modelos', $html);
+            $this->assertStringContainsString('Gerenciar modelos', $html);
             $this->assertStringContainsString('rt-reminder-btn--header', $html);
             $this->assertStringContainsString('Aluguel', $html);
             $this->assertStringContainsString('Dia previsto:', $html);

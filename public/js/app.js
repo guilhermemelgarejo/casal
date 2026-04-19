@@ -1,6 +1,6 @@
 /**
  * Scripts da aplicação (sem bundler).
- * Requer Bootstrap 5 bundle (global `bootstrap`) carregado antes deste ficheiro.
+ * Requer Bootstrap 5 bundle (global `bootstrap`) carregado antes deste arquivo.
  */
 document.addEventListener('DOMContentLoaded', () => {
     const bs = typeof bootstrap !== 'undefined' ? bootstrap : window.bootstrap;
@@ -1026,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (skipAllowed && skipUrl) {
-                    actions += `<form action="${skipUrl}" method="POST" class="d-inline js-tx-skip-month-form ms-1" data-confirm="Pular mês desta parcela e das parcelas seguintes em +1 mês?"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><button type="submit" class="btn btn-link text-warning btn-sm p-0" aria-label="Pular mês" data-bs-toggle="tooltip" data-bs-placement="top" title="Pular mês: desloca esta parcela e as seguintes em +1 mês">${svgTxSkipMonth}</button></form>`;
+                    actions += `<form action="${skipUrl}" method="POST" class="d-inline js-tx-skip-month-form ms-1" data-confirm="Pular mês desta parcela e das parcelas seguintes em +1 mês?"><input type="hidden" name="_token" value="${escapeHtmlTx(csrf)}"><button type="submit" class="btn btn-link text-warning btn-sm p-0" aria-label="Pular mês" data-bs-toggle="tooltip" data-bs-placement="top" title="Pular mês: adia esta parcela e as seguintes em +1 mês">${svgTxSkipMonth}</button></form>`;
                 }
 
                 if (del.paidInvoice) {

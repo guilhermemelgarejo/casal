@@ -75,9 +75,9 @@
                                 @guest
                                     @if (Route::has('register'))
                                         <div class="d-flex flex-column flex-sm-row gap-2 gap-sm-3 justify-content-center justify-content-lg-start mb-3">
-                                            <a href="{{ route('register') }}" class="btn btn-primary btn-lg px-4 shadow-sm" title="Registar-se e começar o período de teste">Criar conta grátis</a>
+                                            <a href="{{ route('register') }}" class="btn btn-primary btn-lg px-4 shadow-sm" title="Cadastrar-se e começar o período de teste">Criar conta grátis</a>
                                             @if (Route::has('login'))
-                                                <a href="{{ route('login') }}" class="btn btn-outline-secondary btn-lg px-4" title="Entrar com e-mail e palavra-passe">Já tenho conta</a>
+                                                <a href="{{ route('login') }}" class="btn btn-outline-secondary btn-lg px-4" title="Entrar com e-mail e senha">Já tenho conta</a>
                                             @endif
                                         </div>
                                         <p class="small text-secondary mb-0">Leva poucos minutos. Depois criem ou entrem no casal, ativem o plano (teste grátis com cartão) e comecem a lançar.</p>
@@ -190,7 +190,7 @@
                             <div class="container text-center py-md-2">
                                 <h2 class="h3 fw-bold mb-2">Prontos para alinhar as finanças?</h2>
                                 <p class="cta-subtle mb-4 col-md-8 mx-auto">Crie sua conta, montem o casal, ativem o plano com período de teste e comecem a registrar em minutos — com a mesma clareza que vocês merecem.</p>
-                                <a href="{{ route('register') }}" class="btn btn-light btn-lg px-5 fw-semibold shadow" title="Registar-se e começar o período de teste">Criar conta grátis</a>
+                                <a href="{{ route('register') }}" class="btn btn-light btn-lg px-5 fw-semibold shadow" title="Cadastrar-se e começar o período de teste">Criar conta grátis</a>
                                 @if (Route::has('login'))
                                     <p class="small cta-subtle mt-3 mb-0">
                                         Já usa o sistema? <a href="{{ route('login') }}" class="text-white fw-semibold">Entrar</a>

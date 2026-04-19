@@ -10,7 +10,7 @@
         <form action="{{ route('budgets.income') }}" method="POST" class="d-flex align-items-center flex-nowrap gap-2">
             @csrf
             <input type="number" name="monthly_income" class="form-control form-control-sm rounded-3 budget-income-editor__input" step="0.01" value="{{ Auth::user()->couple->monthly_income }}" required aria-label="Valor da renda mensal" />
-            <button type="submit" class="btn btn-success btn-sm rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar o valor da renda mensal">Salvar</button>
+            <button type="submit" class="btn btn-success btn-sm rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar o valor da renda mensal">Salvar</button>
             <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="btn-income-cancel" data-bs-toggle="tooltip" data-bs-placement="top" title="Descartar alterações e voltar ao valor atual">Cancelar</button>
         </form>
     </div>

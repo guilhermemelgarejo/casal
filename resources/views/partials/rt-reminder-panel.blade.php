@@ -2,8 +2,8 @@
     Lembretes: modelos recorrentes + faturas de cartão em aberto (painel e /recorrentes).
     Obrigatório: $reminders (collection de RecurringTransaction), $month (int), $year (int).
     Opcional: $invoiceReminders (collection de arrays — ver CreditCardInvoiceReminders::openStatementsForCouple);
-    $title, $description (HTML); $manageUrl (omissão = /recorrentes; vazio oculta), $manageLabel;
-    $invoiceManageUrl (omissão = faturas-cartão sem filtro), $invoiceManageLabel
+    $title, $description (HTML); $manageUrl (padrão = /recorrentes; vazio oculta), $manageLabel;
+    $invoiceManageUrl (padrão = faturas-cartão sem filtro), $invoiceManageLabel
 --}}
 @php
     $invoiceReminders = $invoiceReminders ?? collect();
@@ -32,7 +32,7 @@
     }
 
     $manageUrl = $manageUrl ?? route('recurring-transactions.index');
-    $manageLabel = $manageLabel ?? 'Gerir modelos';
+    $manageLabel = $manageLabel ?? 'Gerenciar modelos';
     $invoiceManageUrl = $invoiceManageUrl ?? route('credit-card-statements.index');
     $invoiceManageLabel = $invoiceManageLabel ?? 'Ver faturas';
 

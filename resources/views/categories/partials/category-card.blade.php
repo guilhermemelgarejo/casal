@@ -108,7 +108,7 @@
                         aria-label="Meta mensal em reais"
                         inputmode="decimal"
                     />
-                    <button type="submit" class="btn btn-sm btn-primary cat-item-card__budget-submit px-3 flex-shrink-0" data-bs-toggle="tooltip" data-bs-placement="top" title="Guardar a meta de orçamento deste mês para a categoria">Salvar</button>
+                    <button type="submit" class="btn btn-sm btn-primary cat-item-card__budget-submit px-3 flex-shrink-0" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar a meta de orçamento deste mês para a categoria">Salvar</button>
                 </form>
                 @if ($isBudgetErrorRow)
                     <x-input-error :messages="$errors->get('category_id')" class="mt-1 small" />

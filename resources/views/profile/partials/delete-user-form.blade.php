@@ -1,7 +1,7 @@
 <section class="card border-0 shadow-sm profile-section-card mb-4">
     <div class="profile-section-head profile-section-head--danger">
         <h2 class="h5 mb-1 fw-semibold text-danger">Zona de risco</h2>
-        <p class="small text-secondary mb-0">Excluir a conta remove os seus dados de utilizador de forma permanente. O casal e os dados partilhados podem continuar a existir para o outro membro.</p>
+        <p class="small text-secondary mb-0">Excluir a conta remove seus dados de usuário de forma permanente. O casal e os dados compartilhados podem continuar a existir para o outro membro.</p>
     </div>
 
     <div class="card-body p-4">

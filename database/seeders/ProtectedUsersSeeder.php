@@ -9,9 +9,9 @@ use Illuminate\Database\Seeder;
 
 /**
  * Contas fixas do projeto (ver `.cursor/rules/usuarios-existentes.mdc`).
- * Utilizadores: `firstOrCreate` por e-mail — não sobrescreve nome/senha de quem já existe.
+ * Usuários: `firstOrCreate` por e-mail — não sobrescreve nome/senha de quem já existe.
  * Casal de desenvolvimento: criado/atualizado por `invite_code` fixo; categorias padrão só se o casal não tiver nenhuma.
- * `couple_id` só é preenchido quando está vazio (não desfaz casal que o utilizador já tenha configurado).
+ * `couple_id` só é preenchido quando está vazio (não desfaz casal que o usuário já tenha configurado).
  */
 class ProtectedUsersSeeder extends Seeder
 {

@@ -16,7 +16,7 @@
                     </div>
                     @if ($subscriptions->total() > 0)
                         <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle px-3 py-2 fw-semibold">
-                            {{ $subscriptions->total() }} {{ $subscriptions->total() === 1 ? 'registo' : 'registos' }}
+                            {{ $subscriptions->total() }} {{ $subscriptions->total() === 1 ? 'registro' : 'registros' }}
                         </span>
                     @endif
                 </div>
@@ -25,7 +25,7 @@
                     <table class="table table-hover align-middle mb-0 admin-subs-table">
                         <thead>
                             <tr>
-                                <th class="ps-4">Utilizador</th>
+                                <th class="ps-4">Usuário</th>
                                 <th>Casal</th>
                                 <th>Tipo</th>
                                 <th>Estado Stripe</th>
@@ -77,7 +77,7 @@
                                 <tr>
                                     <td colspan="7" class="p-0">
                                         <div class="admin-subs-empty text-center py-5 px-3">
-                                            <p class="fw-semibold text-body mb-1">Nenhuma subscrição</p>
+                                            <p class="fw-semibold text-body mb-1">Nenhuma assinatura</p>
                                             <p class="small text-secondary mb-0 mx-auto" style="max-width: 22rem;">Ainda não há linhas na tabela <code class="small">subscriptions</code> ou a página filtrada está vazia.</p>
                                         </div>
                                     </td>

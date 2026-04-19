@@ -151,7 +151,7 @@
                                             <form method="POST" action="{{ route('recurring-transactions.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remover este modelo? Lançamentos já gerados não serão apagados.');">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Remover este modelo (lançamentos já criados mantêm-se)">Excluir</button>
+                                                <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Remover este modelo (os lançamentos já criados permanecem no histórico)">Excluir</button>
                                             </form>
                                         </div>
                                     </div>
@@ -289,8 +289,8 @@
                         </div>
 
                         <div class="modal-footer border-0 px-0 pb-0 pt-2">
-                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" title="Fechar sem guardar" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="rt-submit-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar ou atualizar o modelo recorrente">Guardar</button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" title="Fechar sem salvar" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="rt-submit-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar ou atualizar o modelo recorrente">Salvar</button>
                         </div>
                     </form>
                 </div>
