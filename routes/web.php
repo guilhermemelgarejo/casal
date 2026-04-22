@@ -5,13 +5,19 @@ use App\Http\Controllers\AccountTransferController;
 use App\Http\Controllers\Admin\SubscriptionAdminController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\BudgetReportController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CoupleController;
+use App\Http\Controllers\CreditCardCycleReportController;
 use App\Http\Controllers\CreditCardStatementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardWidgetsController;
+use App\Http\Controllers\FinancialProjectController;
+use App\Http\Controllers\MonthClosingController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurringTransactionController;
+use App\Http\Controllers\StatementExtractController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +30,21 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::post('/onboarding/restart', [OnboardingController::class, 'restart'])->name('onboarding.restart');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/widgets', [DashboardWidgetsController::class, 'update'])->name('dashboard.widgets.update');
+
+    Route::get('/fechamento', [MonthClosingController::class, 'show'])->name('month-closing.show');
+    Route::get('/relatorios/orcamento', [BudgetReportController::class, 'index'])->name('reports.budget-vs-actual');
+    Route::get('/extrato', [StatementExtractController::class, 'index'])->name('reports.statement-extract');
+    Route::get('/relatorios/fatura-cartao/{account}/{referenceYear}/{referenceMonth}', [CreditCardCycleReportController::class, 'show'])
+        ->whereNumber(['referenceYear', 'referenceMonth'])
+        ->name('reports.credit-card-cycle');
+
+    Route::resource('cofrinhos', FinancialProjectController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
+    Route::post('/cofrinhos/{cofrinho}/juros', [FinancialProjectController::class, 'storeInterest'])
+        ->name('cofrinhos.interest.store');
+    Route::delete('/cofrinhos/juros/{entry}', [FinancialProjectController::class, 'destroyInterest'])
+        ->name('cofrinhos.interest.destroy');
 
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');

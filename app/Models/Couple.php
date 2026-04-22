@@ -51,4 +51,24 @@ class Couple extends Model
     {
         return $this->hasMany(CreditCardStatement::class);
     }
+
+    public function plannedIncomeVersions()
+    {
+        return $this->hasMany(CouplePlannedIncome::class);
+    }
+
+    public function financialProjects()
+    {
+        return $this->hasMany(FinancialProject::class);
+    }
+
+    public function resolvePlannedMonthlyIncomeForMonth(int $year, int $month): float
+    {
+        $v = CouplePlannedIncome::amountVigenteForMonth((int) $this->id, $year, $month);
+        if ($v !== null) {
+            return $v;
+        }
+
+        return (float) ($this->monthly_income ?? 0);
+    }
 }

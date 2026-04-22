@@ -581,6 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const precheck = btn.getAttribute('data-tx-precheck') || '';
             const txType = btn.getAttribute('data-tx-type') || '';
             const allocRaw = btn.getAttribute('data-tx-allocations') || '';
+            const fpId = btn.getAttribute('data-tx-financial-project-id') || '';
             txEditForm.setAttribute('action', action);
             txEditForm.dataset.txEditPrecheckUrl = precheck;
             const amtInput = txEditForm.querySelector('[name="amount"]');
@@ -621,6 +622,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 filterSplitCatsInWrap(allocWrap, txType);
+            }
+
+            const fpWrap = document.getElementById('edit-tx-cofrinho-wrapper');
+            const fpSel = document.getElementById('edit-financial-project-id');
+            const isCreditTx = btn.getAttribute('data-tx-is-credit') === '1';
+            if (fpWrap) {
+                fpWrap.classList.toggle('d-none', isCreditTx);
+            }
+            if (fpSel) {
+                fpSel.value = !isCreditTx && fpId ? String(fpId) : '';
             }
             const prevTok = txEditForm.querySelector('input[name="credit_limit_confirm_token"]');
             if (prevTok) {
@@ -1158,6 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const fundingInput = document.getElementById('tx-funding');
+        const cofrinhoWrap = document.getElementById('tx-cofrinho-wrapper');
         const pmInput = document.getElementById('tx-payment-method');
         const paymentFlow = document.getElementById('payment_flow');
         const destWrap = document.getElementById('tx-destination-wrap');
@@ -1166,6 +1178,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const noAccountHint = document.getElementById('tx-no-account-hint');
         const accountMeta = document.getElementById('tx-account-meta');
         const oldAccountId = txForm.dataset.txOldAccountId || '';
+
+        const syncCofrinhoSection = () => {
+            if (!cofrinhoWrap || !fundingInput) {
+                return;
+            }
+            const isCredit = fundingInput.value === 'credit_card';
+            cofrinhoWrap.classList.toggle('d-none', isCredit);
+            if (isCredit) {
+                const fpSel = document.getElementById('financial_project_id');
+                if (fpSel) {
+                    fpSel.value = '';
+                }
+            }
+        };
 
         const syncInstallments = (isCredit) => {
             if (creditSection) {
@@ -1320,6 +1346,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (noAccountHint) noAccountHint.classList.add('d-none');
                 setAccountMetaText('');
                 syncInstallments(false);
+                syncCofrinhoSection();
                 return;
             }
 
@@ -1339,6 +1366,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (noAccountHint) noAccountHint.classList.add('d-none');
                 syncInstallments(true);
                 syncAccountMeta();
+                syncCofrinhoSection();
             } else {
                 fundingInput.value = 'account';
                 if (pmInput) {
@@ -1359,12 +1387,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 syncInstallments(false);
                 syncAccountMeta();
+                syncCofrinhoSection();
             }
         };
 
         if (mode === 'cards_only') {
             syncInstallments(true);
             syncAccountMeta();
+            syncCofrinhoSection();
         } else if (paymentFlow && accountSel) {
             paymentFlow.addEventListener('change', () => {
                 applyPaymentFlow(paymentFlow.value);
@@ -1380,6 +1410,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncAccountMeta();
             });
         }
+
+        txForm.addEventListener('change', (e) => {
+            const t = e.target;
+            if (!t || !t.classList?.contains?.('js-tx-split-cat')) {
+                return;
+            }
+            if (!t.closest('#form-new-transaction')) {
+                return;
+            }
+            const opt = t.selectedOptions[0];
+            const mark = opt?.getAttribute('data-tx-cofrinho');
+            if (!mark || mark === '0') {
+                return;
+            }
+            const wrap = document.getElementById('tx-cofrinho-wrapper');
+            if (wrap && !wrap.classList.contains('d-none')) {
+                wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        });
 
         const modalNewTx = document.getElementById('modalNewTransaction');
         if (modalNewTx) {
@@ -1580,6 +1629,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             delete txForm.dataset.txCreditLimitSubmitting;
             delete txForm.dataset.txRecurringPrefill;
+            delete txForm.dataset.txCofrinhoPrefill;
 
             if (installmentsSelect) {
                 installmentsSelect.value = '1';
@@ -1622,6 +1672,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 txFilterSplitCats(false);
             }
             syncTxAllocRemoveButtons();
+
+            const fpSelReset = document.getElementById('financial_project_id');
+            if (fpSelReset) {
+                fpSelReset.value = '';
+            }
 
             if (mode === 'cards_only') {
                 syncInstallments(true);
@@ -1751,6 +1806,104 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const applyCofrinhoPrefill = (prefill) => {
+            if (!prefill || typeof prefill !== 'object' || mode === 'cards_only') {
+                return;
+            }
+            const titleEl = document.getElementById('modalNewTransactionLabel');
+            if (titleEl) {
+                titleEl.textContent =
+                    prefill.kind === 'retirada' ? 'Retirada do cofrinho' : 'Aporte ao cofrinho';
+            }
+            if (refundCheck) {
+                refundCheck.checked = false;
+            }
+            syncRefundUi();
+            const tmplInput = document.getElementById('tx-recurring-template-id');
+            if (tmplInput) {
+                tmplInput.value = '';
+            }
+            const desc = document.getElementById('description');
+            const amt = document.getElementById('amount');
+            const dateIn = document.getElementById('date');
+            if (desc && prefill.description != null) {
+                desc.value = String(prefill.description);
+            }
+            if (amt) {
+                amt.value = '';
+            }
+            if (dateIn) {
+                const d = txForm.dataset.txDefaultDate;
+                const dateStr = (d && String(d).trim()) || new Date().toISOString().slice(0, 10);
+                if (typeof window.duozenFlatpickrSetDate === 'function') {
+                    window.duozenFlatpickrSetDate(dateIn, dateStr);
+                } else {
+                    dateIn.value = dateStr;
+                }
+            }
+            if (installmentsSelect) {
+                installmentsSelect.value = '1';
+            }
+            if (typeSelect && prefill.type) {
+                typeSelect.value = prefill.type;
+                typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (paymentFlow && prefill.payment_method) {
+                paymentFlow.value = String(prefill.payment_method);
+                paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (accountSel && prefill.account_id != null) {
+                accountSel.value = String(prefill.account_id);
+                syncAccountMeta();
+            }
+            const wrap = document.getElementById('tx-category-allocations-wrap');
+            if (wrap && prefill.category_id != null) {
+                const rows = wrap.querySelectorAll('.tx-cat-alloc-row');
+                rows.forEach((row, idx) => {
+                    if (idx === 0) {
+                        row.classList.remove('d-none');
+                        const cat = row.querySelector('.js-tx-split-cat');
+                        const am = row.querySelector('.js-tx-split-amount');
+                        if (cat) {
+                            cat.value = String(prefill.category_id);
+                        }
+                        if (am) {
+                            am.value = '';
+                        }
+                    } else {
+                        row.classList.add('d-none');
+                        const cat = row.querySelector('.js-tx-split-cat');
+                        const am = row.querySelector('.js-tx-split-amount');
+                        if (cat) {
+                            cat.value = '';
+                        }
+                        if (am) {
+                            am.value = '';
+                        }
+                    }
+                });
+                if (typeof txFilterSplitCats === 'function') {
+                    txFilterSplitCats(false);
+                }
+                syncTxAllocRemoveButtons();
+            }
+            const fpSel = document.getElementById('financial_project_id');
+            if (fpSel && prefill.financial_project_id != null) {
+                fpSel.value = String(prefill.financial_project_id);
+            }
+            syncCofrinhoSection();
+        };
+
+        let cofrinhoPrefillParsed = null;
+        try {
+            const rawCof = txForm.dataset.txCofrinhoPrefill || '';
+            if (rawCof) {
+                cofrinhoPrefillParsed = JSON.parse(rawCof);
+            }
+        } catch {
+            /* ignore */
+        }
+
         let recurringPrefillParsed = null;
         try {
             const rawPrefill = txForm.dataset.txRecurringPrefill || '';
@@ -1760,7 +1913,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch {
             /* ignore */
         }
-        if (recurringPrefillParsed && modalNewTx && bs?.Modal) {
+        if (cofrinhoPrefillParsed && modalNewTx && bs?.Modal) {
+            applyCofrinhoPrefill(cofrinhoPrefillParsed);
+            bs.Modal.getOrCreateInstance(modalNewTx).show();
+        } else if (recurringPrefillParsed && modalNewTx && bs?.Modal) {
             applyRecurringPrefill(recurringPrefillParsed);
             bs.Modal.getOrCreateInstance(modalNewTx).show();
         }

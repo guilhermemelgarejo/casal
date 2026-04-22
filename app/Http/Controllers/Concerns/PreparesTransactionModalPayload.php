@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Account;
+use App\Models\FinancialProject;
 use App\Models\Transaction;
 use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
@@ -83,6 +84,11 @@ trait PreparesTransactionModalPayload
 
         $years = range($now->year - 5, $now->year + 5);
 
+        $financialProjects = FinancialProject::query()
+            ->where('couple_id', $couple->id)
+            ->orderBy('name')
+            ->get();
+
         $editTransactionModalMeta = null;
         $editTransactionIdSession = session('edit_transaction_id');
         if ($editTransactionIdSession !== null) {
@@ -107,6 +113,8 @@ trait PreparesTransactionModalPayload
                     'description' => old('description', $editTx->baseDescriptionWithoutInstallmentSuffix()),
                     'edit' => TransactionListingPresentation::transactionAmountEditMeta($editTx),
                     'category_allocations' => $editAllocRows,
+                    'financial_project_id' => old('financial_project_id', $editTx->financial_project_id),
+                    'is_credit' => (bool) $editTx->accountModel?->isCreditCard(),
                 ];
             }
         }
@@ -125,6 +133,7 @@ trait PreparesTransactionModalPayload
             'refDefaultYear' => $refDefaultYear,
             'years' => $years,
             'editTransactionModalMeta' => $editTransactionModalMeta,
+            'financialProjects' => $financialProjects,
         ];
     }
 }

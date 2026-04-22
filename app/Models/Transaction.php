@@ -170,6 +170,7 @@ class Transaction extends Model
         'refund_of_transaction_id',
         'recurring_transaction_id',
         'internal_transfer_group_id',
+        'financial_project_id',
     ];
 
     protected $casts = [
@@ -215,6 +216,11 @@ class Transaction extends Model
     public function recurringTransaction()
     {
         return $this->belongsTo(RecurringTransaction::class);
+    }
+
+    public function financialProject()
+    {
+        return $this->belongsTo(FinancialProject::class, 'financial_project_id');
     }
 
     /**

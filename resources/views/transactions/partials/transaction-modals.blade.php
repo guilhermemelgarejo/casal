@@ -134,6 +134,7 @@
                                                     <option
                                                         value="{{ $c->id }}"
                                                         data-type="{{ $c->type }}"
+                                                        data-tx-cofrinho="{{ $c->isInvestmentsCategory() ? 'invest' : ($c->isPiggyBankWithdrawalCategory() ? 'withdraw' : '0') }}"
                                                         {{ (string) old('category_allocations.'.$si.'.category_id', $catIdDefault) === (string) $c->id ? 'selected' : '' }}
                                                     >
                                                         {{ $c->name }}
@@ -171,6 +172,29 @@
                             </div>
                             <x-input-error :messages="$errors->get('category_allocations')" class="mt-2" />
                         </div>
+
+                        @if(($financialProjects ?? collect())->isNotEmpty())
+                            <div id="edit-tx-cofrinho-wrapper" class="mt-3 d-none">
+                                <x-input-label for="edit-financial-project-id" value="Cofrinho" />
+                                <select
+                                    name="financial_project_id"
+                                    id="edit-financial-project-id"
+                                    class="form-select mt-1"
+                                >
+                                    <option value="">— Não aplicar —</option>
+                                    @foreach($financialProjects as $fp)
+                                        <option
+                                            value="{{ $fp->id }}"
+                                            @selected((string) old('financial_project_id', ($editTransactionModalMeta ?? [])['financial_project_id'] ?? '') === (string) $fp->id)
+                                        >
+                                            {{ $fp->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="form-text mb-0">Só para lançamentos em conta corrente com categoria <strong>Investimentos</strong> ou <strong>Retirada de cofrinho</strong>.</p>
+                                <x-input-error :messages="$errors->get('financial_project_id')" class="mt-2" />
+                            </div>
+                        @endif
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem salvar alterações" data-bs-dismiss="modal">Cancelar</button>
@@ -187,7 +211,7 @@
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
             'category_allocations', 'recurring_template_id', 'refund_of_transaction_id',
         ]);
-        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations'));
+        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations') || $errors->has('financial_project_id'));
         $txAllocVisibleRows = 1;
         for ($r = 0; $r < 5; $r++) {
             $ov = old('category_allocations.'.$r.'.category_id');
@@ -228,6 +252,7 @@
                         data-tx-default-date="{{ date('Y-m-d') }}"
                         data-credit-limit-precheck-url="{{ route('transactions.credit-limit-precheck') }}"
                         data-tx-recurring-prefill="{{ ($txRecurringPrefill ?? null) ? json_encode($txRecurringPrefill, JSON_UNESCAPED_UNICODE) : '' }}"
+                        data-tx-cofrinho-prefill="{{ ($txCofrinhoPrefill ?? null) ? json_encode($txCofrinhoPrefill, JSON_UNESCAPED_UNICODE) : '' }}"
                     >
                         @csrf
                         <input type="hidden" name="recurring_template_id" id="tx-recurring-template-id" value="{{ old('recurring_template_id', '') }}">
@@ -413,6 +438,11 @@
                                 <section class="tx-form-section" aria-labelledby="tx-section-categories-heading">
                                     <h3 class="tx-form-section-title" id="tx-section-categories-heading">Categorias e valores</h3>
                                     <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total.</p>
+                                    @if($txFormMode !== 'cards_only')
+                                        <p class="small text-secondary mb-2 border-start border-3 border-primary-subtle ps-2">
+                                            <strong>Cofrinho:</strong> em conta corrente, use a categoria <strong>Investimentos</strong> (despesa) ou <strong>Retirada de cofrinho</strong> (receita) e indique o cofrinho na secção seguinte.
+                                        </p>
+                                    @endif
                                     <div id="tx-category-allocations-wrap">
                                         @for($si = 0; $si < 5; $si++)
                                             <div class="tx-cat-alloc-row row g-2 mb-2 align-items-end {{ $si < $txAllocVisibleRows ? '' : 'd-none' }}" data-tx-alloc-row="{{ $si }}">
@@ -428,6 +458,7 @@
                                                             <option
                                                                 value="{{ $c->id }}"
                                                                 data-type="{{ $c->type }}"
+                                                                data-tx-cofrinho="{{ $c->isInvestmentsCategory() ? 'invest' : ($c->isPiggyBankWithdrawalCategory() ? 'withdraw' : '0') }}"
                                                                 {{ (string) old('category_allocations.'.$si.'.category_id') === (string) $c->id ? 'selected' : '' }}
                                                             >
                                                                 {{ $c->name }}
@@ -468,6 +499,30 @@
                                     </div>
                                     <x-input-error :messages="$errors->get('category_allocations')" class="mt-2" />
                                 </section>
+
+                                @if($txFormMode !== 'cards_only')
+                                    <section class="tx-form-section border-top pt-3 mt-2" id="tx-cofrinho-wrapper" aria-labelledby="tx-section-cofrinho-heading">
+                                        <h3 class="tx-form-section-title" id="tx-section-cofrinho-heading">Cofrinho</h3>
+                                        <p class="small text-secondary mb-3">
+                                            Só em <strong>conta corrente</strong> (não em cartão). <strong>Aporte:</strong> despesa + categoria Investimentos. <strong>Retirada:</strong> receita + categoria Retirada de cofrinho.
+                                        </p>
+                                        @if(($financialProjects ?? collect())->isNotEmpty())
+                                            <x-input-label for="financial_project_id" value="Qual cofrinho?" />
+                                            <select name="financial_project_id" id="financial_project_id" class="form-select mt-1">
+                                                <option value="">— Não aplicar —</option>
+                                                @foreach($financialProjects as $fp)
+                                                    <option value="{{ $fp->id }}" @selected((string) old('financial_project_id') === (string) $fp->id)>
+                                                        {{ $fp->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <p class="form-text mb-0">Obrigatório se escolher <strong>Investimentos</strong> ou <strong>Retirada de cofrinho</strong> nas categorias.</p>
+                                            <x-input-error :messages="$errors->get('financial_project_id')" class="mt-2" />
+                                        @else
+                                            <x-cofrinho-promo variant="micro" class="mt-1" />
+                                        @endif
+                                    </section>
+                                @endif
 
                             </div>
                         </div>

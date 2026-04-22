@@ -61,6 +61,8 @@
                 </div>
             @endif
 
+            <x-cofrinho-promo variant="compact" class="mb-4" />
+
             <div class="row g-4 align-items-start">
                 <div class="col-12">
                     <div class="row g-4 g-lg-3 gx-lg-4 align-items-start accounts-lists-row">

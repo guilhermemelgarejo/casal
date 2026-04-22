@@ -53,6 +53,8 @@ class CategoryController extends Controller
                     Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
                     Category::NAME_INTERNAL_TRANSFER_EXPENSE,
                     Category::NAME_INTERNAL_TRANSFER_INCOME,
+                    Category::NAME_INVESTMENTS,
+                    Category::NAME_PIGGY_BANK_WITHDRAWAL,
                 ]),
             ],
             'type' => 'required|in:income,expense',
@@ -77,7 +79,7 @@ class CategoryController extends Controller
             abort(403);
         }
 
-        if ($category->isReservedSystemCategory()) {
+        if ($category->isImmutableSystemCategory()) {
             return back()->withErrors([
                 'name' => 'Esta categoria não pode ser editada.',
             ]);
@@ -92,6 +94,8 @@ class CategoryController extends Controller
                     Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
                     Category::NAME_INTERNAL_TRANSFER_EXPENSE,
                     Category::NAME_INTERNAL_TRANSFER_INCOME,
+                    Category::NAME_INVESTMENTS,
+                    Category::NAME_PIGGY_BANK_WITHDRAWAL,
                 ]),
             ],
             'type' => 'required|in:income,expense',
@@ -110,7 +114,7 @@ class CategoryController extends Controller
             abort(403);
         }
 
-        if ($category->isReservedSystemCategory()) {
+        if ($category->isImmutableSystemCategory()) {
             return back()->withErrors([
                 'category' => 'Esta categoria não pode ser excluída.',
             ]);

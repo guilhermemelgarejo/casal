@@ -19,6 +19,10 @@ class Category extends Model
 
     public const SYSTEM_KEY_INTERNAL_TRANSFER_INCOME = 'internal_transfer_income';
 
+    public const SYSTEM_KEY_INVESTMENTS = 'investments_expense';
+
+    public const SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL = 'piggy_bank_withdrawal_income';
+
     /**
      * Nome padrão ao criar o casal (texto mostrado na UI).
      */
@@ -27,6 +31,10 @@ class Category extends Model
     public const NAME_INTERNAL_TRANSFER_EXPENSE = 'Transferência entre contas (saída)';
 
     public const NAME_INTERNAL_TRANSFER_INCOME = 'Transferência entre contas (entrada)';
+
+    public const NAME_INVESTMENTS = 'Investimentos';
+
+    public const NAME_PIGGY_BANK_WITHDRAWAL = 'Retirada de cofrinho';
 
     protected $fillable = ['couple_id', 'name', 'type', 'color', 'icon', 'system_key'];
 
@@ -56,6 +64,32 @@ class Category extends Model
     public function isReservedSystemCategory(): bool
     {
         return $this->isCreditCardInvoicePayment() || $this->isInternalTransferCategory();
+    }
+
+    public function isInvestmentsCategory(): bool
+    {
+        return $this->system_key === self::SYSTEM_KEY_INVESTMENTS;
+    }
+
+    public function isPiggyBankWithdrawalCategory(): bool
+    {
+        return $this->system_key === self::SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL;
+    }
+
+    /**
+     * Categorias de cofrinho (Investimentos / retirada) — não editáveis nem excluíveis, mas entram em orçamento.
+     */
+    public function isCofrinhoSystemCategory(): bool
+    {
+        return $this->isInvestmentsCategory() || $this->isPiggyBankWithdrawalCategory();
+    }
+
+    /**
+     * Bloqueio de edição/exclusão na UI de categorias (reservadas + cofrinho).
+     */
+    public function isImmutableSystemCategory(): bool
+    {
+        return $this->isReservedSystemCategory() || $this->isCofrinhoSystemCategory();
     }
 
     /**
@@ -112,6 +146,56 @@ class Category extends Model
             ->where('couple_id', $coupleId)
             ->where('system_key', self::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT)
             ->first();
+    }
+
+    public static function investmentsForCouple(int $coupleId): ?self
+    {
+        return static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_INVESTMENTS)
+            ->first();
+    }
+
+    public static function piggyBankWithdrawalForCouple(int $coupleId): ?self
+    {
+        return static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL)
+            ->first();
+    }
+
+    /**
+     * Garante categorias de sistema para cofrinho (Investimentos + Retirada de cofrinho).
+     */
+    public static function ensureSavingsCategoriesForCouple(int $coupleId): void
+    {
+        static::ensureInternalTransferCategoriesForCouple($coupleId);
+
+        if (! static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_INVESTMENTS)
+            ->exists()) {
+            static::query()->create([
+                'couple_id' => $coupleId,
+                'name' => self::NAME_INVESTMENTS,
+                'type' => 'expense',
+                'color' => '#0d9488',
+                'system_key' => self::SYSTEM_KEY_INVESTMENTS,
+            ]);
+        }
+
+        if (! static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL)
+            ->exists()) {
+            static::query()->create([
+                'couple_id' => $coupleId,
+                'name' => self::NAME_PIGGY_BANK_WITHDRAWAL,
+                'type' => 'income',
+                'color' => '#0d9488',
+                'system_key' => self::SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL,
+            ]);
+        }
     }
 
     /**

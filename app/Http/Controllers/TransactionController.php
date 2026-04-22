@@ -5,11 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\CreditCardStatement;
-use App\Models\RecurringTransaction;
+use App\Models\FinancialProject;
 use App\Models\Transaction;
 use App\Support\PaymentMethods;
 use App\Support\TransactionCategorySplitDistribution;
-use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -119,6 +118,7 @@ class TransactionController extends Controller
                 'category_allocations.*.category_id' => 'nullable|exists:categories,id',
                 'category_allocations.*.amount' => 'nullable|numeric|min:0.01',
                 'installment_scope' => ['nullable', 'string', Rule::in(['single', 'all'])],
+                'financial_project_id' => ['nullable', 'integer'],
             ]);
         } catch (ValidationException $e) {
             return back()
@@ -169,6 +169,7 @@ class TransactionController extends Controller
         $installmentScope = $request->input('installment_scope', 'single');
         $applyToAllInstallments = $installmentScope === 'all';
         $allocPairs = null;
+        $financialProjectId = null;
         if ($hasCategoryAllocations) {
             $allocParsed = $this->parseCategoryAllocations(
                 $request,
@@ -192,6 +193,22 @@ class TransactionController extends Controller
                 ],
                 $allocParsed['pairs']
             );
+
+            $transaction->loadMissing('accountModel');
+            $fpResolved = $this->validateFinancialProjectForNewTransaction(
+                $request,
+                ['isCredit' => (bool) $transaction->accountModel?->isCreditCard()],
+                $allocParsed['pairs'],
+                (int) Auth::user()->couple_id,
+                (string) $transaction->type
+            );
+            if (isset($fpResolved['errors'])) {
+                return back()
+                    ->withErrors($fpResolved['errors'])
+                    ->withInput()
+                    ->with('edit_transaction_id', $transaction->id);
+            }
+            $financialProjectId = $fpResolved['financial_project_id'] ?? null;
         } elseif ($amountChanged) {
             try {
                 $scaled = $this->categorySplitRowsScaledToAmount($transaction, $newAmountCentsAbs);
@@ -215,21 +232,51 @@ class TransactionController extends Controller
             $applyToAllInstallments = false;
         }
 
-        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged) {
-            session()->forget('edit_transaction_id');
-            $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
-
-            return back()->with('success', 'Lançamento inalterado.');
+        if (! $hasCategoryAllocations) {
+            // Permite transformar um lançamento existente em cofrinho sem mexer nas categorias.
+            $transaction->loadMissing(['accountModel', 'categorySplits']);
+            $pairs = $transaction->categorySplits->map(fn ($s) => [
+                'category_id' => (int) $s->category_id,
+                'cents' => (int) round(abs((float) $s->amount) * 100),
+            ])->values()->all();
+            $fpResolved = $this->validateFinancialProjectForNewTransaction(
+                $request,
+                ['isCredit' => (bool) $transaction->accountModel?->isCreditCard()],
+                $pairs,
+                (int) Auth::user()->couple_id,
+                (string) $transaction->type
+            );
+            if (isset($fpResolved['errors'])) {
+                return back()
+                    ->withErrors($fpResolved['errors'])
+                    ->withInput()
+                    ->with('edit_transaction_id', $transaction->id);
+            }
+            $financialProjectId = $fpResolved['financial_project_id'] ?? null;
         }
 
-        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs) {
+        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged) {
+            if ((int) ($transaction->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
+                // Continua para persistir o cofrinho.
+            } else {
+                session()->forget('edit_transaction_id');
+                $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
+
+                return back()->with('success', 'Lançamento inalterado.');
+            }
+        }
+
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId) {
             if ($descriptionChanged) {
                 $transaction->description = $newDescriptionFull;
             }
             if ($amountChanged) {
                 $transaction->amount = $newAmountFormatted;
             }
-            if ($amountChanged || $descriptionChanged) {
+            if ((int) ($transaction->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
+                $transaction->financial_project_id = $financialProjectId;
+            }
+            if ($amountChanged || $descriptionChanged || (int) ($transaction->getOriginal('financial_project_id') ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 $transaction->save();
             }
             if ($categoryChanged && $splitRows !== null) {
@@ -241,9 +288,14 @@ class TransactionController extends Controller
                         $ratios = $this->categoryRatiosFromAllocPairs($allocPairs ?? []);
                         if ($ratios === []) {
                             $transaction->syncCategorySplits($splitRows);
+
                             return;
                         }
                         foreach ($group as $tx) {
+                            if ((int) ($tx->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
+                                $tx->financial_project_id = $financialProjectId;
+                                $tx->save();
+                            }
                             $txAmtRaw = (float) str_replace(',', '.', (string) $tx->amount);
                             $txSign = $txAmtRaw < 0 ? -1 : 1;
                             $txAmountCentsAbs = (int) round(abs($txAmtRaw) * 100);
@@ -262,6 +314,15 @@ class TransactionController extends Controller
                     }
                 } else {
                     $transaction->syncCategorySplits($splitRows);
+                }
+            } elseif ($applyToAllInstallments) {
+                // Caso o usuário só queira aplicar/remover o cofrinho no grupo, sem mexer nas categorias.
+                $group = $this->installmentGroupTransactionsFor($transaction);
+                foreach ($group as $tx) {
+                    if ((int) ($tx->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
+                        $tx->financial_project_id = $financialProjectId;
+                        $tx->save();
+                    }
                 }
             }
         });
@@ -369,7 +430,7 @@ class TransactionController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, Transaction>
+     * @return Collection<int, Transaction>
      */
     private function installmentGroupTransactionsFor(Transaction $transaction): Collection
     {
@@ -577,6 +638,7 @@ class TransactionController extends Controller
                 'integer',
                 Rule::exists('recurring_transactions', 'id')->where('couple_id', Auth::user()->couple_id),
             ],
+            'financial_project_id' => ['nullable', 'integer'],
         ]);
 
         $isRefund = (bool) $request->boolean('is_refund');
@@ -650,6 +712,22 @@ class TransactionController extends Controller
             return $limitRedirect;
         }
 
+        if (! $isRefund) {
+            $fpResolved = $this->validateFinancialProjectForNewTransaction(
+                $request,
+                $ctx,
+                $allocParsed['pairs'],
+                (int) Auth::user()->couple_id,
+                (string) $request->type
+            );
+            if (isset($fpResolved['errors'])) {
+                return back()->withErrors($fpResolved['errors'])->withInput();
+            }
+            $financialProjectId = $fpResolved['financial_project_id'] ?? null;
+        } else {
+            $financialProjectId = null;
+        }
+
         $installmentParentId = null;
         $pairs = $allocParsed['pairs'];
         $refundOfId = null;
@@ -674,7 +752,7 @@ class TransactionController extends Controller
         $recurringTemplateId = $request->filled('recurring_template_id')
             ? (int) $request->input('recurring_template_id')
             : null;
-        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs, $recurringTemplateId, $isRefund, $refundOfId) {
+        DB::transaction(function () use ($ctx, &$installmentParentId, $request, $pairs, $recurringTemplateId, $isRefund, $refundOfId, $financialProjectId) {
             $installments = $ctx['installments'];
             $baseCents = $ctx['baseCents'];
             $remainderCents = $ctx['remainderCents'];
@@ -714,6 +792,7 @@ class TransactionController extends Controller
                     'date' => $startDate->toDateString(),
                     'reference_month' => (int) $ref->month,
                     'reference_year' => (int) $ref->year,
+                    'financial_project_id' => $financialProjectId,
                 ];
 
                 if ($refundOfId !== null) {
@@ -769,7 +848,7 @@ class TransactionController extends Controller
             $queryString = parse_url($referer, PHP_URL_QUERY);
             if (is_string($queryString) && $queryString !== '') {
                 parse_str($queryString, $q);
-                unset($q['prefill_recurring']);
+                unset($q['prefill_recurring'], $q['prefill_cofrinho'], $q['prefill_cofrinho_kind']);
                 if (isset($q['month'])) {
                     $m = (int) $q['month'];
                     if ($m >= 1 && $m <= 12) {
@@ -930,6 +1009,83 @@ class TransactionController extends Controller
             'purchase_total' => $purchaseTotal,
             'projected_available' => bcsub($limit, $after, 2),
         ]);
+    }
+
+    /**
+     * @param  array<int, array{category_id: int, cents: int}>  $pairs
+     * @return array{errors: array<string, array<int, string>>}|array{financial_project_id: int|null}
+     */
+    private function validateFinancialProjectForNewTransaction(
+        Request $request,
+        array $ctx,
+        array $pairs,
+        int $coupleId,
+        ?string $txTypeOverride = null
+    ): array {
+        $raw = $request->input('financial_project_id');
+        $fpId = ($raw === null || $raw === '') ? null : (int) $raw;
+
+        $categoryIds = array_values(array_unique(array_map(fn ($p) => (int) $p['category_id'], $pairs)));
+        $categories = Category::query()
+            ->where('couple_id', $coupleId)
+            ->whereIn('id', $categoryIds)
+            ->get()
+            ->keyBy('id');
+
+        $hasInv = false;
+        $hasW = false;
+        foreach ($pairs as $p) {
+            $c = $categories->get((int) $p['category_id']);
+            if ($c?->isInvestmentsCategory()) {
+                $hasInv = true;
+            }
+            if ($c?->isPiggyBankWithdrawalCategory()) {
+                $hasW = true;
+            }
+        }
+
+        if ($fpId !== null) {
+            $exists = FinancialProject::query()
+                ->where('couple_id', $coupleId)
+                ->whereKey($fpId)
+                ->exists();
+            if (! $exists) {
+                return ['errors' => ['financial_project_id' => ['Cofrinho inválido.']]];
+            }
+            if ($ctx['isCredit']) {
+                return ['errors' => ['financial_project_id' => ['Cofrinho só em conta corrente (não em cartão).']]];
+            }
+            if (! $hasInv && ! $hasW) {
+                return ['errors' => ['financial_project_id' => ['Use projeto só com as categorias Investimentos ou Retirada de cofrinho.']]];
+            }
+        }
+
+        $txType = $txTypeOverride ?? (string) $request->type;
+
+        if ($hasInv) {
+            if ($ctx['isCredit']) {
+                return ['errors' => ['category_allocations' => ['Investimentos não se aplica em compras no cartão de crédito.']]];
+            }
+            if ($txType !== 'expense') {
+                return ['errors' => ['category_allocations' => ['Investimentos exige um lançamento do tipo despesa.']]];
+            }
+            if ($fpId === null) {
+                return ['errors' => ['financial_project_id' => ['Selecione o cofrinho para o aporte.']]];
+            }
+        }
+        if ($hasW) {
+            if ($ctx['isCredit']) {
+                return ['errors' => ['category_allocations' => ['Retirada de cofrinho não se aplica em compras no cartão de crédito.']]];
+            }
+            if ($txType !== 'income') {
+                return ['errors' => ['category_allocations' => ['Retirada de cofrinho exige um lançamento do tipo receita.']]];
+            }
+            if ($fpId === null) {
+                return ['errors' => ['financial_project_id' => ['Selecione o cofrinho para a retirada.']]];
+            }
+        }
+
+        return ['financial_project_id' => $fpId];
     }
 
     /**

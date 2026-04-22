@@ -26,6 +26,10 @@
                 </div>
             @endif
 
+            @if ($couple)
+                <x-cofrinho-promo variant="compact" class="mb-4" />
+            @endif
+
             @if (!$couple)
                 <div class="row g-4">
                     <div class="col-md-6">

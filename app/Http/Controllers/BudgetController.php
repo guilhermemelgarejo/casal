@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Category;
+use App\Models\CouplePlannedIncome;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -28,7 +30,7 @@ class BudgetController extends Controller
             abort(403);
         }
 
-        if ($category->isReservedSystemCategory()) {
+        if ($category->isCreditCardInvoicePayment() || $category->isInternalTransferCategory()) {
             return redirect()
                 ->route('categories.index')
                 ->withFragment('orcamento')
@@ -60,9 +62,23 @@ class BudgetController extends Controller
             'monthly_income' => 'required|numeric|min:0',
         ]);
 
-        Auth::user()->couple->update([
+        $couple = Auth::user()->couple;
+        $old = (float) ($couple->monthly_income ?? 0);
+        $new = (float) $request->monthly_income;
+        $couple->update([
             'monthly_income' => $request->monthly_income,
         ]);
+
+        if (abs($old - $new) > 0.00001) {
+            $now = Carbon::now();
+            CouplePlannedIncome::recordVersion(
+                (int) $couple->id,
+                (int) $now->year,
+                (int) $now->month,
+                $new,
+                (int) Auth::id()
+            );
+        }
 
         return redirect()
             ->route('categories.index')

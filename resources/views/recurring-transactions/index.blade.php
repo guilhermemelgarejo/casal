@@ -48,6 +48,8 @@
                 </div>
             @endif
 
+            <x-cofrinho-promo variant="compact" class="mb-3" />
+
             <div class="card border-0 shadow-sm overflow-hidden tx-index-card mb-4">
                 <div class="tx-index-head px-4 py-3">
                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">

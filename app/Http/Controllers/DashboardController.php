@@ -4,9 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
+use App\Models\Budget;
+use App\Models\Category;
+use App\Models\FinancialProject;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Support\CreditCardInvoiceReminders;
+use App\Support\DashboardAnalytics;
 use App\Support\PaymentMethods;
 use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
@@ -37,6 +41,18 @@ class DashboardController extends Controller
                 'integer',
                 Rule::exists('recurring_transactions', 'id')->where('couple_id', $couple->id),
             ],
+            'prefill_cofrinho' => [
+                Rule::requiredIf(fn () => $request->filled('prefill_cofrinho_kind')),
+                'nullable',
+                'integer',
+                Rule::exists('financial_projects', 'id')->where('couple_id', $couple->id),
+            ],
+            'prefill_cofrinho_kind' => [
+                Rule::requiredIf(fn () => $request->filled('prefill_cofrinho')),
+                'nullable',
+                'string',
+                Rule::in(['aporte', 'retirada']),
+            ],
             'focus_transaction' => [
                 'nullable',
                 'integer',
@@ -54,6 +70,16 @@ class DashboardController extends Controller
         $parts = explode('-', $period);
         $year = (int) ($parts[0] ?? date('Y'));
         $month = (int) ($parts[1] ?? date('m'));
+
+        if ($request->filled('burn_base')) {
+            $request->validate([
+                'burn_base' => ['required', 'string', 'in:income,budget'],
+            ]);
+            $user = Auth::user();
+            $prefs = $user->dashboard_widget_prefs ?? [];
+            $prefs['burn_base'] = $request->string('burn_base')->toString();
+            $user->forceFill(['dashboard_widget_prefs' => $prefs])->save();
+        }
 
         $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
         $filteredRegularAccountBalance = null;
@@ -126,10 +152,67 @@ class DashboardController extends Controller
         $totalExpense = $statsTransactions->where('type', 'expense')->sum('amount');
         $balance = $totalIncome - $totalExpense;
 
+        $couple->refresh();
+        $plannedIncomeResolved = $couple->resolvePlannedMonthlyIncomeForMonth($year, $month);
+
         $thresholdPercentage = $couple->spending_alert_threshold ?? 80.00;
-        $income = $couple->monthly_income ?? 0;
+        $income = $plannedIncomeResolved;
         $thresholdAmount = ($income * $thresholdPercentage) / 100;
         $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
+
+        $regularFlowFilterId = null;
+        if ($filterAccountId !== null) {
+            $fa = Account::query()->where('couple_id', $couple->id)->whereKey($filterAccountId)->first();
+            if ($fa && $fa->kind === Account::KIND_REGULAR) {
+                $regularFlowFilterId = $filterAccountId;
+            }
+        }
+        $regularCashFlow = DashboardAnalytics::regularAccountCashFlow($couple, $month, $year, $regularFlowFilterId);
+
+        $cycleRef = DashboardAnalytics::creditCardCycleReferenceFromFilterMonth($month, $year);
+        $creditCardKpiFilterId = null;
+        if ($filterAccountId !== null) {
+            $fca = Account::query()->where('couple_id', $couple->id)->whereKey($filterAccountId)->first();
+            if ($fca && $fca->isCreditCard()) {
+                $creditCardKpiFilterId = $filterAccountId;
+            }
+        }
+        $creditCardKpiTotal = DashboardAnalytics::creditCardExpensesInCycle(
+            $couple,
+            $cycleRef['month'],
+            $cycleRef['year'],
+            $creditCardKpiFilterId
+        );
+
+        $prevAnchor = Carbon::createFromDate($year, $month, 1)->subMonth();
+        $prevYear = (int) $prevAnchor->year;
+        $prevMonth = (int) $prevAnchor->month;
+        $kpiPrev = DashboardAnalytics::dashboardKpiTotals($couple, $prevMonth, $prevYear);
+        $plannedPrev = $couple->resolvePlannedMonthlyIncomeForMonth($prevYear, $prevMonth);
+        $deltaPlannedVsRealized = (float) $totalIncome - (float) $plannedIncomeResolved;
+        $momIncomeDelta = (float) $totalIncome - (float) $kpiPrev['income'];
+        $momIncomePct = $kpiPrev['income'] > 0.00001
+            ? (($momIncomeDelta / $kpiPrev['income']) * 100.0)
+            : null;
+
+        $burnBase = Auth::user()->dashboard_widget_prefs['burn_base'] ?? 'income';
+        $burnDaysRemaining = DashboardAnalytics::calendarDaysRemainingInSelectorMonth($month, $year);
+        $remainingRenda = max(0.0, (float) $plannedIncomeResolved - (float) $totalExpense);
+        $remainingBudget = DashboardAnalytics::budgetHeadroomRemaining($couple, $month, $year);
+        $budgetRowsCount = Budget::query()
+            ->where('couple_id', $couple->id)
+            ->where('month', $month)
+            ->where('year', $year)
+            ->count();
+        $burnRemaining = $burnBase === 'budget' ? $remainingBudget : $remainingRenda;
+        $burnPerDay = $burnDaysRemaining > 0 ? $burnRemaining / $burnDaysRemaining : null;
+        $showBurnSetupCta = ((float) $plannedIncomeResolved <= 0.0) && $budgetRowsCount === 0;
+
+        $momExpenseDelta = (float) $totalExpense - (float) $kpiPrev['expense'];
+        $momBalanceDelta = (float) $balance - (float) $kpiPrev['balance'];
+        $momCardDelta = $creditCardKpiTotal - (float) $kpiPrev['card_spend'];
+        $topCategoriesCurrent = DashboardAnalytics::topExpenseCategories($couple, $month, $year, 8);
+        $topCategoriesPrev = DashboardAnalytics::topExpenseCategories($couple, $prevMonth, $prevYear, 8);
 
         $now = Carbon::now();
         $recurringReminders = $couple->recurringTransactions()
@@ -143,6 +226,26 @@ class DashboardController extends Controller
             ->where('kind', Account::KIND_CREDIT_CARD)
             ->orderBy('name')
             ->get();
+
+        $cycleReportAccount = null;
+        if ($creditCardKpiFilterId !== null) {
+            $cycleReportAccount = $cardAccounts->firstWhere('id', $creditCardKpiFilterId);
+        }
+        $cycleReportAccount ??= $cardAccounts->first();
+
+        $hiddenDashboardPanels = array_values(array_intersect(
+            DashboardWidgetsController::PANEL_KEYS,
+            array_map('strval', (array) (Auth::user()->dashboard_widget_prefs['hidden_panels'] ?? []))
+        ));
+
+        $dashboardPanelLabels = [
+            'reminders' => 'Lembretes (recorrentes e faturas)',
+            'kpis' => 'Receitas, despesas e saldo do período',
+            'liquidity' => 'Fluxo em contas, cartão e renda planejada',
+            'mom_burn' => 'Comparativo mês anterior e burn rate',
+            'top_cats' => 'Top categorias de despesa',
+        ];
+
         $creditCardInvoiceReminders = CreditCardInvoiceReminders::openStatementsForCouple(
             (int) $couple->id,
             $cardAccounts,
@@ -154,11 +257,74 @@ class DashboardController extends Controller
         $regularAccounts = $modalPayload['regularAccounts'] ?? collect();
         $canCreateAccountTransfer = $regularAccounts->count() >= 2;
         $transferPaymentMethods = PaymentMethods::forRegularAccounts();
+        $txFormMode = $modalPayload['txFormMode'] ?? 'regular_only';
+
+        $txCofrinhoPrefill = null;
+        $txCofrinhoPrefillBlockedReason = null;
+        $prefillCofrinhoId = isset($validated['prefill_cofrinho']) ? (int) $validated['prefill_cofrinho'] : null;
+        $prefillCofrinhoKind = isset($validated['prefill_cofrinho_kind']) ? (string) $validated['prefill_cofrinho_kind'] : null;
+
+        if ($prefillCofrinhoId !== null && $prefillCofrinhoKind !== null && $prefillCofrinhoKind !== '') {
+            if ($txFormMode === 'cards_only') {
+                $txCofrinhoPrefillBlockedReason = 'Aportes e retiradas de cofrinho só em conta corrente. Cadastre uma conta em Gerenciar contas para lançar a partir do cofrinho.';
+            } else {
+                Category::ensureSavingsCategoriesForCouple((int) $couple->id);
+                $project = FinancialProject::query()
+                    ->where('couple_id', $couple->id)
+                    ->whereKey($prefillCofrinhoId)
+                    ->first();
+                $investCat = Category::investmentsForCouple((int) $couple->id);
+                $withdrawCat = Category::piggyBankWithdrawalForCouple((int) $couple->id);
+
+                if ($project === null) {
+                    $txCofrinhoPrefillBlockedReason = 'Cofrinho não encontrado.';
+                } elseif ($investCat === null || $withdrawCat === null) {
+                    $txCofrinhoPrefillBlockedReason = 'Categorias de cofrinho não encontradas.';
+                } else {
+                    $paymentMethod = null;
+                    $accountId = null;
+                    foreach (PaymentMethods::forRegularAccounts() as $pm) {
+                        $acc = $regularAccounts->first(function (Account $a) use ($pm) {
+                            return in_array($pm, $a->getEffectivePaymentMethods(), true);
+                        });
+                        if ($acc !== null) {
+                            $paymentMethod = $pm;
+                            $accountId = (int) $acc->id;
+
+                            break;
+                        }
+                    }
+                    if ($paymentMethod === null || $accountId === null) {
+                        $txCofrinhoPrefillBlockedReason = 'Nenhuma conta corrente compatível com as formas de pagamento. Ajuste em Gerenciar contas.';
+                    } elseif ($prefillCofrinhoKind === 'aporte') {
+                        $txCofrinhoPrefill = [
+                            'kind' => 'aporte',
+                            'type' => 'expense',
+                            'category_id' => (int) $investCat->id,
+                            'financial_project_id' => (int) $project->id,
+                            'description' => 'Aporte: '.$project->name,
+                            'payment_method' => $paymentMethod,
+                            'account_id' => $accountId,
+                        ];
+                    } else {
+                        $txCofrinhoPrefill = [
+                            'kind' => 'retirada',
+                            'type' => 'income',
+                            'category_id' => (int) $withdrawCat->id,
+                            'financial_project_id' => (int) $project->id,
+                            'description' => 'Retirada: '.$project->name,
+                            'payment_method' => $paymentMethod,
+                            'account_id' => $accountId,
+                        ];
+                    }
+                }
+            }
+        }
 
         $txRecurringPrefill = null;
         $txRecurringPrefillBlockedReason = null;
         $prefillRecurringId = isset($validated['prefill_recurring']) ? (int) $validated['prefill_recurring'] : null;
-        if ($prefillRecurringId !== null) {
+        if ($txCofrinhoPrefill === null && $prefillRecurringId !== null) {
             $rt = RecurringTransaction::query()
                 ->where('couple_id', $couple->id)
                 ->whereKey($prefillRecurringId)
@@ -167,7 +333,6 @@ class DashboardController extends Controller
             if ($rt !== null) {
                 $anchor = Carbon::createFromDate($year, $month, 1);
                 $payload = $rt->toTransactionPrefillPayload($anchor);
-                $txFormMode = $modalPayload['txFormMode'] ?? 'regular_only';
                 if ($txFormMode === 'regular_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_CREDIT_CARD) {
                     $txRecurringPrefillBlockedReason = 'Este modelo usa cartão de crédito. Cadastre um cartão em Gerenciar contas para abrir o formulário já pré-preenchido.';
                 } elseif ($txFormMode === 'cards_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_ACCOUNT) {
@@ -202,8 +367,35 @@ class DashboardController extends Controller
                 'creditCardInvoiceReminders',
                 'txRecurringPrefill',
                 'txRecurringPrefillBlockedReason',
+                'txCofrinhoPrefill',
+                'txCofrinhoPrefillBlockedReason',
                 'canCreateAccountTransfer',
-                'transferPaymentMethods'
+                'transferPaymentMethods',
+                'plannedIncomeResolved',
+                'regularCashFlow',
+                'cycleRef',
+                'creditCardKpiTotal',
+                'prevMonth',
+                'prevYear',
+                'plannedPrev',
+                'deltaPlannedVsRealized',
+                'momIncomeDelta',
+                'momIncomePct',
+                'burnBase',
+                'burnDaysRemaining',
+                'remainingRenda',
+                'remainingBudget',
+                'burnRemaining',
+                'burnPerDay',
+                'showBurnSetupCta',
+                'momExpenseDelta',
+                'momBalanceDelta',
+                'momCardDelta',
+                'topCategoriesCurrent',
+                'topCategoriesPrev',
+                'cycleReportAccount',
+                'hiddenDashboardPanels',
+                'dashboardPanelLabels'
             ),
             $modalPayload
         ));

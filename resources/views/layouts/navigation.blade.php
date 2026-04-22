@@ -38,15 +38,54 @@
                         Categorias
                     </x-nav-link>
                 </li>
-                <li class="nav-item">
-                    <x-nav-link :href="route('accounts.index')" :active="request()->routeIs('accounts.*')">
-                        Contas
-                    </x-nav-link>
+                <li class="nav-item dropdown">
+                    <a
+                        class="nav-link app-nav-link rounded-pill px-3 py-2 dropdown-toggle {{ request()->routeIs(['accounts.*', 'cofrinhos.*']) ? 'active fw-semibold' : '' }}"
+                        href="#"
+                        id="navAccountsDropdown"
+                        role="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                    >Contas</a>
+                    <ul class="dropdown-menu shadow-sm border-0" aria-labelledby="navAccountsDropdown">
+                        <li><a class="dropdown-item" href="{{ route('accounts.index') }}">Gerenciar contas e cartões</a></li>
+                        <li><a class="dropdown-item" href="{{ route('cofrinhos.index') }}">Cofrinhos</a></li>
+                        @if(Auth::user()->couple_id)
+                            @php
+                                $navCofrinhoSpotlight = ! \App\Models\FinancialProject::query()
+                                    ->where('couple_id', Auth::user()->couple_id)
+                                    ->exists();
+                            @endphp
+                            @if($navCofrinhoSpotlight)
+                                <li class="px-1">
+                                    <a class="dropdown-item dz-cofrinho-nav-spotlight" href="{{ route('cofrinhos.index', ['novo' => 1]) }}">
+                                        Criar cofrinho
+                                        <span class="dz-cofrinho-nav-spotlight__hint">Metas compartilhadas com barra de progresso — leva segundos.</span>
+                                    </a>
+                                </li>
+                            @endif
+                        @endif
+                    </ul>
                 </li>
                 <li class="nav-item">
                     <x-nav-link :href="route('credit-card-statements.index')" :active="request()->routeIs('credit-card-statements.*')">
                         Faturas
                     </x-nav-link>
+                </li>
+                <li class="nav-item dropdown">
+                    <a
+                        class="nav-link app-nav-link rounded-pill px-3 py-2 dropdown-toggle {{ request()->routeIs(['month-closing.*', 'reports.*']) ? 'active fw-semibold' : '' }}"
+                        href="#"
+                        id="navReportsDropdown"
+                        role="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                    >Relatórios</a>
+                    <ul class="dropdown-menu shadow-sm border-0" aria-labelledby="navReportsDropdown">
+                        <li><a class="dropdown-item" href="{{ route('month-closing.show') }}">Fechamento do mês</a></li>
+                        <li><a class="dropdown-item" href="{{ route('reports.budget-vs-actual') }}">Orçamento vs realizado</a></li>
+                        <li><a class="dropdown-item" href="{{ route('reports.statement-extract') }}">Extrato (CSV)</a></li>
+                    </ul>
                 </li>
                 <li class="nav-item">
                     <x-nav-link :href="route('couple.index')" :active="request()->routeIs('couple.*')">

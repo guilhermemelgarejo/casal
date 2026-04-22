@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Mail\InvitationMail;
 use App\Models\Category;
 use App\Models\Couple;
+use App\Models\CouplePlannedIncome;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -62,6 +64,8 @@ class CoupleController extends Controller
         foreach ($defaults as $default) {
             $couple->categories()->create($default);
         }
+
+        Category::ensureSavingsCategoriesForCouple((int) $couple->id);
 
         $user = Auth::user();
         $user->couple_id = $couple->id;
@@ -128,11 +132,26 @@ class CoupleController extends Controller
             return back()->withErrors(['name' => 'Você não faz parte de um casal.']);
         }
 
+        $oldIncome = $couple->monthly_income;
         $couple->update([
             'name' => $request->name,
             'monthly_income' => $request->monthly_income,
             'spending_alert_threshold' => $request->spending_alert_threshold,
         ]);
+
+        $newIncome = $couple->fresh()->monthly_income;
+        $oldF = $oldIncome === null ? null : (float) $oldIncome;
+        $newF = $newIncome === null ? null : (float) $newIncome;
+        if ($oldF !== $newF) {
+            $now = Carbon::now();
+            CouplePlannedIncome::recordVersion(
+                (int) $couple->id,
+                (int) $now->year,
+                (int) $now->month,
+                (float) ($newF ?? 0.0),
+                (int) $user->id
+            );
+        }
 
         return back()->with('success', 'Configurações do casal atualizadas!');
     }
