@@ -1630,7 +1630,7 @@ body .modal .modal-header.tx-modal-head--danger {
     flex: 0 0 auto;
 }
 
-/* Painel: KPIs, secções e tabela */
+/* Painel: secções e tabela */
 /* Nota: título e toolbar do painel ficam no <header>, fora de .dashboard-page — não prefixar com .dashboard-page */
 .dashboard-title {
     letter-spacing: -0.02em;
@@ -1794,62 +1794,7 @@ body .modal .modal-header.tx-modal-head--danger {
     color: #fff !important;
 }
 
-.dashboard-kpi-card {
-    border-radius: var(--bs-border-radius-xl);
-    transition: box-shadow 0.2s ease, transform 0.18s ease;
-    border-top: 3px solid transparent;
-}
-
-.dashboard-kpi-card:hover {
-    box-shadow: 0 0.5rem 1.35rem rgba(0, 0, 0, 0.07) !important;
-    transform: translateY(-2px);
-}
-
-.dashboard-kpi-card--income {
-    border-top-color: var(--bs-success);
-    background: linear-gradient(
-        165deg,
-        rgba(var(--bs-success-rgb), 0.1) 0%,
-        var(--bs-body-bg) 48%
-    );
-}
-
-.dashboard-kpi-card--expense {
-    border-top-color: var(--bs-danger);
-    background: linear-gradient(
-        165deg,
-        rgba(var(--bs-danger-rgb), 0.09) 0%,
-        var(--bs-body-bg) 48%
-    );
-}
-
-.dashboard-kpi-card--balance {
-    border-top-color: var(--bs-primary);
-    background: linear-gradient(
-        165deg,
-        rgba(var(--bs-primary-rgb), 0.11) 0%,
-        var(--bs-body-bg) 48%
-    );
-}
-
-.dashboard-kpi-card--balance-negative {
-    border-top-color: var(--bs-danger);
-    background: linear-gradient(
-        165deg,
-        rgba(var(--bs-danger-rgb), 0.08) 0%,
-        var(--bs-body-bg) 48%
-    );
-}
-
-.dashboard-kpi-card .dashboard-kpi-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: var(--bs-border-radius-lg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
+/* (removido) estilos do bloco de resumo do painel */
 
 .dashboard-section-head {
     background: linear-gradient(
@@ -2772,13 +2717,11 @@ body.duozen-onboarding-active {
     overflow-x: hidden;
 }
 
-/* Relatórios e cofrinhos */
-.reports-page .reports-hero-title,
+/* Cofrinhos */
 .cofrinhos-page .cofrinhos-hero-title {
     letter-spacing: -0.02em;
 }
 
-.reports-page .dz-stat-card,
 .cofrinhos-page .dz-stat-card {
     border-radius: 1.125rem;
     border: 1px solid var(--bs-border-color-translucent);
@@ -2789,80 +2732,22 @@ body.duozen-onboarding-active {
     transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.reports-page .dz-stat-card:hover,
 .cofrinhos-page .dz-stat-card:hover {
     box-shadow: 0 0.45rem 1.25rem rgba(15, 23, 42, 0.09);
     transform: translateY(-1px);
 }
 
-[data-bs-theme='dark'] .reports-page .dz-stat-card:hover,
 [data-bs-theme='dark'] .cofrinhos-page .dz-stat-card:hover {
     box-shadow: 0 0.45rem 1.35rem rgba(0, 0, 0, 0.42);
 }
 
-.reports-page .dz-kpi-label,
-.cofrinhos-page .dz-kpi-label {
+.cofrinhos-page .dz-stat-label {
     font-size: 0.65rem;
     letter-spacing: 0.06em;
     font-weight: 600;
     text-transform: uppercase;
     color: var(--bs-secondary-color);
     margin-bottom: 0.35rem;
-}
-
-.reports-page .dz-panel {
-    border-radius: 1.125rem;
-    border: 1px solid var(--bs-border-color-translucent);
-    background: var(--bs-body-bg);
-    box-shadow: 0 0.125rem 0.55rem rgba(15, 23, 42, 0.055);
-    overflow: hidden;
-}
-
-.reports-page .dz-panel--filter {
-    background: linear-gradient(
-        165deg,
-        rgba(var(--bs-primary-rgb), 0.07) 0%,
-        var(--bs-body-bg) 48%
-    );
-}
-
-[data-bs-theme='dark'] .reports-page .dz-panel--filter {
-    background: linear-gradient(
-        165deg,
-        rgba(var(--bs-primary-rgb), 0.14) 0%,
-        var(--bs-body-bg) 50%
-    );
-}
-
-.reports-page .dz-section-title {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--bs-emphasis-color);
-}
-
-.reports-page .dz-table thead th {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 600;
-    color: var(--bs-secondary-color);
-    background: var(--bs-tertiary-bg);
-    border-bottom: 1px solid var(--bs-border-color-translucent);
-    padding-top: 0.85rem;
-    padding-bottom: 0.85rem;
-    white-space: nowrap;
-}
-
-.reports-page .dz-table tbody td {
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom-color: var(--bs-border-color-translucent);
-    vertical-align: middle;
-}
-
-.reports-page .dz-table tbody tr:last-child td {
-    border-bottom: 0;
 }
 
 .cofrinhos-page .dz-tip-card {

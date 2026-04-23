@@ -38,7 +38,7 @@
                     'steps' => [
                         [
                             'route' => 'dashboard',
-                            'selector' => '#onboarding-anchor-welcome',
+                            'selector' => '.dashboard-title',
                             'title' => 'Bem-vindos ao DuoZen',
                             'body' => 'Este é o painel. Nos próximos passos vamos indicar onde cadastrar a primeira conta, criar uma categoria do jeito de vocês e registrar o primeiro lançamento.',
                             'prevUrl' => null,

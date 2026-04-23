@@ -91,89 +91,95 @@
                     </button>
                 </div>
             @else
-                <div class="vstack gap-3">
+                <div class="row g-3">
                     @foreach($items as $item)
                         @php
                             $accent = $item->account?->color ?? ($item->type === 'income' ? '#198754' : '#0d6efd');
                             $pendingThisMonth = $item->is_active && ! $item->hasGeneratedForCalendarMonth(now()->year, now()->month);
                             $isCard = $item->funding === \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD;
                         @endphp
-                        <article class="card border-0 rt-item-card shadow-sm overflow-hidden" style="--rt-accent: {{ $accent }}">
-                            <div class="rt-item-card__accent" aria-hidden="true"></div>
-                            <div class="card-body p-0">
-                                <div class="rt-item-card__top px-3 px-sm-4 pt-3 pb-3">
-                                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-                                        <div class="d-flex align-items-start gap-3 min-w-0 flex-grow-1">
-                                            <div class="rt-item-card__avatar flex-shrink-0 text-white" style="background-color: {{ $accent }}">
-                                                @if($isCard)
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                                                @else
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                @endif
-                                            </div>
-                                            <div class="min-w-0 flex-grow-1">
-                                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                                    <h3 class="rt-item-card__title mb-0 text-truncate">{{ $item->description }}</h3>
-                                                    <span class="rt-item-card__type {{ $item->type === 'income' ? 'rt-item-card__type--income' : 'rt-item-card__type--expense' }}">
-                                                        {{ $item->type === 'income' ? 'Receita' : 'Despesa' }}
-                                                    </span>
-                                                    @if($item->is_active)
-                                                        <span class="rt-item-card__badge rt-item-card__badge--ok">Ativo</span>
+                        <div class="col-12 col-lg-6">
+                            <article class="card border-0 rt-item-card shadow-sm overflow-hidden h-100" style="--rt-accent: {{ $accent }}">
+                                <div class="rt-item-card__accent" aria-hidden="true"></div>
+                                <div class="card-body p-0 d-flex flex-column h-100">
+                                    <div class="rt-item-card__top px-3 px-sm-4 pt-3 pb-3">
+                                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                                            <div class="d-flex align-items-start gap-3 min-w-0 flex-grow-1">
+                                                <div class="rt-item-card__avatar flex-shrink-0 text-white" style="background-color: {{ $accent }}">
+                                                    @if($isCard)
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                                                     @else
-                                                        <span class="rt-item-card__badge">Inativo</span>
-                                                    @endif
-                                                    @if($pendingThisMonth)
-                                                        <span class="rt-item-card__badge rt-item-card__badge--pending">Pendente no mês</span>
-                                                    @elseif($item->is_active)
-                                                        <span class="rt-item-card__badge rt-item-card__badge--done">Registado no mês</span>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                                     @endif
                                                 </div>
-                                                <p class="rt-item-card__meta small mb-0">
-                                                    <span class="rt-item-card__amount">R$ {{ number_format((float) $item->amount, 2, ',', '.') }}</span>
-                                                    <span class="text-secondary">· Dia {{ $item->day_of_month }}</span>
-                                                    <span class="text-secondary">· {{ $item->account?->name ?? 'Conta' }}</span>
-                                                    @if($item->funding === \App\Models\RecurringTransaction::FUNDING_ACCOUNT && $item->payment_method)
-                                                        <span class="text-secondary">· {{ $item->payment_method }}</span>
-                                                    @endif
-                                                </p>
+                                                <div class="min-w-0 flex-grow-1">
+                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                        <h3 class="rt-item-card__title mb-0 text-truncate">{{ $item->description }}</h3>
+                                                        <span class="rt-item-card__type {{ $item->type === 'income' ? 'rt-item-card__type--income' : 'rt-item-card__type--expense' }}">
+                                                            {{ $item->type === 'income' ? 'Receita' : 'Despesa' }}
+                                                        </span>
+                                                        @if($item->is_active)
+                                                            <span class="rt-item-card__badge rt-item-card__badge--ok">Ativo</span>
+                                                        @else
+                                                            <span class="rt-item-card__badge">Inativo</span>
+                                                        @endif
+                                                        @if($pendingThisMonth)
+                                                            <span class="rt-item-card__badge rt-item-card__badge--pending">Pendente no mês</span>
+                                                        @elseif($item->is_active)
+                                                            <span class="rt-item-card__badge rt-item-card__badge--done">Registado no mês</span>
+                                                        @endif
+                                                    </div>
+                                                    <p class="rt-item-card__meta small mb-0">
+                                                        <span class="rt-item-card__amount">R$ {{ number_format((float) $item->amount, 2, ',', '.') }}</span>
+                                                        <span class="text-secondary">· Dia {{ $item->day_of_month }}</span>
+                                                        <span class="text-secondary">· {{ $item->account?->name ?? 'Conta' }}</span>
+                                                        @if($item->funding === \App\Models\RecurringTransaction::FUNDING_ACCOUNT && $item->payment_method)
+                                                            <span class="text-secondary">· {{ $item->payment_method }}</span>
+                                                        @endif
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="rt-item-card__toolbar d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
-                                            @if(!$item->hasGeneratedForCalendarMonth(now()->year, now()->month))
-                                                <a href="{{ route('dashboard', ['prefill_recurring' => $item->id, 'period' => now()->format('Y-m')]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
-                                            @endif
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm rt-item-card__btn-edit rounded-pill px-3 btn-rt-edit"
-                                                data-bs-toggle="tooltip"
-                                                data-bs-placement="top"
-                                                title="Alterar valor, dia, conta ou categorias do modelo"
-                                                data-rt-edit-id="{{ $item->id }}"
-                                            >Editar</button>
-                                            <form method="POST" action="{{ route('recurring-transactions.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remover este modelo? Lançamentos já gerados não serão apagados.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Remover este modelo (os lançamentos já criados permanecem no histórico)">Excluir</button>
-                                            </form>
+                                    </div>
+                                    <div class="rt-item-card__body px-3 px-sm-4 pb-4 d-flex flex-column flex-grow-1">
+                                        <p class="rt-item-card__cats-label small text-secondary text-uppercase fw-semibold mb-2">Categorias</p>
+
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <div class="rt-item-card__chips flex-grow-1 min-w-0">
+                                                @forelse($item->categorySplits as $sp)
+                                                    @php $c = $sp->category; @endphp
+                                                    <span
+                                                        class="rt-cat-chip"
+                                                        @if($c?->color) style="--rt-cat-chip-color: {{ $c->color }}" @endif
+                                                    >{{ $c?->name ?? '—' }}</span>
+                                                @empty
+                                                    <span class="rt-cat-chip rt-cat-chip--muted">Sem categorias</span>
+                                                @endforelse
+                                            </div>
+
+                                            <div class="rt-item-card__toolbar d-flex flex-wrap align-items-center gap-2 justify-content-end flex-shrink-0 ms-auto">
+                                                @if(!$item->hasGeneratedForCalendarMonth(now()->year, now()->month))
+                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $item->id, 'period' => now()->format('Y-m')]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
+                                                @endif
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm rt-item-card__btn-edit rounded-pill px-3 btn-rt-edit"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    title="Alterar valor, dia, conta ou categorias do modelo"
+                                                    data-rt-edit-id="{{ $item->id }}"
+                                                >Editar</button>
+                                                <form method="POST" action="{{ route('recurring-transactions.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remover este modelo? Lançamentos já gerados não serão apagados.');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Remover este modelo (os lançamentos já criados permanecem no histórico)">Excluir</button>
+                                                </form>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="rt-item-card__body px-3 px-sm-4 pb-4">
-                                    <p class="rt-item-card__cats-label small text-secondary text-uppercase fw-semibold mb-2">Categorias</p>
-                                    <div class="rt-item-card__chips">
-                                        @forelse($item->categorySplits as $sp)
-                                            @php $c = $sp->category; @endphp
-                                            <span
-                                                class="rt-cat-chip"
-                                                @if($c?->color) style="--rt-cat-chip-color: {{ $c->color }}" @endif
-                                            >{{ $c?->name ?? '—' }}</span>
-                                        @empty
-                                            <span class="rt-cat-chip rt-cat-chip--muted">Sem categorias</span>
-                                        @endforelse
-                                    </div>
-                                </div>
-                            </div>
-                        </article>
+                            </article>
+                        </div>
                     @endforeach
                 </div>
             @endif

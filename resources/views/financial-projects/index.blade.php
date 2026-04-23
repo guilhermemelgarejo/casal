@@ -169,7 +169,7 @@
                                     <x-input-error :messages="$errors->get('color')" class="mt-2" />
                                 </div>
                                 <div class="rounded-3 border border-secondary-subtle bg-body-secondary p-3">
-                                    <p class="dz-kpi-label mb-1">Progresso atual</p>
+                                    <p class="dz-stat-label mb-1">Progresso atual</p>
                                     <p class="h5 mb-0 fw-semibold" id="fp-edit-saved">R$ 0,00</p>
                                 </div>
                             </div>
@@ -200,7 +200,7 @@
                                     $remaining = $target !== null ? max(0.0, $target - $saved) : null;
                                     $pct = ($target !== null && $target > 0.00001) ? min(100.0, ($saved / $target) * 100.0) : null;
                                 @endphp
-                                <p class="dz-kpi-label mb-0">Guardado</p>
+                                <p class="dz-stat-label mb-0">Guardado</p>
                                 <p class="h5 fw-semibold mb-2">R$ {{ number_format($saved, 2, ',', '.') }}</p>
                                 @if($target !== null)
                                     <p class="small text-secondary mb-1">Meta: R$ {{ number_format($target, 2, ',', '.') }}</p>

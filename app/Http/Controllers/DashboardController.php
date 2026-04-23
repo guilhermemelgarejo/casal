@@ -4,13 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
-use App\Models\Budget;
 use App\Models\Category;
 use App\Models\FinancialProject;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Support\CreditCardInvoiceReminders;
-use App\Support\DashboardAnalytics;
 use App\Support\PaymentMethods;
 use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
@@ -71,16 +69,6 @@ class DashboardController extends Controller
         $year = (int) ($parts[0] ?? date('Y'));
         $month = (int) ($parts[1] ?? date('m'));
 
-        if ($request->filled('burn_base')) {
-            $request->validate([
-                'burn_base' => ['required', 'string', 'in:income,budget'],
-            ]);
-            $user = Auth::user();
-            $prefs = $user->dashboard_widget_prefs ?? [];
-            $prefs['burn_base'] = $request->string('burn_base')->toString();
-            $user->forceFill(['dashboard_widget_prefs' => $prefs])->save();
-        }
-
         $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
         $filteredRegularAccountBalance = null;
         if ($filterAccountId !== null) {
@@ -94,7 +82,7 @@ class DashboardController extends Controller
         }
 
         $statsTransactions = $couple->transactions()
-            ->whereMatchesDashboardKpiPeriod($month, $year)
+            ->whereMatchesDashboardPeriod($month, $year)
             ->with(['accountModel', 'categorySplits.category'])
             ->latest('date')
             ->get();
@@ -160,60 +148,6 @@ class DashboardController extends Controller
         $thresholdAmount = ($income * $thresholdPercentage) / 100;
         $showAlert = $income > 0 && $totalExpense >= $thresholdAmount;
 
-        $regularFlowFilterId = null;
-        if ($filterAccountId !== null) {
-            $fa = Account::query()->where('couple_id', $couple->id)->whereKey($filterAccountId)->first();
-            if ($fa && $fa->kind === Account::KIND_REGULAR) {
-                $regularFlowFilterId = $filterAccountId;
-            }
-        }
-        $regularCashFlow = DashboardAnalytics::regularAccountCashFlow($couple, $month, $year, $regularFlowFilterId);
-
-        $cycleRef = DashboardAnalytics::creditCardCycleReferenceFromFilterMonth($month, $year);
-        $creditCardKpiFilterId = null;
-        if ($filterAccountId !== null) {
-            $fca = Account::query()->where('couple_id', $couple->id)->whereKey($filterAccountId)->first();
-            if ($fca && $fca->isCreditCard()) {
-                $creditCardKpiFilterId = $filterAccountId;
-            }
-        }
-        $creditCardKpiTotal = DashboardAnalytics::creditCardExpensesInCycle(
-            $couple,
-            $cycleRef['month'],
-            $cycleRef['year'],
-            $creditCardKpiFilterId
-        );
-
-        $prevAnchor = Carbon::createFromDate($year, $month, 1)->subMonth();
-        $prevYear = (int) $prevAnchor->year;
-        $prevMonth = (int) $prevAnchor->month;
-        $kpiPrev = DashboardAnalytics::dashboardKpiTotals($couple, $prevMonth, $prevYear);
-        $plannedPrev = $couple->resolvePlannedMonthlyIncomeForMonth($prevYear, $prevMonth);
-        $deltaPlannedVsRealized = (float) $totalIncome - (float) $plannedIncomeResolved;
-        $momIncomeDelta = (float) $totalIncome - (float) $kpiPrev['income'];
-        $momIncomePct = $kpiPrev['income'] > 0.00001
-            ? (($momIncomeDelta / $kpiPrev['income']) * 100.0)
-            : null;
-
-        $burnBase = Auth::user()->dashboard_widget_prefs['burn_base'] ?? 'income';
-        $burnDaysRemaining = DashboardAnalytics::calendarDaysRemainingInSelectorMonth($month, $year);
-        $remainingRenda = max(0.0, (float) $plannedIncomeResolved - (float) $totalExpense);
-        $remainingBudget = DashboardAnalytics::budgetHeadroomRemaining($couple, $month, $year);
-        $budgetRowsCount = Budget::query()
-            ->where('couple_id', $couple->id)
-            ->where('month', $month)
-            ->where('year', $year)
-            ->count();
-        $burnRemaining = $burnBase === 'budget' ? $remainingBudget : $remainingRenda;
-        $burnPerDay = $burnDaysRemaining > 0 ? $burnRemaining / $burnDaysRemaining : null;
-        $showBurnSetupCta = ((float) $plannedIncomeResolved <= 0.0) && $budgetRowsCount === 0;
-
-        $momExpenseDelta = (float) $totalExpense - (float) $kpiPrev['expense'];
-        $momBalanceDelta = (float) $balance - (float) $kpiPrev['balance'];
-        $momCardDelta = $creditCardKpiTotal - (float) $kpiPrev['card_spend'];
-        $topCategoriesCurrent = DashboardAnalytics::topExpenseCategories($couple, $month, $year, 8);
-        $topCategoriesPrev = DashboardAnalytics::topExpenseCategories($couple, $prevMonth, $prevYear, 8);
-
         $now = Carbon::now();
         $recurringReminders = $couple->recurringTransactions()
             ->where('is_active', true)
@@ -222,33 +156,9 @@ class DashboardController extends Controller
             ->filter(fn (RecurringTransaction $r) => $r->shouldShowReminder($now))
             ->values();
 
-        $cardAccounts = $couple->accounts()
-            ->where('kind', Account::KIND_CREDIT_CARD)
-            ->orderBy('name')
-            ->get();
-
-        $cycleReportAccount = null;
-        if ($creditCardKpiFilterId !== null) {
-            $cycleReportAccount = $cardAccounts->firstWhere('id', $creditCardKpiFilterId);
-        }
-        $cycleReportAccount ??= $cardAccounts->first();
-
-        $hiddenDashboardPanels = array_values(array_intersect(
-            DashboardWidgetsController::PANEL_KEYS,
-            array_map('strval', (array) (Auth::user()->dashboard_widget_prefs['hidden_panels'] ?? []))
-        ));
-
-        $dashboardPanelLabels = [
-            'reminders' => 'Lembretes (recorrentes e faturas)',
-            'kpis' => 'Receitas, despesas e saldo do período',
-            'liquidity' => 'Fluxo em contas, cartão e renda planejada',
-            'mom_burn' => 'Comparativo mês anterior e burn rate',
-            'top_cats' => 'Top categorias de despesa',
-        ];
-
         $creditCardInvoiceReminders = CreditCardInvoiceReminders::openStatementsForCouple(
             (int) $couple->id,
-            $cardAccounts,
+            $couple->accounts()->where('kind', Account::KIND_CREDIT_CARD)->orderBy('name')->get(),
             $now
         );
 
@@ -372,30 +282,6 @@ class DashboardController extends Controller
                 'canCreateAccountTransfer',
                 'transferPaymentMethods',
                 'plannedIncomeResolved',
-                'regularCashFlow',
-                'cycleRef',
-                'creditCardKpiTotal',
-                'prevMonth',
-                'prevYear',
-                'plannedPrev',
-                'deltaPlannedVsRealized',
-                'momIncomeDelta',
-                'momIncomePct',
-                'burnBase',
-                'burnDaysRemaining',
-                'remainingRenda',
-                'remainingBudget',
-                'burnRemaining',
-                'burnPerDay',
-                'showBurnSetupCta',
-                'momExpenseDelta',
-                'momBalanceDelta',
-                'momCardDelta',
-                'topCategoriesCurrent',
-                'topCategoriesPrev',
-                'cycleReportAccount',
-                'hiddenDashboardPanels',
-                'dashboardPanelLabels'
             ),
             $modalPayload
         ));

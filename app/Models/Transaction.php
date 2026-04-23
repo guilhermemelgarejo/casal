@@ -359,7 +359,7 @@ class Transaction extends Model
 
     /**
      * Exclui despesas vinculadas à quitação de fatura (evita duplicar gasto no cartão + pagamento em agregações que tratam tudo junto).
-     * Usado em **Orçamentos** e outras agregações em que a quitação de fatura não deve contar em duplicado com o gasto no cartão — **não** nos KPIs Receitas/Despesas/Saldo do painel (`whereMatchesDashboardKpiPeriod`).
+     * Usado em **Orçamentos** e outras agregações em que a quitação de fatura não deve contar em duplicado com o gasto no cartão — não no resumo do painel (`whereMatchesDashboardPeriod`).
      */
     public function scopeExcludingCreditCardInvoicePayments(Builder $query): Builder
     {
@@ -367,7 +367,7 @@ class Transaction extends Model
     }
 
     /**
-     * Par de lançamentos criado em transferência entre contas (não entra em KPIs nem gasto por categoria).
+     * Par de lançamentos criado em transferência entre contas (não entra em agregações do painel nem gasto por categoria).
      */
     public function scopeExcludingInternalTransfers(Builder $query): Builder
     {
@@ -375,11 +375,11 @@ class Transaction extends Model
     }
 
     /**
-     * Mês de referência para os cartões **Receitas**, **Despesas** e **Saldo** do painel: toda receita;
+     * Mês de referência para o resumo do painel: toda receita;
      * despesas **efetivas em caixa** (conta que não é cartão de crédito **ou** lançamento de pagamento de fatura na conta corrente).
      * **Exclui** compras lançadas diretamente no cartão de crédito (ainda não “pagas” pela conta).
      */
-    public function scopeWhereMatchesDashboardKpiPeriod(Builder $query, int $month, int $year): Builder
+    public function scopeWhereMatchesDashboardPeriod(Builder $query, int $month, int $year): Builder
     {
         return $query
             ->where('reference_month', $month)
