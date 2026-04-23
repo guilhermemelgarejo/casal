@@ -82,4 +82,50 @@ class FinancialProjectInterestTest extends TestCase
             ->delete(route('cofrinhos.interest.destroy', $entry))
             ->assertStatus(404);
     }
+
+    public function test_cannot_store_interest_in_project_of_another_couple(): void
+    {
+        ['user' => $user] = $this->seedCofrinhoSetup();
+
+        $otherCouple = Couple::factory()->create();
+        $otherProject = FinancialProject::create([
+            'couple_id' => $otherCouple->id,
+            'name' => 'Outro',
+            'target_amount' => '100.00',
+        ]);
+
+        $this->actingAs($user)->post(route('cofrinhos.interest.store', $otherProject), [
+            'amount' => '9.99',
+            'date' => '2026-04-22',
+            'note' => 'Tentativa indevida',
+        ])->assertStatus(404);
+
+        $this->assertDatabaseMissing('financial_project_entries', [
+            'financial_project_id' => $otherProject->id,
+            'amount' => 9.99,
+        ]);
+    }
+
+    public function test_cannot_update_project_of_another_couple(): void
+    {
+        ['user' => $user] = $this->seedCofrinhoSetup();
+
+        $otherCouple = Couple::factory()->create();
+        $otherProject = FinancialProject::create([
+            'couple_id' => $otherCouple->id,
+            'name' => 'Outro',
+            'target_amount' => '100.00',
+            'color' => '#111111',
+        ]);
+
+        $this->actingAs($user)->put(route('cofrinhos.update', $otherProject), [
+            'name' => 'Hack',
+            'target_amount' => '999.99',
+            'color' => '#222222',
+        ])->assertStatus(404);
+
+        $otherProject->refresh();
+        $this->assertSame('Outro', $otherProject->name);
+        $this->assertSame('100.00', number_format((float) $otherProject->target_amount, 2, '.', ''));
+    }
 }

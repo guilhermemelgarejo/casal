@@ -867,8 +867,8 @@ class TransactionController extends Controller
                 if (($month === null || $year === null) && isset($q['period']) && is_string($q['period'])) {
                     $periodParts = explode('-', $q['period']);
                     if (count($periodParts) >= 2) {
-                        $py = (int) ($periodParts[0] ?? 0);
-                        $pm = (int) ($periodParts[1] ?? 0);
+                        $py = (int) $periodParts[0];
+                        $pm = (int) $periodParts[1];
                         if ($pm >= 1 && $pm <= 12 && $py >= 2000 && $py <= 2100) {
                             $month = $pm;
                             $year = $py;

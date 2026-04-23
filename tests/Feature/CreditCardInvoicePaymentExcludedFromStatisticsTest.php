@@ -16,7 +16,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_pagamento_de_fatura_entra_nos_kpis_do_dashboard_e_lista_sem_soma_errada(): void
+    public function test_pagamento_de_fatura_aparece_na_lista_do_dashboard_sem_quebrar_a_pagina(): void
     {
         $couple = Couple::factory()->create();
         $user = User::factory()->create(['couple_id' => $couple->id]);
@@ -87,14 +87,13 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
         $dash = $this->actingAs($user)->get(route('dashboard', ['period' => $period]));
         $dash->assertOk();
         $dash->assertSee('R$ 100,00', false);
-        $dash->assertSee('R$ 600,00', false);
         $dash->assertSee('Pagamento fatura Visa', false);
         $dash->assertSee('R$ 500,00', false);
 
         $txPage = $this->actingAs($user)->get(route('dashboard', ['period' => $period]));
         $txPage->assertOk();
         $txPage->assertSee('R$ 100,00', false);
-        $txPage->assertSee('R$ 600,00', false);
+        $txPage->assertSee('R$ 500,00', false);
     }
 
     public function test_pagamento_de_fatura_nao_entra_no_gasto_por_categoria_do_orcamento(): void

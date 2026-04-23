@@ -43,7 +43,6 @@ class DashboardController extends Controller
                 Rule::requiredIf(fn () => $request->filled('prefill_cofrinho_kind')),
                 'nullable',
                 'integer',
-                Rule::exists('financial_projects', 'id')->where('couple_id', $couple->id),
             ],
             'prefill_cofrinho_kind' => [
                 Rule::requiredIf(fn () => $request->filled('prefill_cofrinho')),
@@ -66,8 +65,8 @@ class DashboardController extends Controller
         }
 
         $parts = explode('-', $period);
-        $year = (int) ($parts[0] ?? date('Y'));
-        $month = (int) ($parts[1] ?? date('m'));
+        $year = (int) $parts[0];
+        $month = (int) $parts[1];
 
         $filterAccountId = isset($validated['account_id']) ? (int) $validated['account_id'] : null;
         $filteredRegularAccountBalance = null;
@@ -83,8 +82,7 @@ class DashboardController extends Controller
 
         $statsTransactions = $couple->transactions()
             ->whereMatchesDashboardPeriod($month, $year)
-            ->with(['accountModel', 'categorySplits.category'])
-            ->latest('date')
+            ->select('type', 'amount')
             ->get();
 
         $transactionsForPeriod = $couple->transactions()
@@ -136,9 +134,7 @@ class DashboardController extends Controller
             $transactionAmountEditMeta[$txRow->id] = TransactionListingPresentation::transactionAmountEditMeta($txRow);
         }
 
-        $totalIncome = $statsTransactions->where('type', 'income')->sum('amount');
         $totalExpense = $statsTransactions->where('type', 'expense')->sum('amount');
-        $balance = $totalIncome - $totalExpense;
 
         $couple->refresh();
         $plannedIncomeResolved = $couple->resolvePlannedMonthlyIncomeForMonth($year, $month);
@@ -243,9 +239,9 @@ class DashboardController extends Controller
             if ($rt !== null) {
                 $anchor = Carbon::createFromDate($year, $month, 1);
                 $payload = $rt->toTransactionPrefillPayload($anchor);
-                if ($txFormMode === 'regular_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_CREDIT_CARD) {
+                if ($txFormMode === 'regular_only' && $payload['funding'] === RecurringTransaction::FUNDING_CREDIT_CARD) {
                     $txRecurringPrefillBlockedReason = 'Este modelo usa cartão de crédito. Cadastre um cartão em Gerenciar contas para abrir o formulário já pré-preenchido.';
-                } elseif ($txFormMode === 'cards_only' && ($payload['funding'] ?? '') === RecurringTransaction::FUNDING_ACCOUNT) {
+                } elseif ($txFormMode === 'cards_only' && $payload['funding'] === RecurringTransaction::FUNDING_ACCOUNT) {
                     $txRecurringPrefillBlockedReason = 'Este modelo usa conta à ordem. Cadastre uma conta em Gerenciar contas para abrir o formulário já pré-preenchido.';
                 } else {
                     $txRecurringPrefill = $payload;
@@ -257,9 +253,7 @@ class DashboardController extends Controller
             compact(
                 'couple',
                 'transactions',
-                'totalIncome',
                 'totalExpense',
-                'balance',
                 'period',
                 'month',
                 'year',

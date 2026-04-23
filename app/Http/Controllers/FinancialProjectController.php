@@ -48,6 +48,8 @@ class FinancialProjectController extends Controller
 
     public function update(Request $request, FinancialProject $cofrinho): RedirectResponse
     {
+        $this->authorizeCofrinho($cofrinho);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'target_amount' => ['nullable', 'numeric', 'min:0'],
@@ -65,6 +67,8 @@ class FinancialProjectController extends Controller
 
     public function destroy(FinancialProject $cofrinho): RedirectResponse
     {
+        $this->authorizeCofrinho($cofrinho);
+
         if ($cofrinho->transactions()->exists()) {
             return redirect()->route('cofrinhos.index')->with('error', 'Não é possível excluir: há lançamentos vinculados a este cofrinho.');
         }
@@ -75,6 +79,8 @@ class FinancialProjectController extends Controller
 
     public function storeInterest(Request $request, FinancialProject $cofrinho): RedirectResponse
     {
+        $this->authorizeCofrinho($cofrinho);
+
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
             'date' => ['required', 'date'],
@@ -100,5 +106,10 @@ class FinancialProjectController extends Controller
         $entry->delete();
 
         return redirect()->route('cofrinhos.index')->with('success', 'Juros removidos.');
+    }
+
+    private function authorizeCofrinho(FinancialProject $cofrinho): void
+    {
+        abort_unless((int) $cofrinho->couple_id === (int) Auth::user()->couple_id, 403);
     }
 }
