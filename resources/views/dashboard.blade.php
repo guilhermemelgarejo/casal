@@ -180,7 +180,7 @@
                 <div class="list-group list-group-flush" role="list">
                     @include('transactions.partials.transaction-list-rows', [
                         'emptyTitle' => 'Nenhum lançamento neste período',
-                        'emptyHint' => 'Altere o mês no filtro do painel ou registe com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.',
+                        'emptyHint' => 'Altere o mês no filtro do painel ou registre com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.',
                     ])
                 </div>
             </div>

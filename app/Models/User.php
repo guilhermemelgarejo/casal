@@ -31,7 +31,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Primeiro token do nome (espaços), para exibição compacta (ex.: coluna «Registado por»).
+     * Primeiro token do nome (espaços), para exibição compacta (ex.: coluna "Registrado por").
      */
     public function firstGivenName(): string
     {

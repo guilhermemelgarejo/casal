@@ -275,7 +275,7 @@ class TransactionListingPresentation
         if ($t->internal_transfer_group_id) {
             return [
                 'canEditAmount' => false,
-                'blockedMessage' => 'Não é possível alterar o valor de uma transferência entre contas. Exclua os dois lançamentos e registe de novo.',
+                'blockedMessage' => 'Não é possível alterar o valor de uma transferência entre contas. Exclua os dois lançamentos e registre de novo.',
                 'needsCreditLimitPrecheck' => false,
                 'precheckUrl' => null,
             ];

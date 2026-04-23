@@ -369,7 +369,7 @@ class TransactionController extends Controller
     private function transactionAmountEditBlockedReason(Transaction $transaction): ?string
     {
         if ($transaction->internal_transfer_group_id) {
-            return 'Não é possível alterar o valor de uma transferência entre contas. Exclua os dois lançamentos e registe de novo.';
+            return 'Não é possível alterar o valor de uma transferência entre contas. Exclua os dois lançamentos e registre de novo.';
         }
 
         if ($transaction->isCreditCardInvoicePaymentTransaction()) {
@@ -391,7 +391,7 @@ class TransactionController extends Controller
     private function transactionEditBlockedReason(Transaction $transaction, bool $wantsAmountChange): ?string
     {
         if ($transaction->internal_transfer_group_id) {
-            return 'Não é possível alterar uma transferência entre contas. Exclua os dois lançamentos e registe de novo.';
+            return 'Não é possível alterar uma transferência entre contas. Exclua os dois lançamentos e registre de novo.';
         }
 
         if ($transaction->isCreditCardInvoicePaymentTransaction()) {

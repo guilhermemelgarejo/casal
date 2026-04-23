@@ -126,7 +126,7 @@
                                                         @if($pendingThisMonth)
                                                             <span class="rt-item-card__badge rt-item-card__badge--pending">Pendente no mês</span>
                                                         @elseif($item->is_active)
-                                                            <span class="rt-item-card__badge rt-item-card__badge--done">Registado no mês</span>
+                                                            <span class="rt-item-card__badge rt-item-card__badge--done">Registrado no mês</span>
                                                         @endif
                                                     </div>
                                                     <p class="rt-item-card__meta small mb-0">

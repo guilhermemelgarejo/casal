@@ -35,7 +35,7 @@
                             </div>
                             <h3 class="h5 mb-2">Nenhum cartão cadastrado</h3>
                             <p class="small text-secondary mb-4 mx-auto cc-picker-empty-text">
-                                Cadastre um <strong>cartão de crédito</strong> em <a href="{{ route('accounts.index') }}">Contas</a> e registe compras no <a href="{{ route('dashboard') }}">Painel</a> para ver as faturas aqui.
+                                Cadastre um <strong>cartão de crédito</strong> em <a href="{{ route('accounts.index') }}">Contas</a> e registre compras no <a href="{{ route('dashboard') }}">Painel</a> para ver as faturas aqui.
                             </p>
                             <a href="{{ route('accounts.index') }}" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Cadastrar um cartão de crédito em Contas">Ir para Contas</a>
                         </div>
@@ -249,7 +249,7 @@
                                                                 >
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="tooltip" data-bs-placement="top" title="Eliminar esta fatura avulsa">Excluir</button>
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir esta fatura avulsa">Excluir</button>
                                                                 </form>
                                                             @endif
                                                             @unless ($meta?->is_avulsa)

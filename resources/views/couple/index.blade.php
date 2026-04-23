@@ -82,7 +82,7 @@
                         <div class="couple-summary-head px-4 py-4">
                             <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-lg-between gap-3">
                                 <div class="min-w-0">
-                                    <p class="small text-secondary text-uppercase fw-semibold mb-1" style="font-size: 0.65rem; letter-spacing: 0.06em;">O vosso casal</p>
+                                    <p class="small text-secondary text-uppercase fw-semibold mb-1" style="font-size: 0.65rem; letter-spacing: 0.06em;">O casal de vocês</p>
                                     <h3 class="h4 mb-3 fw-semibold text-truncate" title="{{ $couple->name }}">{{ $couple->name }}</h3>
                                     <div class="d-flex flex-wrap gap-2">
                                         <span class="couple-stat-pill text-secondary">

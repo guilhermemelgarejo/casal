@@ -15,4 +15,4 @@ Um aplicativo web moderno e responsivo para controle financeiro compartilhado en
 
 ##  Licença
 
-Este projeto é um software de código aberto licenciado sob a [MIT license](https://opensource.org/licenses/MIT).
+Este projeto é um software de código aberto licenciado sob a [licença MIT](https://opensource.org/licenses/MIT).

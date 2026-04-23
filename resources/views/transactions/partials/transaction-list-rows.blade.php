@@ -4,7 +4,7 @@
             <div>Data</div>
             <div>Descrição</div>
             <div>Categorias</div>
-            <div>Registado por</div>
+            <div>Registrado por</div>
             <div>Pagamento / conta</div>
             <div>Valor</div>
             <div class="text-end text-nowrap">Ações</div>
@@ -29,7 +29,7 @@
         $blockedMsg = 'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
         $accRow = $transaction->accountModel;
         $registeredByLabel = $transaction->user?->firstGivenName() ?? '';
-        $registeredByTitle = $transaction->user ? 'Registado por '.$transaction->user->name : '';
+        $registeredByTitle = $transaction->user ? 'Registrado por '.$transaction->user->name : '';
         $txAllocationsMeta = $transaction->categorySplits
             ->map(fn ($sp) => ['category_id' => (int) $sp->category_id, 'amount' => number_format((float) $sp->amount, 2, '.', '')])
             ->values()
@@ -74,7 +74,7 @@
             </div>
             <div class="tx-cell-truncate small">
                 <div class="text-truncate" title="{{ $registeredByTitle }}">
-                    <span class="d-lg-none text-secondary">Registado por </span><span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
+                    <span class="d-lg-none text-secondary">Registrado por </span><span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
                 </div>
             </div>
             <div class="small text-body-secondary tx-cell-truncate">
@@ -225,7 +225,7 @@
     <div class="list-group-item border-0 text-center py-4" role="listitem">
         <div class="tx-empty-state py-5 px-3">
             <p class="fw-semibold text-body mb-1">{{ $emptyTitle ?? 'Nenhum lançamento neste período' }}</p>
-            <p class="small text-secondary mb-0 mx-auto" style="max-width: 22rem;">{!! $emptyHint ?? 'Ajuste mês, ano ou conta — ou registe com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.' !!}</p>
+            <p class="small text-secondary mb-0 mx-auto" style="max-width: 22rem;">{!! $emptyHint ?? 'Ajuste mês, ano ou conta — ou registre com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.' !!}</p>
         </div>
     </div>
 @endforelse

@@ -20,7 +20,7 @@
                                 <tr>
                                     <th>Parcela</th>
                                     <th>Descrição</th>
-                                    <th>Registado por</th>
+                                    <th>Registrado por</th>
                                     <th>Ref. fatura</th>
                                     <th>Fatura</th>
                                     <th class="text-end">Valor</th>
@@ -440,7 +440,7 @@
                                     <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total.</p>
                                     @if($txFormMode !== 'cards_only')
                                         <p class="small text-secondary mb-2 border-start border-3 border-primary-subtle ps-2">
-                                            <strong>Cofrinho:</strong> em conta corrente, use a categoria <strong>Investimentos</strong> (despesa) ou <strong>Retirada de cofrinho</strong> (receita) e indique o cofrinho na secção seguinte.
+                                            <strong>Cofrinho:</strong> em conta corrente, use a categoria <strong>Investimentos</strong> (despesa) ou <strong>Retirada de cofrinho</strong> (receita) e indique o cofrinho na seção seguinte.
                                         </p>
                                     @endif
                                     <div id="tx-category-allocations-wrap">
