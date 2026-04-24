@@ -29,6 +29,11 @@
                     </x-nav-link>
                 </li>
                 <li class="nav-item">
+                    <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                        Relatórios
+                    </x-nav-link>
+                </li>
+                <li class="nav-item">
                     <x-nav-link :href="route('recurring-transactions.index')" :active="request()->routeIs('recurring-transactions.*')">
                         Recorrentes
                     </x-nav-link>

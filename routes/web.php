@@ -12,6 +12,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinancialProjectController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,7 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::post('/onboarding/restart', [OnboardingController::class, 'restart'])->name('onboarding.restart');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/relatorios', [ReportController::class, 'index'])->name('reports.index');
 
     Route::resource('cofrinhos', FinancialProjectController::class)
         ->only(['index', 'store', 'update', 'destroy']);
