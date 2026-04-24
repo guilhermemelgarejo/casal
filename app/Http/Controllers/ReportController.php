@@ -11,7 +11,6 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
 {
@@ -21,22 +20,11 @@ class ReportController extends Controller
 
         $validated = $request->validate([
             'period' => ['nullable', 'string', 'regex:/^\d{4}\-\d{2}$/'],
-            'account_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('accounts', 'id')->where('couple_id', (int) $couple->id),
-            ],
         ]);
 
         $period = (string) ($validated['period'] ?? now()->format('Y-m'));
         [$year, $month] = array_map('intval', explode('-', $period));
 
-        $selectedAccount = null;
-        if (isset($validated['account_id'])) {
-            $selectedAccount = $couple->accounts()->whereKey((int) $validated['account_id'])->first();
-        }
-        $filterAccountId = $selectedAccount?->id;
-        $accountsForFilter = $couple->accounts()->orderBy('name')->get();
         $anchorMonth = Carbon::createFromDate($year, $month, 1)->startOfMonth();
         $trendMonths = collect(range(5, 0))
             ->map(fn (int $offset) => $anchorMonth->copy()->subMonths($offset))
@@ -44,7 +32,6 @@ class ReportController extends Controller
 
         $statsTransactions = $couple->transactions()
             ->whereMatchesDashboardPeriod($month, $year)
-            ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
             ->select('type', 'amount')
             ->get();
 
@@ -65,14 +52,13 @@ class ReportController extends Controller
             ->get();
 
         $spentByCategory = TransactionCategorySplit::query()
-            ->whereHas('transaction', function ($q) use ($couple, $month, $year, $filterAccountId) {
+            ->whereHas('transaction', function ($q) use ($couple, $month, $year) {
                 $q->where('couple_id', $couple->id)
                     ->where('type', 'expense')
                     ->where('reference_month', $month)
                     ->where('reference_year', $year)
                     ->excludingCreditCardInvoicePayments()
-                    ->excludingInternalTransfers()
-                    ->when($filterAccountId !== null, fn ($inner) => $inner->where('account_id', $filterAccountId));
+                    ->excludingInternalTransfers();
             })
             ->selectRaw('category_id, SUM(amount) as total')
             ->groupBy('category_id')
@@ -118,7 +104,6 @@ class ReportController extends Controller
 
         $cardAccounts = $couple->accounts()
             ->where('kind', Account::KIND_CREDIT_CARD)
-            ->when($selectedAccount?->isCreditCard(), fn ($q) => $q->whereKey((int) $selectedAccount->id))
             ->orderBy('name')
             ->get();
 
@@ -140,7 +125,6 @@ class ReportController extends Controller
             ->with('account')
             ->where('couple_id', $couple->id)
             ->whereHas('account', fn ($q) => $q->where('kind', Account::KIND_CREDIT_CARD))
-            ->when($selectedAccount?->isCreditCard(), fn ($q) => $q->where('account_id', (int) $selectedAccount->id))
             ->orderByDesc('reference_year')
             ->orderByDesc('reference_month')
             ->get()
@@ -245,19 +229,16 @@ class ReportController extends Controller
             'budget_commitment_pct' => $budgetCommitmentPct,
         ];
 
-        $executiveTrend = $this->buildExecutiveTrend($trendMonths, $filterAccountId, $couple);
-        $budgetCommitmentTrend = $this->buildBudgetCommitmentTrend($couple->id, $trendMonths, $filterAccountId, $couple);
+        $executiveTrend = $this->buildExecutiveTrend($trendMonths, $couple);
+        $budgetCommitmentTrend = $this->buildBudgetCommitmentTrend($couple->id, $trendMonths, $couple);
         $cardUtilizationTrend = $this->buildCardUtilizationTrend($couple->id, $trendMonths, $cardAccounts, $totalLimit);
-        $projectMonthlyNetTrend = $this->buildProjectMonthlyNetTrend($couple->id, $trendMonths, $filterAccountId);
+        $projectMonthlyNetTrend = $this->buildProjectMonthlyNetTrend($couple->id, $trendMonths);
         $recurringDisciplineTrend = $this->buildRecurringDisciplineTrend($trendMonths, $activeRecurring);
 
         return view('reports.index', compact(
             'period',
             'month',
             'year',
-            'filterAccountId',
-            'selectedAccount',
-            'accountsForFilter',
             'executiveKpis',
             'executiveTrend',
             'budgetRows',
@@ -282,15 +263,14 @@ class ReportController extends Controller
         ));
     }
 
-    private function buildExecutiveTrend(Collection $trendMonths, ?int $filterAccountId, $couple): array
+    private function buildExecutiveTrend(Collection $trendMonths, $couple): array
     {
-        $rows = $trendMonths->map(function (Carbon $monthAnchor) use ($filterAccountId, $couple) {
+        $rows = $trendMonths->map(function (Carbon $monthAnchor) use ($couple) {
             $month = (int) $monthAnchor->month;
             $year = (int) $monthAnchor->year;
 
             $stats = $couple->transactions()
                 ->whereMatchesDashboardPeriod($month, $year)
-                ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
                 ->select('type', 'amount')
                 ->get();
 
@@ -315,9 +295,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function buildBudgetCommitmentTrend(int $coupleId, Collection $trendMonths, ?int $filterAccountId, $couple): array
+    private function buildBudgetCommitmentTrend(int $coupleId, Collection $trendMonths, $couple): array
     {
-        $values = $trendMonths->map(function (Carbon $monthAnchor) use ($coupleId, $filterAccountId, $couple) {
+        $values = $trendMonths->map(function (Carbon $monthAnchor) use ($coupleId, $couple) {
             $month = (int) $monthAnchor->month;
             $year = (int) $monthAnchor->year;
             $plannedIncome = (float) $couple->resolvePlannedMonthlyIncomeForMonth($year, $month);
@@ -329,14 +309,13 @@ class ReportController extends Controller
                 ->sum('amount');
 
             $spentTotal = (float) TransactionCategorySplit::query()
-                ->whereHas('transaction', function ($q) use ($coupleId, $month, $year, $filterAccountId) {
+                ->whereHas('transaction', function ($q) use ($coupleId, $month, $year) {
                     $q->where('couple_id', $coupleId)
                         ->where('type', 'expense')
                         ->where('reference_month', $month)
                         ->where('reference_year', $year)
                         ->excludingCreditCardInvoicePayments()
-                        ->excludingInternalTransfers()
-                        ->when($filterAccountId !== null, fn ($inner) => $inner->where('account_id', $filterAccountId));
+                        ->excludingInternalTransfers();
                 })
                 ->sum('amount');
 
@@ -384,9 +363,9 @@ class ReportController extends Controller
         ];
     }
 
-    private function buildProjectMonthlyNetTrend(int $coupleId, Collection $trendMonths, ?int $filterAccountId): array
+    private function buildProjectMonthlyNetTrend(int $coupleId, Collection $trendMonths): array
     {
-        $values = $trendMonths->map(function (Carbon $monthAnchor) use ($coupleId, $filterAccountId) {
+        $values = $trendMonths->map(function (Carbon $monthAnchor) use ($coupleId) {
             $month = (int) $monthAnchor->month;
             $year = (int) $monthAnchor->year;
 
@@ -396,7 +375,6 @@ class ReportController extends Controller
                 ->where('type', 'expense')
                 ->where('reference_month', $month)
                 ->where('reference_year', $year)
-                ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
                 ->sum('amount');
             $out = (float) \App\Models\Transaction::query()
                 ->where('couple_id', $coupleId)
@@ -404,7 +382,6 @@ class ReportController extends Controller
                 ->where('type', 'income')
                 ->where('reference_month', $month)
                 ->where('reference_year', $year)
-                ->when($filterAccountId !== null, fn ($q) => $q->where('account_id', $filterAccountId))
                 ->sum('amount');
             $interest = (float) FinancialProjectEntry::query()
                 ->where('couple_id', $coupleId)

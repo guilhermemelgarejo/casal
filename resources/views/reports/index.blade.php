@@ -109,9 +109,6 @@
                             <h3 class="h5 mb-1 reports-hero-title">Resumo executivo do período</h3>
                             <p class="small text-secondary mb-0">Painel consolidado com os mesmos critérios de cálculo para manter consistência entre telas.</p>
                         </div>
-                        @if($selectedAccount)
-                            <span class="reports-chip">Conta filtrada: {{ $selectedAccount->name }}</span>
-                        @endif
                     </div>
                     <form action="{{ route('reports.index') }}" method="GET" class="reports-filter-shell">
                         <div class="reports-filter-grid">
@@ -128,19 +125,8 @@
                                     aria-label="Mês de referência"
                                 >
                             </div>
-                            <div class="reports-filter-field">
-                                <label class="reports-filter-label" for="reports-account">Conta</label>
-                                <select id="reports-account" name="account_id" class="form-select form-select-sm" aria-label="Conta">
-                                    <option value="" {{ $filterAccountId === null ? 'selected' : '' }}>Todas as contas</option>
-                                    @foreach($accountsForFilter as $account)
-                                        <option value="{{ $account->id }}" {{ (int) ($filterAccountId ?? 0) === (int) $account->id ? 'selected' : '' }}>
-                                            {{ $account->name }}{{ $account->isCreditCard() ? ' (cartão)' : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
                             <button type="submit" class="btn btn-sm btn-primary px-3">Aplicar</button>
-                            @if(request()->has('period') || request()->has('account_id'))
+                            @if(request()->has('period'))
                                 <a href="{{ route('reports.index') }}" class="btn btn-sm btn-outline-secondary px-3">Limpar</a>
                             @endif
                         </div>
