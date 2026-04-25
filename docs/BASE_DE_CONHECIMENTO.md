@@ -38,7 +38,7 @@ app/
   Console/Commands/     # ex.: SyncAccountBalances (`accounts:sync-balances`), RecalculateCreditCardLimits (`accounts:recalc-credit-card-limits`)
   Http/Controllers/     # Dashboard, Couple, Category, Transaction, Budget, Account, AccountTransfer, CreditCardStatement, Billing, Admin/SubscriptionAdmin, Profile, Auth/*
   Http/Middleware/      # EnsureHasCouple (has-couple), EnsureCoupleBillingActive (couple-billing), EnsureCasalAdmin (duozen-admin)
-  Mail/InvitationMail.php
+  Mail/InvitationMail.php, ContactMessageMail.php
   Models/               # User (Billable Cashier), Couple, Category, Transaction, Account, CreditCardStatement, Budget, RecurringTransaction (+ RecurringTransactionCategorySplit)
   Support/PaymentMethods.php, Support/Billing.php, Support/CreditCardInvoiceReminders.php (faturas em aberto no lembrete, até o mês civil seguinte), Support/TransactionListingPresentation.php
 bootstrap/app.php       # aliases de middleware; exceção CSRF `stripe/*`; redirect pós-login → dashboard
@@ -58,6 +58,7 @@ public/vendor/bootstrap, public/css, public/js, `public/favicon.png` (marca; fal
 ## 4. Fluxo de acesso e rotas
 
 - **`/`** — `welcome` (landing), com seção pública sobre assinatura (`resources/views/partials/subscription-public-info.blade.php`).
+- **`/contato`** — página pública de contato (`contact.show` / `contact.send`), acessível também quando logado; envia e-mail para `guilherme.melgarejo@gmail.com` e inclui dados do usuário autenticado quando houver sessão.
 - **`auth`** sem `has-couple` — perfil (`profile.*`), casal (`couple.*`): criar, entrar, convidar, atualizar, sair.
 - **`auth` + `has-couple`** — assinatura (`billing.*`): página do plano, Checkout Stripe, sucesso, portal de faturamento.
 - **`auth` + `has-couple` + `couple-billing`** — dashboard (inclui **lista/filtros de lançamentos** e **transferências entre contas**), categorias (inclui planejamento mensal / orçamento na mesma página), **recorrentes** (`GET/POST/PUT/DELETE /recorrentes`), contas (exige plano ativo quando o faturamento está aplicado); `POST /onboarding/dismiss` (`onboarding.dismiss`) remove da sessão a flag do tour de onboarding; `POST /onboarding/restart` (`onboarding.restart`) volta a ativar o tour e redireciona ao painel (atalho na página **Casal** quando `passesCoupleBillingGate()`).
@@ -109,6 +110,12 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 - **transferBillingOwner:** `POST /couple/transfer-billing-owner` (`couple.transfer-billing-owner`); só quem é `couples.billing_owner_user_id` pode transferir; destino obrigatório, outro membro do mesmo casal. Atualiza `billing_owner_user_id` (metadado no casal; assinatura Cashier continua no usuário que pagou até cancelar/alterar no Stripe).
 - **leave:** `couple_id` null; **bloqueado** se o usuário é `billing_owner_user_id` e existe **outro** membro no casal (deve usar **transferBillingOwner** antes). Se o casal fica **sem** membros, `billing_owner_user_id` é limpo (`null`). Casal sem membros **não** é apagado automaticamente.
 - **UI** (`resources/views/couple/index.blade.php`): wrapper `.couple-page`; cabeçalho com `.couple-page-title` e subtítulo; alertas de sucesso / `session('error')` (ex.: middleware sem casal) estilizados; sem casal — dois cartões `.couple-choice-card` com cabeçalhos `.couple-choice-head--create` / `--join`; com casal — resumo `.couple-summary-card` / `.couple-summary-head`, pills `.couple-stat-pill`, ações em pill (inclui **Ver tour novamente** → `POST onboarding.restart` quando `passesCoupleBillingGate()`); modal **`#modal-edit-couple`** (`x-modal` `edit-couple`), rodapé com botões pill; convite `.couple-invite-card` / `.couple-invite-head`; cartão **Responsável pela assinatura** (transferência) quando há 2 membros e o usuário atual é `billing_owner_user_id`; badge **Responsável pela assinatura** no cartão do membro correspondente; membros `.couple-member-card` e placeholder `.couple-member-placeholder`; **`#copy-invite-link`** inalterado para `public/js/app.js`.
+
+### `ContactController`
+
+- **Rotas públicas:** `GET /contato` (`contact.show`) e `POST /contato` (`contact.send`, com `throttle:5,1`). Visitantes e usuários logados usam a mesma página (`resources/views/contact.blade.php`).
+- **Envio:** valida `name`, `email`, `subject` opcional e `message`; envia `App\Mail\ContactMessageMail` para `guilherme.melgarejo@gmail.com` com `replyTo` do remetente. Quando há usuário autenticado, o e-mail inclui `id`, nome, e-mail e casal vinculado (se houver).
+- **E-mail:** template Markdown em `resources/views/emails/contact-message.blade.php`.
 
 ### `DashboardController`
 
@@ -205,7 +212,7 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 
 ## 9. Navegação (UI)
 
-`resources/views/layouts/navigation.blade.php`: classe `.app-navbar` (gradiente leve, `sticky-top`, sombra, blur opcional; variáveis `--bs-navbar-*` alinhadas ao tema; links principais **sem** mudança visual ao hover; `:focus-visible` nos links com anel roxo); links via `components/nav-link.blade.php` (`.app-nav-link`, pills, estado ativo em roxo); logo `.app-navbar-logo`; usuário desktop com avatar circular (`.app-navbar-user-btn`, `.app-navbar-user-avatar`) e dropdown com menu arredondado; bloco móvel `.app-navbar-mobile`; `components/responsive-nav-link.blade.php` com `.app-responsive-nav-link`. Itens: Painel, **Recorrentes**, Categorias, Contas, **Faturas**, Casal; **Assinatura** (se `couple_id`); **Admin** (se `User::isCasalAdmin()`); dropdown Perfil, Assinatura, assinaturas admin, Sair.
+`resources/views/layouts/navigation.blade.php`: classe `.app-navbar` (gradiente leve, `sticky-top`, sombra, blur opcional; variáveis `--bs-navbar-*` alinhadas ao tema; links principais **sem** mudança visual ao hover; `:focus-visible` nos links com anel roxo); links via `components/nav-link.blade.php` (`.app-nav-link`, pills, estado ativo em roxo); logo `.app-navbar-logo`; usuário desktop com avatar circular (`.app-navbar-user-btn`, `.app-navbar-user-avatar`) e dropdown com menu arredondado; bloco móvel `.app-navbar-mobile`; `components/responsive-nav-link.blade.php` com `.app-responsive-nav-link`. Itens: Painel, **Recorrentes**, Categorias, Contas, **Faturas**, Casal, **Contato**; **Assinatura** (se `couple_id`); **Admin** (se `User::isCasalAdmin()`); dropdown Perfil, Assinatura, assinaturas admin, Sair.
 
 Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/assets.blade.php`, `scripts`. O `@stack('scripts')` fica **depois** de `layouts/partials/scripts.blade.php` (Bootstrap bundle), para que `@push('scripts')` nas páginas possa usar `bootstrap.Modal` e eventos `*.bs.modal` sem `ReferenceError`.
 
@@ -216,7 +223,7 @@ Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/
 - `phpunit.xml`: `APP_URL=http://casal.localhost`, SQLite memória, `DUOZEN_BILLING_DISABLED=true` (evita bloquear dashboard nos testes sem Stripe).
 - **Recomendado:** criar um arquivo `.env.testing` (não versionado) apontando para SQLite `:memory:` para garantir que comandos em `APP_ENV=testing` não atinjam o MySQL do desenvolvimento.
 - `tests/TestCase.php`: desativa o middleware `ValidateCsrfToken` nos testes de funcionalidade (evita 419 em `POST`/`PUT`/`DELETE` sem token).
-- Pastas: `tests/Feature` (Auth, Profile, CoupleAccess, CategoryCrud, `CreditCardStatementTest`, `CreditCardLimitTest`, `CreditCardInvoicePaymentExcludedFromStatisticsTest`, `CreditCardInvoiceCategoryExclusionTest`, `CreditCardInvoiceReminderPanelTest`, `RegularAccountBalanceDisplayTest`, `AccountTransferTest`, `TransactionAmountUpdateTest`, `RecurringTransactionTest`, …), `tests/Unit` (ex.: `PaymentMethodsTest`, `AccountDefaultStatementDueDateTest`, `AccountBalanceFromTransactionsTest`).
+- Pastas: `tests/Feature` (Auth, Profile, CoupleAccess, `ContactPageTest`, CategoryCrud, `CreditCardStatementTest`, `CreditCardLimitTest`, `CreditCardInvoicePaymentExcludedFromStatisticsTest`, `CreditCardInvoiceCategoryExclusionTest`, `CreditCardInvoiceReminderPanelTest`, `RegularAccountBalanceDisplayTest`, `AccountTransferTest`, `TransactionAmountUpdateTest`, `RecurringTransactionTest`, …), `tests/Unit` (ex.: `PaymentMethodsTest`, `AccountDefaultStatementDueDateTest`, `AccountBalanceFromTransactionsTest`).
 - Usuários de `User::factory()` usam senha em texto plano `'password'` no factory; o cast `hashed` do modelo `User` gera o hash ao gravar (alinha com registro/atualização de senha na app).
 
 ---

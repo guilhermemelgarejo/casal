@@ -63,6 +63,11 @@
                         Casal
                     </x-nav-link>
                 </li>
+                <li class="nav-item">
+                    <x-nav-link :href="route('contact.show')" :active="request()->routeIs('contact.*')">
+                        Contato
+                    </x-nav-link>
+                </li>
                 @if(Auth::user()->couple_id)
                     <li class="nav-item">
                         <x-nav-link :href="route('billing.index')" :active="request()->routeIs('billing.*')">
@@ -134,6 +139,9 @@
                 </div>
                 <x-responsive-nav-link :href="route('profile.edit')">
                     Perfil
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('contact.show')">
+                    Contato
                 </x-responsive-nav-link>
                 @if(Auth::user()->couple_id)
                     <x-responsive-nav-link :href="route('billing.index')">

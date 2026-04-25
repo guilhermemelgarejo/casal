@@ -47,6 +47,7 @@
                             />
                         </a>
                         <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">
+                            <a class="btn btn-link btn-sm text-decoration-none text-secondary px-2" href="{{ route('contact.show') }}" title="Entrar em contato">Contato</a>
                             @auth
                                 <a class="btn btn-primary btn-sm" href="{{ url('/dashboard') }}" title="Abrir o painel financeiro">Ir ao painel</a>
                             @else
@@ -204,6 +205,8 @@
                 <footer class="py-4 bg-white border-top mt-auto">
                     <div class="container text-center text-secondary small">
                         &copy; {{ date('Y') }} {{ config('app.name', 'DuoZen') }}
+                        <span class="mx-2">·</span>
+                        <a href="{{ route('contact.show') }}" class="text-secondary text-decoration-none">Contato</a>
                     </div>
                 </footer>
             </main>
