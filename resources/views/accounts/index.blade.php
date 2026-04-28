@@ -6,13 +6,18 @@
     $storeModalOpen = $errors->any() && old('_form') === 'account-store';
     $transferModalOpen = $errors->any() && old('_form') === 'account-transfer';
     $kindOld = old('_form') === 'account-store' ? old('kind', Account::KIND_REGULAR) : Account::KIND_REGULAR;
+    $regularBalanceTotal = (float) $regularAccounts->sum(fn ($account) => (float) $account->balance);
+    $trackedCards = $creditCardAccounts->filter(fn ($account) => $account->tracksCreditCardLimit());
+    $creditLimitTotal = (float) $trackedCards->sum(fn ($account) => (float) $account->credit_card_limit_total);
+    $creditLimitAvailable = (float) $trackedCards->sum(fn ($account) => (float) ($account->credit_card_limit_available ?? 0));
 @endphp
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <div>
-                <h2 class="h5 mb-0 accounts-hero-title">Gerenciar contas e cartões</h2>
-                <p class="small text-secondary mb-0 mt-1">Cadastre contas correntes e cartões para lançamentos e faturas.</p>
+                <p class="small text-secondary mb-1">Contas e crédito</p>
+                <h2 class="h5 mb-0 accounts-hero-title">Contas</h2>
+                <p class="small text-secondary mb-0 mt-1">Cadastre contas correntes e cartões para lançamentos, faturas e transferências.</p>
             </div>
             <div class="d-flex flex-wrap align-items-center gap-2 justify-content-md-end">
                 @if ($canCreateAccountTransfer)
@@ -35,9 +40,9 @@
     </x-slot>
 
     <div class="py-4 accounts-page">
-        <div class="container-xxl px-3 px-lg-4">
+        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
             @if (session('success'))
-                <div class="alert alert-success border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                <div class="alert alert-success border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
                     <span class="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                     </span>
@@ -46,7 +51,7 @@
             @endif
 
             @if ($errors->any() && old('_form') === 'account-transfer')
-                <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                <div class="alert alert-danger border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
                     <span class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     </span>
@@ -61,7 +66,48 @@
                 </div>
             @endif
 
-            <x-cofrinho-promo variant="compact" class="mb-4" />
+            <section class="accounts-hero card border-0 shadow-sm">
+                <div class="card-body p-4 p-lg-5">
+                    <div class="row g-4 align-items-center">
+                        <div class="col-lg-5">
+                            <span class="accounts-hero__badge">Visão geral</span>
+                            <h3 class="accounts-hero__title h4 mt-3 mb-2">A base dos lançamentos e faturas.</h3>
+                            <p class="text-secondary mb-0">Contas correntes guardam saldo persistido; cartões concentram faturas, parcelas e controle opcional de limite.</p>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="accounts-summary-grid">
+                                <div class="accounts-summary-card accounts-summary-card--primary">
+                                    <span class="accounts-summary-card__label">Contas</span>
+                                    <strong class="accounts-summary-card__value">{{ $regularAccounts->count() }}</strong>
+                                    <span class="accounts-summary-card__hint">correntes cadastradas</span>
+                                </div>
+                                <div class="accounts-summary-card accounts-summary-card--success">
+                                    <span class="accounts-summary-card__label">Saldo em contas</span>
+                                    <strong class="accounts-summary-card__money {{ $regularBalanceTotal < 0 ? 'text-danger' : '' }}">R$ {{ number_format($regularBalanceTotal, 2, ',', '.') }}</strong>
+                                    <span class="accounts-summary-card__hint">somatório dos saldos</span>
+                                </div>
+                                <div class="accounts-summary-card">
+                                    <span class="accounts-summary-card__label">Cartões</span>
+                                    <strong class="accounts-summary-card__value">{{ $creditCardAccounts->count() }}</strong>
+                                    <span class="accounts-summary-card__hint">{{ $trackedCards->count() }} com limite</span>
+                                </div>
+                                <div class="accounts-summary-card accounts-summary-card--warning">
+                                    <span class="accounts-summary-card__label">Limite disponível</span>
+                                    <strong class="accounts-summary-card__money {{ $creditLimitAvailable < 0 ? 'text-danger' : '' }}">R$ {{ number_format($creditLimitAvailable, 2, ',', '.') }}</strong>
+                                    <span class="accounts-summary-card__hint">de R$ {{ number_format($creditLimitTotal, 2, ',', '.') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accounts-hero__strip mt-4">
+                        <span>{{ $accounts->count() }} item(ns) no total</span>
+                        <span>{{ $canCreateAccountTransfer ? 'Transferência disponível' : 'Cadastre 2 contas para transferir' }}</span>
+                        <span>{{ $trackedCards->count() }} cartão(ões) com limite monitorado</span>
+                    </div>
+                </div>
+            </section>
+
+            <x-cofrinho-promo variant="compact" />
 
             <div class="row g-4 align-items-start">
                 <div class="col-12">
@@ -69,9 +115,15 @@
                         <div class="col-12 col-lg-6">
                             <section class="h-100" aria-labelledby="accounts-regular-heading">
                                 <div class="accounts-list-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <div class="min-w-0">
-                                        <h3 class="h5 mb-0" id="accounts-regular-heading">Suas contas</h3>
-                                        <p class="small text-secondary mb-0">Contas correntes — dinheiro, débito, Pix ou boleto.</p>
+                                    <div class="accounts-list-header__title-wrap min-w-0">
+                                        <span class="accounts-list-header__icon accounts-list-header__icon--regular" aria-hidden="true">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <span class="accounts-section-kicker">Caixa</span>
+                                            <h3 class="h5 mb-0" id="accounts-regular-heading">Suas contas</h3>
+                                            <p class="small text-secondary mb-0">Dinheiro, débito, Pix ou boleto.</p>
+                                        </div>
                                     </div>
                                     @if ($regularAccounts->isNotEmpty())
                                         <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle px-3 py-2 flex-shrink-0">
@@ -99,9 +151,15 @@
                         <div class="col-12 col-lg-6">
                             <section class="h-100" aria-labelledby="accounts-cards-heading">
                                 <div class="accounts-list-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <div class="min-w-0">
-                                        <h3 class="h5 mb-0" id="accounts-cards-heading">Seus cartões</h3>
-                                        <p class="small text-secondary mb-0">Cartões — faturas, parcelas e limite.</p>
+                                    <div class="accounts-list-header__title-wrap min-w-0">
+                                        <span class="accounts-list-header__icon accounts-list-header__icon--card" aria-hidden="true">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <span class="accounts-section-kicker">Crédito</span>
+                                            <h3 class="h5 mb-0" id="accounts-cards-heading">Seus cartões</h3>
+                                            <p class="small text-secondary mb-0">Faturas, parcelas e limite.</p>
+                                        </div>
                                     </div>
                                     @if ($creditCardAccounts->isNotEmpty())
                                         <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle px-3 py-2 flex-shrink-0">

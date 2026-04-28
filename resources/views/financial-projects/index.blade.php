@@ -33,13 +33,36 @@
             'saved' => $cofrinhoEditSavedForJs,
         ];
     }
+
+    $cofrinhoRows = $projects->map(function ($project) {
+        $saved = (float) $project->savedProgress();
+        $target = $project->target_amount !== null ? (float) $project->target_amount : null;
+        $remaining = $target !== null ? max(0.0, $target - $saved) : null;
+        $pct = ($target !== null && $target > 0.00001) ? min(100.0, ($saved / $target) * 100.0) : null;
+
+        return [
+            'project' => $project,
+            'saved' => $saved,
+            'target' => $target,
+            'remaining' => $remaining,
+            'pct' => $pct,
+            'is_complete' => $pct !== null && $pct >= 100,
+        ];
+    });
+
+    $totalSaved = (float) $cofrinhoRows->sum('saved');
+    $totalTarget = (float) $cofrinhoRows->sum(fn ($row) => (float) ($row['target'] ?? 0));
+    $projectsWithTarget = $cofrinhoRows->filter(fn ($row) => $row['target'] !== null)->count();
+    $completedProjects = $cofrinhoRows->filter(fn ($row) => $row['is_complete'])->count();
+    $totalPct = $totalTarget > 0.00001 ? min(100.0, ($totalSaved / $totalTarget) * 100.0) : null;
 @endphp
 <x-app-layout>
     <x-slot name="header">
         <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <div>
-                <h2 class="h5 mb-0 cofrinhos-hero-title">Cofrinhos</h2>
-                <p class="small text-secondary mb-0 mt-1">Metas com aportes (despesa Investimentos) e retiradas (receita dedicada).</p>
+                <p class="small text-secondary mb-1">Metas compartilhadas</p>
+                <h2 class="h5 mb-0 cofrinhos-page-title">Cofrinhos</h2>
+                <p class="small text-secondary mb-0 mt-1">Acompanhe aportes, retiradas e juros por objetivo.</p>
             </div>
             <button type="button" class="btn btn-primary rounded-pill px-4 py-2" data-bs-toggle="modal" data-bs-target="#modalCofrinhoCreate">
                 Novo cofrinho
@@ -66,17 +89,46 @@
                 </div>
             @endif
 
-            <div class="card border-0 dz-tip-card mb-4">
-                <div class="card-body p-4 d-flex gap-3">
-                    <span class="rounded-3 bg-info-subtle text-info d-flex align-items-center justify-content-center flex-shrink-0 p-2 align-self-start" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </span>
-                    <div class="small mb-0">
-                        <strong class="d-block text-body mb-1">Como lançar no cofrinho</strong>
-                        No painel, use <strong>+ Despesa</strong> ou <strong>+ Receita</strong>, conta corrente, categoria <strong>Investimentos</strong> (aporte) ou <strong>Retirada de cofrinho</strong> (retirada) e escolha o cofrinho na seção <strong>Cofrinho</strong> do mesmo formulário.
+            <section class="cofrinhos-hero card border-0 shadow-sm mb-4">
+                <div class="card-body p-4 p-lg-5">
+                    <div class="row g-4 align-items-center">
+                        <div class="col-lg-5">
+                            <span class="cofrinhos-hero__badge">Visão geral</span>
+                            <h3 class="cofrinhos-hero__title h4 mt-3 mb-2">Transformem planos em metas visíveis.</h3>
+                            <p class="text-secondary mb-0">Cada cofrinho soma aportes em Investimentos, desconta retiradas e pode receber juros sem movimentar uma conta.</p>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="cofrinhos-summary-grid">
+                                <div class="cofrinhos-summary-card cofrinhos-summary-card--primary">
+                                    <span class="cofrinhos-summary-card__label">Total guardado</span>
+                                    <strong class="cofrinhos-summary-card__value">R$ {{ number_format($totalSaved, 2, ',', '.') }}</strong>
+                                    @if($totalPct !== null)
+                                        <span class="cofrinhos-summary-card__hint">{{ number_format($totalPct, 1, ',', '.') }}% das metas definidas</span>
+                                    @else
+                                        <span class="cofrinhos-summary-card__hint">Crie metas para acompanhar o avanço geral</span>
+                                    @endif
+                                </div>
+                                <div class="cofrinhos-summary-card">
+                                    <span class="cofrinhos-summary-card__label">Cofrinhos</span>
+                                    <strong class="cofrinhos-summary-card__value">{{ $projects->count() }}</strong>
+                                    <span class="cofrinhos-summary-card__hint">{{ $projectsWithTarget }} com meta</span>
+                                </div>
+                                <div class="cofrinhos-summary-card">
+                                    <span class="cofrinhos-summary-card__label">Metas concluídas</span>
+                                    <strong class="cofrinhos-summary-card__value">{{ $completedProjects }}</strong>
+                                    <span class="cofrinhos-summary-card__hint">objetivos no alvo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cofrinhos-hero__tip mt-4">
+                        <span class="cofrinhos-hero__tip-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </span>
+                        <span>No painel, use <strong>+ Despesa</strong> com categoria <strong>Investimentos</strong> para aporte ou <strong>+ Receita</strong> com <strong>Retirada de cofrinho</strong> para retirada.</span>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <div
                 class="modal fade"
@@ -182,54 +234,88 @@
                 </div>
             </div>
 
-            <div class="row g-4">
-                @forelse($projects as $p)
-                    <div class="col-md-6 col-lg-4">
+            <div class="row g-4 cofrinhos-grid">
+                @forelse($cofrinhoRows as $row)
+                    @php
+                        $p = $row['project'];
+                        $saved = $row['saved'];
+                        $target = $row['target'];
+                        $remaining = $row['remaining'];
+                        $pct = $row['pct'];
+                        $isComplete = $row['is_complete'];
+                    @endphp
+                    <div class="col-md-6 col-xl-4">
                         <div class="card border-0 cofrinhos-project-card h-100" style="--cofrinho-accent: {{ $p->color ? e($p->color) : 'var(--bs-primary)' }}">
                             <div class="cofrinhos-project-card__accent" aria-hidden="true"></div>
-                            <div class="card-body p-4 cofrinhos-project-card__body">
-                                <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
-                                    <h3 class="h6 mb-0 fw-semibold">{{ $p->name }}</h3>
-                                    @if($p->color)
-                                        <span class="rounded-circle flex-shrink-0 border shadow-sm" style="width:1.125rem;height:1.125rem;background:{{ $p->color }}" title="Cor do cofrinho"></span>
+                            <div class="cofrinhos-project-card__top">
+                                <div class="cofrinhos-project-card__avatar" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 48 48">
+                                        <ellipse cx="24" cy="29" rx="16" ry="11" fill="currentColor" opacity="0.18" />
+                                        <path d="M12 27c0-7.2 6.2-13 14-13 6.8 0 12.6 4.4 13.8 10.2l3 1.1a2 2 0 011.2 1.8v3.1a2 2 0 01-2 2h-2.4a13.8 13.8 0 01-3.6 4.1v3.2a2 2 0 01-2 2h-3.1a2 2 0 01-1.9-1.4l-.5-1.4a20.3 20.3 0 01-6.9 0l-.5 1.4a2 2 0 01-1.9 1.4H16a2 2 0 01-2-2v-3.3A12.8 12.8 0 0112 27z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
+                                        <path d="M20 14c1.4-3.4 5.9-5 9.8-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                                        <circle cx="31" cy="24" r="1.8" fill="currentColor" />
+                                        <path d="M21 23h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                                    </svg>
+                                </div>
+                                <div class="min-w-0 flex-grow-1">
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <h3 class="cofrinhos-project-card__title mb-1">{{ $p->name }}</h3>
+                                        @if($isComplete)
+                                            <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--done">Concluído</span>
+                                        @elseif($target !== null)
+                                            <span class="cofrinhos-project-card__badge">Com meta</span>
+                                        @else
+                                            <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--muted">Livre</span>
+                                        @endif
+                                    </div>
+                                    @if($target !== null)
+                                        <p class="small text-secondary mb-0">Meta de R$ {{ number_format($target, 2, ',', '.') }}</p>
+                                    @else
+                                        <p class="small text-secondary mb-0">Sem valor-alvo definido</p>
                                     @endif
                                 </div>
-                                @php
-                                    $saved = (float) $p->savedProgress();
-                                    $target = $p->target_amount !== null ? (float) $p->target_amount : null;
-                                    $remaining = $target !== null ? max(0.0, $target - $saved) : null;
-                                    $pct = ($target !== null && $target > 0.00001) ? min(100.0, ($saved / $target) * 100.0) : null;
-                                @endphp
-                                <p class="dz-stat-label mb-0">Guardado</p>
-                                <p class="h5 fw-semibold mb-2">R$ {{ number_format($saved, 2, ',', '.') }}</p>
+                            </div>
+                            <div class="card-body p-4 cofrinhos-project-card__body">
+                                <p class="dz-stat-label mb-1">Guardado agora</p>
+                                <p class="cofrinhos-project-card__amount mb-3">R$ {{ number_format($saved, 2, ',', '.') }}</p>
                                 @if($target !== null)
-                                    <p class="small text-secondary mb-1">Meta: R$ {{ number_format($target, 2, ',', '.') }}</p>
-                                    <p class="small mb-2">Falta: <strong>R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong>@if($pct !== null) · <strong>{{ number_format((float) $pct, 1, ',', '.') }}%</strong>@endif</p>
                                     @if($pct !== null)
-                                        <div class="progress rounded-pill bg-body-secondary mb-3" style="height: 10px;">
-                                            <div class="progress-bar {{ $pct >= 100 ? 'bg-success' : 'bg-primary' }}" style="width: {{ number_format((float) $pct, 2, '.', '') }}%"></div>
+                                        <div class="cofrinhos-progress mb-3" aria-label="Progresso de {{ number_format((float) $pct, 1, ',', '.') }}%">
+                                            <div class="cofrinhos-progress__bar {{ $isComplete ? 'cofrinhos-progress__bar--done' : '' }}" style="width: {{ number_format((float) $pct, 2, '.', '') }}%"></div>
                                         </div>
-                                    @else
-                                        <div class="mb-3"></div>
                                     @endif
+                                    <div class="cofrinhos-project-card__metrics mb-3">
+                                        <div class="cofrinhos-mini-stat">
+                                            <span>Falta</span>
+                                            <strong>R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong>
+                                        </div>
+                                        <div class="cofrinhos-mini-stat">
+                                            <span>Avanço</span>
+                                            <strong>{{ number_format((float) $pct, 1, ',', '.') }}%</strong>
+                                        </div>
+                                    </div>
                                 @else
-                                    <p class="small text-secondary mb-3">Sem meta numérica.</p>
+                                    <div class="cofrinhos-no-target mb-3">
+                                        Use como reserva livre ou edite o cofrinho para definir uma meta.
+                                    </div>
                                 @endif
-                                <div class="d-flex flex-wrap gap-2 pt-1">
+                                <div class="cofrinhos-project-card__primary-actions">
                                     <a
                                         href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'aporte']) }}"
-                                        class="btn btn-success btn-sm rounded-pill"
+                                        class="btn btn-success btn-sm rounded-pill px-3"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
                                         title="Ir ao painel com despesa em Investimentos e este cofrinho"
                                     >+ Aporte</a>
                                     <a
                                         href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
-                                        class="btn btn-outline-danger btn-sm rounded-pill"
+                                        class="btn btn-outline-danger btn-sm rounded-pill px-3"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
                                         title="Ir ao painel com receita em Retirada de cofrinho e este cofrinho"
                                     >− Retirada</a>
+                                </div>
+                                <div class="cofrinhos-project-card__toolbar pt-3 mt-3">
                                     <button
                                         type="button"
                                         class="btn btn-outline-primary btn-sm rounded-pill"
@@ -238,6 +324,12 @@
                                     >
                                         + Juros
                                     </button>
+                                    <a
+                                        href="{{ route('cofrinhos.movements', ['cofrinho' => $p->id, 'period' => now()->format('Y-m')]) }}"
+                                        class="btn btn-outline-dark btn-sm rounded-pill"
+                                    >
+                                        Movimentações
+                                    </a>
                                     <button
                                         type="button"
                                         class="btn btn-outline-secondary btn-sm rounded-pill js-cofrinho-edit-open"
@@ -249,7 +341,7 @@
                                         data-cofrinho-color="{{ e($p->color ?: '#0d9488') }}"
                                         data-cofrinho-saved="{{ number_format((float) $saved, 2, ',', '.') }}"
                                     >Editar</button>
-                                    <form action="{{ route('cofrinhos.destroy', $p) }}" method="post" class="d-inline" onsubmit="return confirm('Excluir este cofrinho?');">
+                                    <form action="{{ route('cofrinhos.destroy', $p) }}" method="post" class="d-inline" data-confirm-title="Excluir cofrinho" data-confirm="Excluir este cofrinho? Movimentações vinculadas podem afetar o histórico." data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill">Excluir</button>

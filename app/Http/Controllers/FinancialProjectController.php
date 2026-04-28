@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\FinancialProject;
 use App\Models\FinancialProjectEntry;
+use App\Models\Transaction;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -44,6 +47,77 @@ class FinancialProjectController extends Controller
         ]);
 
         return redirect()->route('cofrinhos.index')->with('success', 'Cofrinho criado.');
+    }
+
+    public function movements(Request $request, FinancialProject $cofrinho): View
+    {
+        $this->authorizeCofrinho($cofrinho);
+
+        $validated = $request->validate([
+            'period' => ['nullable', 'string', 'regex:/^\d{4}\-\d{2}$/'],
+        ]);
+
+        $period = (string) ($validated['period'] ?? now()->format('Y-m'));
+        [$year, $month] = array_map('intval', explode('-', $period));
+
+        $transactionRows = $cofrinho->transactions()
+            ->with(['accountModel:id,name', 'user:id,name'])
+            ->where('reference_month', $month)
+            ->where('reference_year', $year)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Transaction $transaction): array {
+                $kind = $transaction->type === 'expense' ? 'aporte' : 'retirada';
+                $signedAmount = $transaction->type === 'expense'
+                    ? (float) $transaction->amount
+                    : (float) $transaction->amount * -1;
+
+                return [
+                    'source' => 'transaction',
+                    'kind' => $kind,
+                    'date' => $transaction->date,
+                    'description' => $transaction->description,
+                    'note' => null,
+                    'account_name' => $transaction->accountModel?->name,
+                    'user_name' => $transaction->user?->name,
+                    'amount' => $signedAmount,
+                    'raw_amount' => (float) $transaction->amount,
+                    'sort_key' => $this->buildMovementSortKey($transaction->date, $transaction->id, 2),
+                ];
+            });
+
+        $interestRows = FinancialProjectEntry::query()
+            ->where('couple_id', Auth::user()->couple_id)
+            ->where('financial_project_id', $cofrinho->id)
+            ->where('type', 'interest')
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (FinancialProjectEntry $entry): array {
+                return [
+                    'source' => 'interest',
+                    'kind' => 'juros',
+                    'date' => $entry->date,
+                    'description' => 'Juros lançados no cofrinho',
+                    'note' => $entry->note,
+                    'account_name' => null,
+                    'user_name' => null,
+                    'amount' => (float) $entry->amount,
+                    'raw_amount' => (float) $entry->amount,
+                    'sort_key' => $this->buildMovementSortKey($entry->date, $entry->id, 1),
+                ];
+            });
+
+        $movements = $this->sortMovements($transactionRows->concat($interestRows));
+
+        return view('financial-projects.movements', [
+            'cofrinho' => $cofrinho,
+            'period' => $period,
+            'movements' => $movements,
+        ]);
     }
 
     public function update(Request $request, FinancialProject $cofrinho): RedirectResponse
@@ -111,5 +185,22 @@ class FinancialProjectController extends Controller
     private function authorizeCofrinho(FinancialProject $cofrinho): void
     {
         abort_unless((int) $cofrinho->couple_id === (int) Auth::user()->couple_id, 403);
+    }
+
+    private function sortMovements(Collection $rows): Collection
+    {
+        return $rows
+            ->sortByDesc(fn (array $row): string => (string) ($row['sort_key'] ?? ''))
+            ->values();
+    }
+
+    private function buildMovementSortKey(?Carbon $date, int $id, int $sourcePriority): string
+    {
+        return sprintf(
+            '%s|%012d|%d',
+            $date?->toDateString() ?? '1970-01-01',
+            $id,
+            $sourcePriority
+        );
     }
 }

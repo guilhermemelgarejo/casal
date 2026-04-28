@@ -46,8 +46,10 @@
         );
 @endphp
 @if($showPanel)
-    <div class="rt-reminder-strip mb-3">
-        <div class="container-xxl px-3 px-lg-4">
+    <div class="rt-reminder-strip {{ ! empty($embedded ?? false) ? 'rt-reminder-strip--embedded mb-0' : 'mb-3' }}">
+        @if(empty($embedded ?? false))
+            <div class="container-xxl px-3 px-lg-4">
+        @endif
             <div class="rt-reminder-card border-0 shadow-sm @if($reminderPanelHasOverdue) rt-reminder-card--overdue @endif" role="status">
                 <div class="rt-reminder-card__inner">
                     <div class="rt-reminder-card__icon" aria-hidden="true">
@@ -122,6 +124,8 @@
                     </div>
                 </div>
             </div>
-        </div>
+        @if(empty($embedded ?? false))
+            </div>
+        @endif
     </div>
 @endif

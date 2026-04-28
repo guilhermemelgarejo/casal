@@ -134,7 +134,10 @@ class DashboardController extends Controller
             $transactionAmountEditMeta[$txRow->id] = TransactionListingPresentation::transactionAmountEditMeta($txRow);
         }
 
-        $totalExpense = $statsTransactions->where('type', 'expense')->sum('amount');
+        $totalIncome = (float) $statsTransactions->where('type', 'income')->sum('amount');
+        $totalExpense = (float) $statsTransactions->where('type', 'expense')->sum('amount');
+        $netResult = round($totalIncome - $totalExpense, 2);
+        $periodTransactionCount = $transactionsForPeriod->count();
 
         $couple->refresh();
         $plannedIncomeResolved = $couple->resolvePlannedMonthlyIncomeForMonth($year, $month);
@@ -253,7 +256,10 @@ class DashboardController extends Controller
             compact(
                 'couple',
                 'transactions',
+                'totalIncome',
                 'totalExpense',
+                'netResult',
+                'periodTransactionCount',
                 'period',
                 'month',
                 'year',

@@ -51,18 +51,18 @@
         role="listitem"
     >
         <div class="tx-list-row-grid">
-            <div class="text-secondary small text-nowrap">{{ $transaction->date->format('d/m/Y') }}</div>
-            <div class="tx-cell-truncate">
+            <div class="tx-list-row-cell tx-list-row-date text-secondary small text-nowrap" data-label="Data">{{ $transaction->date->format('d/m/Y') }}</div>
+            <div class="tx-list-row-cell tx-list-row-description tx-cell-truncate" data-label="Descrição">
                 <div class="text-truncate" title="{{ $ccRowMeta['base_description'] ?? $transaction->description }}">
                     <span class="fw-medium">{{ $ccRowMeta['base_description'] ?? $transaction->description }}</span>
                 </div>
             </div>
-            <div class="d-flex flex-wrap gap-1 align-items-center">
+            <div class="tx-list-row-cell tx-list-row-categories d-flex flex-wrap gap-1 align-items-center" data-label="Categorias">
                 @forelse($transaction->categorySplits as $sp)
                     @if($sp->category)
                         <span
-                            class="badge rounded-pill text-white"
-                            style="background-color: {{ $sp->category->color ?? '#ccc' }}"
+                            class="tx-category-chip"
+                            style="--tx-category-color: {{ $sp->category->color ?? '#94a3b8' }}"
                             data-bs-toggle="tooltip"
                             data-bs-placement="top"
                             title="Valor: R$ {{ number_format((float) $sp->amount, 2, ',', '.') }}"
@@ -72,12 +72,12 @@
                     <span class="text-secondary small">—</span>
                 @endforelse
             </div>
-            <div class="tx-cell-truncate small">
+            <div class="tx-list-row-cell tx-list-row-user tx-cell-truncate small" data-label="Registrado por">
                 <div class="text-truncate" title="{{ $registeredByTitle }}">
-                    <span class="d-lg-none text-secondary">Registrado por </span><span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
+                    <span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
                 </div>
             </div>
-            <div class="small text-body-secondary tx-cell-truncate">
+            <div class="tx-list-row-cell tx-list-row-payment small text-body-secondary tx-cell-truncate" data-label="Pagamento / conta">
                 @if($accRow?->isCreditCard())
                     <div class="text-truncate" title="Cartão · {{ $accRow->name }}"><span class="fw-medium text-body">Cartão</span><span class="text-muted"> · {{ $accRow->name }}</span></div>
                 @elseif($transaction->payment_method || $accRow)
@@ -91,7 +91,7 @@
                 $isCreditCardRefund = $transaction->type === 'expense' && $amtRaw < -0.004;
                 $amtAbsStr = number_format(abs($amtRaw), 2, ',', '.');
             @endphp
-            <div class="fw-bold text-nowrap {{ $transaction->type === 'income' || $isCreditCardRefund ? 'text-success' : 'text-danger' }}">
+            <div class="tx-list-row-cell tx-list-row-amount fw-bold text-nowrap {{ $transaction->type === 'income' || $isCreditCardRefund ? 'text-success' : 'text-danger' }}" data-label="Valor">
                 @if($ccRowMeta !== null)
                     {{ $transaction->type === 'income' ? '+' : '-' }} R$ {{ $ccRowMeta['purchase_total_str'] }}@if($ccRowMeta['installment_count'] > 1)<span class="small fw-normal text-muted"> em {{ $ccRowMeta['installment_count'] }}x</span>@endif
                     @if(($ccRowMeta['refund_total'] ?? 0) > 0.004)
@@ -107,7 +107,7 @@
                     @endif
                 @endif
             </div>
-            <div class="tx-cell-actions">
+            <div class="tx-list-row-cell tx-cell-actions" data-label="Ações">
                 @if ($delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard())
                     <button
                         type="button"
@@ -224,8 +224,11 @@
 @empty
     <div class="list-group-item border-0 text-center py-4" role="listitem">
         <div class="tx-empty-state py-5 px-3">
+            <div class="tx-empty-state__icon mx-auto mb-3" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7h16M4 12h16M4 17h10" /></svg>
+            </div>
             <p class="fw-semibold text-body mb-1">{{ $emptyTitle ?? 'Nenhum lançamento neste período' }}</p>
-            <p class="small text-secondary mb-0 mx-auto" style="max-width: 22rem;">{!! $emptyHint ?? 'Ajuste mês, ano ou conta — ou registre com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.' !!}</p>
+            <p class="tx-empty-state__hint small text-secondary mb-0 mx-auto">{!! $emptyHint ?? 'Ajuste mês, ano ou conta — ou registre com <strong class="fw-medium text-body">+ Receita</strong> ou <strong class="fw-medium text-body">+ Despesa</strong>.' !!}</p>
         </div>
     </div>
 @endforelse

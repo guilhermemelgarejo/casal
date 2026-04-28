@@ -27,12 +27,15 @@
         $rtTotal = $items->count();
         $rtActive = $items->where('is_active', true)->count();
         $rtPendingCount = $pendingReminders->count();
+        $rtIncomeTotal = (float) $items->where('type', 'income')->where('is_active', true)->sum(fn ($item) => (float) $item->amount);
+        $rtExpenseTotal = (float) $items->where('type', 'expense')->where('is_active', true)->sum(fn ($item) => (float) $item->amount);
+        $rtCardCount = $items->where('funding', \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD)->count();
     @endphp
 
     <div class="py-4 recurring-page">
-        <div class="container-xxl px-3 px-lg-4">
+        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
             @if (session('success'))
-                <div class="alert alert-success border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                <div class="alert alert-success border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
                     <span class="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                     </span>
@@ -40,7 +43,7 @@
                 </div>
             @endif
             @if (session('error'))
-                <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                <div class="alert alert-danger border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
                     <span class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     </span>
@@ -48,14 +51,61 @@
                 </div>
             @endif
 
-            <x-cofrinho-promo variant="compact" class="mb-3" />
+            <section class="rt-hero card border-0 shadow-sm">
+                <div class="card-body p-4 p-lg-5">
+                    <div class="row g-4 align-items-center">
+                        <div class="col-lg-5">
+                            <span class="rt-hero__badge">Modelos mensais</span>
+                            <h3 class="rt-hero__title h4 mt-3 mb-2">Organize contas fixas sem gerar nada sozinho.</h3>
+                            <p class="text-secondary mb-0">Os modelos aparecem como lembrete no mês. Você decide quando criar o lançamento no Painel.</p>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="rt-summary-grid">
+                                <div class="rt-summary-card rt-summary-card--primary">
+                                    <span class="rt-summary-card__label">Modelos</span>
+                                    <strong class="rt-summary-card__value">{{ $rtTotal }}</strong>
+                                    <span class="rt-summary-card__hint">{{ $rtActive }} ativo(s)</span>
+                                </div>
+                                <div class="rt-summary-card rt-summary-card--success">
+                                    <span class="rt-summary-card__label">Receitas ativas</span>
+                                    <strong class="rt-summary-card__money">R$ {{ number_format($rtIncomeTotal, 2, ',', '.') }}</strong>
+                                    <span class="rt-summary-card__hint">previsão mensal</span>
+                                </div>
+                                <div class="rt-summary-card rt-summary-card--danger">
+                                    <span class="rt-summary-card__label">Despesas ativas</span>
+                                    <strong class="rt-summary-card__money">R$ {{ number_format($rtExpenseTotal, 2, ',', '.') }}</strong>
+                                    <span class="rt-summary-card__hint">previsão mensal</span>
+                                </div>
+                                <div class="rt-summary-card rt-summary-card--warning">
+                                    <span class="rt-summary-card__label">Pendentes</span>
+                                    <strong class="rt-summary-card__value">{{ $rtPendingCount }}</strong>
+                                    <span class="rt-summary-card__hint">lembretes do mês</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rt-hero__strip mt-4">
+                        <span>{{ $rtCardCount }} modelo(s) no cartão</span>
+                        <span>{{ $regularAccounts->count() }} conta(s) corrente(s)</span>
+                        <span>{{ $cardAccounts->count() }} cartão(ões)</span>
+                    </div>
+                </div>
+            </section>
 
-            <div class="card border-0 shadow-sm overflow-hidden tx-index-card mb-4">
+            <x-cofrinho-promo variant="compact" />
+
+            <section class="card border-0 shadow-sm overflow-hidden tx-index-card rt-list-shell">
                 <div class="tx-index-head px-4 py-3">
                     <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-                        <div class="min-w-0">
-                            <h3 class="h5 mb-1 fw-semibold">Seus modelos</h3>
-                            <p class="small text-secondary mb-0">O <strong class="fw-medium text-body">dia do mês</strong> sugere a data ao abrir o Painel; em meses curtos usa-se o último dia útil.</p>
+                        <div class="rt-list-head-title min-w-0">
+                            <span class="rt-list-head-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </span>
+                            <div class="min-w-0">
+                                <span class="rt-section-kicker">Recorrência</span>
+                                <h3 class="h5 mb-1 fw-semibold">Seus modelos</h3>
+                                <p class="small text-secondary mb-0">O <strong class="fw-medium text-body">dia do mês</strong> sugere a data ao abrir o Painel; em meses curtos usa-se o último dia possível.</p>
+                            </div>
                         </div>
                         @if($rtTotal > 0)
                             <div class="d-flex flex-wrap gap-2 justify-content-end flex-shrink-0" role="group" aria-label="Resumo dos modelos">
@@ -77,29 +127,29 @@
                         @endif
                     </div>
                 </div>
-            </div>
 
-            @if($items->isEmpty())
-                <div class="rt-empty text-center px-4 py-5">
-                    <div class="rt-empty__icon mx-auto mb-3" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    </div>
-                    <p class="fw-semibold text-body mb-1">Nenhum modelo ainda</p>
-                    <p class="small text-secondary mb-4 mx-auto" style="max-width: 22rem;">Crie o primeiro para aluguel, assinaturas ou salários — depois use o lembrete para lançar no mês.</p>
-                    <button type="button" class="btn btn-primary rounded-pill px-4 js-rt-open-new" title="Criar modelo de lançamento recorrente" data-bs-toggle="modal" data-bs-target="#modalRecurringForm">
-                        Criar primeiro modelo
-                    </button>
-                </div>
-            @else
-                <div class="row g-3">
-                    @foreach($items as $item)
-                        @php
-                            $accent = $item->account?->color ?? ($item->type === 'income' ? '#198754' : '#0d6efd');
-                            $pendingThisMonth = $item->is_active && ! $item->hasGeneratedForCalendarMonth(now()->year, now()->month);
-                            $isCard = $item->funding === \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD;
-                        @endphp
-                        <div class="col-12 col-lg-6">
-                            <article class="card border-0 rt-item-card shadow-sm overflow-hidden h-100" style="--rt-accent: {{ $accent }}">
+                <div class="rt-list-shell__body p-3 p-lg-4">
+                    @if($items->isEmpty())
+                        <div class="rt-empty text-center px-4 py-5">
+                            <div class="rt-empty__icon mx-auto mb-3" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </div>
+                            <p class="fw-semibold text-body mb-1">Nenhum modelo ainda</p>
+                            <p class="small text-secondary mb-4 mx-auto" style="max-width: 22rem;">Crie o primeiro para aluguel, assinaturas ou salários — depois use o lembrete para lançar no mês.</p>
+                            <button type="button" class="btn btn-primary rounded-pill px-4 js-rt-open-new" title="Criar modelo de lançamento recorrente" data-bs-toggle="modal" data-bs-target="#modalRecurringForm">
+                                Criar primeiro modelo
+                            </button>
+                        </div>
+                    @else
+                        <div class="row g-3">
+                            @foreach($items as $item)
+                                @php
+                                    $accent = $item->account?->color ?? ($item->type === 'income' ? '#198754' : '#0d6efd');
+                                    $pendingThisMonth = $item->is_active && ! $item->hasGeneratedForCalendarMonth(now()->year, now()->month);
+                                    $isCard = $item->funding === \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD;
+                                @endphp
+                                <div class="col-12 col-lg-6">
+                                    <article class="card border-0 rt-item-card shadow-sm overflow-hidden h-100" style="--rt-accent: {{ $accent }}">
                                 <div class="rt-item-card__accent" aria-hidden="true"></div>
                                 <div class="card-body p-0 d-flex flex-column h-100">
                                     <div class="rt-item-card__top px-3 px-sm-4 pt-3 pb-3">
@@ -169,7 +219,7 @@
                                                     title="Alterar valor, dia, conta ou categorias do modelo"
                                                     data-rt-edit-id="{{ $item->id }}"
                                                 >Editar</button>
-                                                <form method="POST" action="{{ route('recurring-transactions.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remover este modelo? Lançamentos já gerados não serão apagados.');">
+                                                <form method="POST" action="{{ route('recurring-transactions.destroy', $item) }}" class="d-inline" data-confirm-title="Remover modelo" data-confirm="Remover este modelo? Lançamentos já gerados não serão apagados." data-confirm-accept="Sim, remover" data-confirm-cancel="Cancelar">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-sm rt-item-card__btn-delete rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Remover este modelo (os lançamentos já criados permanecem no histórico)">Excluir</button>
@@ -178,11 +228,13 @@
                                         </div>
                                     </div>
                                 </div>
-                            </article>
+                                    </article>
+                                </div>
+                            @endforeach
                         </div>
-                    @endforeach
+                    @endif
                 </div>
-            @endif
+            </section>
         </div>
     </div>
 

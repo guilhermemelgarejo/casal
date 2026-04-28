@@ -1,5 +1,5 @@
 <div class="budget-income-toolbar flex-shrink-0">
-    <span class="small fw-semibold text-secondary text-uppercase flex-shrink-0" style="font-size: 0.65rem; letter-spacing: 0.05em;">Renda</span>
+    <span class="budget-income-toolbar__label flex-shrink-0">Renda</span>
     <div id="budget-income-display" class="d-flex align-items-center gap-2 flex-shrink-0">
         <span class="fw-bold text-nowrap">R$ {{ number_format(Auth::user()->couple->monthly_income, 2, ',', '.') }}</span>
         <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-2 py-0" id="btn-income-edit" data-bs-toggle="tooltip" data-bs-placement="top" title="Editar renda mensal do casal" aria-label="Editar renda mensal">

@@ -36,6 +36,8 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
 
     Route::resource('cofrinhos', FinancialProjectController::class)
         ->only(['index', 'store', 'update', 'destroy']);
+    Route::get('/cofrinhos/{cofrinho}/movimentacoes', [FinancialProjectController::class, 'movements'])
+        ->name('cofrinhos.movements');
     Route::post('/cofrinhos/{cofrinho}/juros', [FinancialProjectController::class, 'storeInterest'])
         ->name('cofrinhos.interest.store');
     Route::delete('/cofrinhos/juros/{entry}', [FinancialProjectController::class, 'destroyInterest'])

@@ -27,7 +27,7 @@
         <div class="row g-3 g-lg-4 align-items-center">
             <div class="col-lg-8">
                 <div class="d-flex justify-content-between align-items-end mb-2 flex-wrap gap-2">
-                    <span class="small fw-semibold text-secondary text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.06em;">Planejamento total</span>
+                    <span class="budget-summary-eyebrow">Planejamento total</span>
                     <span class="fw-bold {{ $budgetPercent > 100 ? 'text-danger' : 'text-primary' }}">
                         R$ {{ number_format($totalBudgeted, 2, ',', '.') }}
                         <span class="small text-secondary fw-normal ms-1">de R$ {{ number_format($income, 2, ',', '.') }}</span>
@@ -48,13 +48,13 @@
                 <div class="row g-2">
                     <div class="col-6">
                         <div class="budget-summary-stat h-100 text-center">
-                            <p class="small fw-semibold text-secondary text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.04em;">Comprometido</p>
+                            <p class="budget-summary-eyebrow mb-1">Comprometido</p>
                             <p class="fw-bold mb-0 {{ $budgetPercent > 100 ? 'text-danger' : 'text-body' }}">{{ number_format($budgetPercent, 1, ',', '.') }}%</p>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="budget-summary-stat h-100 text-center">
-                            <p class="small fw-semibold text-secondary text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.04em;">Disponível</p>
+                            <p class="budget-summary-eyebrow mb-1">Disponível</p>
                             <p class="fw-bold text-success mb-0">R$ {{ number_format(max(0, $income - $totalBudgeted), 2, ',', '.') }}</p>
                         </div>
                     </div>
@@ -65,7 +65,7 @@
 </div>
 
 @if($budgetPercent > 100)
-    <div class="alert alert-danger border-0 shadow-sm d-flex align-items-start gap-3 mt-3 mb-0" role="alert">
+    <div class="alert alert-danger border-0 shadow-sm rounded-4 d-flex align-items-start gap-3 mt-3 mb-0" role="alert">
         <span class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01" /></svg>
         </span>

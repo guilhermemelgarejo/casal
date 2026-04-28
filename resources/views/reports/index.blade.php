@@ -93,7 +93,7 @@
     <x-slot name="header">
         <div class="reports-head-wrap">
             <div class="reports-title-block">
-                <p class="reports-title-kicker">visão financeira</p>
+                <p class="reports-title-kicker">Visão financeira</p>
                 <h2 class="h4 mb-0 reports-title">Relatórios</h2>
                 <p class="small text-secondary mb-0 mt-1">{{ ucfirst($periodLabel) }}</p>
             </div>
@@ -104,33 +104,43 @@
         <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
             <section class="reports-hero card border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="reports-hero-top">
-                        <div>
-                            <h3 class="h5 mb-1 reports-hero-title">Resumo executivo do período</h3>
-                            <p class="small text-secondary mb-0">Painel consolidado com os mesmos critérios de cálculo para manter consistência entre telas.</p>
+                    <div class="row g-4 align-items-center reports-hero-intro">
+                        <div class="col-lg-5">
+                            <span class="reports-hero__badge">Resumo executivo</span>
+                            <h3 class="reports-hero-title h4 mt-3 mb-2">Leitura consolidada do período.</h3>
+                            <p class="text-secondary mb-0">Indicadores, tendências e tabelas usam os mesmos critérios das demais telas para manter a leitura consistente.</p>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="reports-hero-panel">
+                                <form action="{{ route('reports.index') }}" method="GET" class="reports-filter-shell">
+                                    <div class="reports-filter-grid">
+                                        <div class="reports-filter-field">
+                                            <label class="reports-filter-label" for="reports-period">Período</label>
+                                            <input
+                                                id="reports-period"
+                                                type="text"
+                                                name="period"
+                                                value="{{ $period }}"
+                                                class="form-control form-control-sm rounded-pill"
+                                                data-duozen-flatpickr="month"
+                                                autocomplete="off"
+                                                aria-label="Mês de referência"
+                                            >
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">Aplicar</button>
+                                        @if(request()->has('period'))
+                                            <a href="{{ route('reports.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Limpar</a>
+                                        @endif
+                                    </div>
+                                </form>
+                                <div class="reports-hero__strip">
+                                    <span>Renda base: {{ $money($executiveKpis['planned_income']) }}</span>
+                                    <span>Orçamento: {{ $pct($budgetCommitmentPct) }}</span>
+                                    <span>Cartões: {{ $pct($overallCardUtilizationPct) }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <form action="{{ route('reports.index') }}" method="GET" class="reports-filter-shell">
-                        <div class="reports-filter-grid">
-                            <div class="reports-filter-field">
-                                <label class="reports-filter-label" for="reports-period">Período</label>
-                                <input
-                                    id="reports-period"
-                                    type="text"
-                                    name="period"
-                                    value="{{ $period }}"
-                                    class="form-control form-control-sm"
-                                    data-duozen-flatpickr="month"
-                                    autocomplete="off"
-                                    aria-label="Mês de referência"
-                                >
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-primary px-3">Aplicar</button>
-                            @if(request()->has('period'))
-                                <a href="{{ route('reports.index') }}" class="btn btn-sm btn-outline-secondary px-3">Limpar</a>
-                            @endif
-                        </div>
-                    </form>
                     <div class="reports-kpi-grid">
                         <article class="reports-kpi-card reports-kpi-card--income">
                             <p class="reports-kpi-label">Receitas</p>
@@ -163,9 +173,15 @@
             <section class="reports-section card border-0 shadow-sm">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
-                        <div>
-                            <h3 class="h6 mb-1">Tendências dos últimos 6 meses</h3>
-                            <p class="small text-secondary mb-0">Leitura rápida de direção dos indicadores principais.</p>
+                        <div class="reports-section-title-wrap">
+                            <span class="reports-section-icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17l6-6 4 4 8-8" /></svg>
+                            </span>
+                            <div>
+                                <span class="reports-section-kicker">Histórico</span>
+                                <h3 class="h6 mb-1">Tendências dos últimos 6 meses</h3>
+                                <p class="small text-secondary mb-0">Leitura rápida de direção dos indicadores principais.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="reports-trend-grid">
@@ -361,9 +377,15 @@
             <section class="reports-section card border-0 shadow-sm">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
-                        <div>
-                            <h3 class="h6 mb-1">Orçamento por Categoria</h3>
-                            <p class="small text-secondary mb-0">Planejado x realizado sem transferências internas e sem pagamento de fatura.</p>
+                        <div class="reports-section-title-wrap">
+                            <span class="reports-section-icon reports-section-icon--success" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l2 2 4-4M7 4h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V6a2 2 0 012-2z" /></svg>
+                            </span>
+                            <div>
+                                <span class="reports-section-kicker">Planejamento</span>
+                                <h3 class="h6 mb-1">Orçamento por Categoria</h3>
+                                <p class="small text-secondary mb-0">Planejado x realizado sem transferências internas e sem pagamento de fatura.</p>
+                            </div>
                         </div>
                         <span class="reports-chip">{{ $num($budgetRows->count()) }} categorias com dados</span>
                     </div>
@@ -417,7 +439,17 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="5" class="text-secondary">Sem dados de orçamento para este período.</td></tr>
+                                    <tr class="reports-empty-row">
+                                        <td colspan="5">
+                                            <div class="reports-empty-state">
+                                                <span class="reports-empty-state__icon" aria-hidden="true">—</span>
+                                                <div>
+                                                    <strong>Sem dados de orçamento</strong>
+                                                    <span>Este período ainda não tem metas ou gastos classificados.</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -438,9 +470,15 @@
             <section class="reports-section card border-0 shadow-sm">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
-                        <div>
-                            <h3 class="h6 mb-1">Cartões e Faturas</h3>
-                            <p class="small text-secondary mb-0">Utilização de limite, saldos em aberto e vencimentos.</p>
+                        <div class="reports-section-title-wrap">
+                            <span class="reports-section-icon reports-section-icon--warning" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h.01M11 15h2M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg>
+                            </span>
+                            <div>
+                                <span class="reports-section-kicker">Crédito</span>
+                                <h3 class="h6 mb-1">Cartões e Faturas</h3>
+                                <p class="small text-secondary mb-0">Utilização de limite, saldos em aberto e vencimentos.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="reports-stat-grid reports-stat-grid--three mb-3">
@@ -473,7 +511,17 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-secondary">Nenhum cartão encontrado.</td></tr>
+                                    <tr class="reports-empty-row">
+                                        <td colspan="4">
+                                            <div class="reports-empty-state">
+                                                <span class="reports-empty-state__icon" aria-hidden="true">—</span>
+                                                <div>
+                                                    <strong>Nenhum cartão encontrado</strong>
+                                                    <span>Cadastre cartões para acompanhar limite e utilização.</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -507,7 +555,17 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-secondary">Sem faturas em aberto.</td></tr>
+                                    <tr class="reports-empty-row">
+                                        <td colspan="4">
+                                            <div class="reports-empty-state">
+                                                <span class="reports-empty-state__icon" aria-hidden="true">—</span>
+                                                <div>
+                                                    <strong>Sem faturas em aberto</strong>
+                                                    <span>Nenhum ciclo pendente para o período analisado.</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -518,9 +576,15 @@
             <section class="reports-section card border-0 shadow-sm">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
-                        <div>
-                            <h3 class="h6 mb-1">Metas (Cofrinhos)</h3>
-                            <p class="small text-secondary mb-0">Progresso acumulado e aporte líquido no período.</p>
+                        <div class="reports-section-title-wrap">
+                            <span class="reports-section-icon reports-section-icon--info" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.866 0-7 1.343-7 3s3.134 3 7 3 7-1.343 7-3-3.134-3-7-3zM5 11v4c0 1.657 3.134 3 7 3s7-1.343 7-3v-4" /></svg>
+                            </span>
+                            <div>
+                                <span class="reports-section-kicker">Reservas</span>
+                                <h3 class="h6 mb-1">Metas (Cofrinhos)</h3>
+                                <p class="small text-secondary mb-0">Progresso acumulado e aporte líquido no período.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="reports-stat-grid reports-stat-grid--two mb-3">
@@ -560,7 +624,17 @@
                                         <td class="text-end">{{ $money($row['monthly_net']) }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="5" class="text-secondary">Nenhum cofrinho cadastrado.</td></tr>
+                                    <tr class="reports-empty-row">
+                                        <td colspan="5">
+                                            <div class="reports-empty-state">
+                                                <span class="reports-empty-state__icon" aria-hidden="true">—</span>
+                                                <div>
+                                                    <strong>Nenhum cofrinho cadastrado</strong>
+                                                    <span>Crie cofrinhos para acompanhar metas e aportes no relatório.</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -571,9 +645,15 @@
             <section class="reports-section card border-0 shadow-sm">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
-                        <div>
-                            <h3 class="h6 mb-1">Recorrências</h3>
-                            <p class="small text-secondary mb-0">Previsto x realizado para os modelos ativos no mês.</p>
+                        <div class="reports-section-title-wrap">
+                            <span class="reports-section-icon reports-section-icon--secondary" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </span>
+                            <div>
+                                <span class="reports-section-kicker">Automação manual</span>
+                                <h3 class="h6 mb-1">Recorrências</h3>
+                                <p class="small text-secondary mb-0">Previsto x realizado para os modelos ativos no mês.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="reports-stat-grid reports-stat-grid--three mb-3">
@@ -600,7 +680,17 @@
                                         <td class="text-end">{{ $row['account_name'] }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-secondary">Sem pendências no período selecionado.</td></tr>
+                                    <tr class="reports-empty-row">
+                                        <td colspan="4">
+                                            <div class="reports-empty-state">
+                                                <span class="reports-empty-state__icon" aria-hidden="true">—</span>
+                                                <div>
+                                                    <strong>Sem pendências no período</strong>
+                                                    <span>Todos os modelos ativos foram tratados ou não há recorrências.</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>

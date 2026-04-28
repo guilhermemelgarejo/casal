@@ -1,15 +1,32 @@
+@php
+    $selectedCard = $filterCardId !== null ? $cardAccounts->firstWhere('id', $filterCardId) : null;
+    $openSummaries = collect($cardPickerSummaries)->filter();
+    $openAmount = (float) $openSummaries->sum(fn ($summary) => (float) ($summary['remaining'] ?? $summary['spent_total'] ?? 0));
+    $listedTotal = $filterCardId !== null ? (float) $invoiceCycles->sum(fn ($cycle) => (float) $cycle->spent_total) : 0.0;
+    $listedPaid = $filterCardId !== null ? $invoiceCycles->filter(fn ($cycle) => $cycle->meta?->isPaid() ?? false)->count() : 0;
+    $listedPartial = $filterCardId !== null ? $invoiceCycles->filter(fn ($cycle) => $cycle->meta?->hasPartialPayments() ?? false)->count() : 0;
+@endphp
+
 <x-app-layout>
     <x-slot name="header">
-        <div>
-            <h2 class="h5 mb-0 cc-statements-page-title">Faturas de cartão de crédito</h2>
-            <p class="small text-secondary mb-0 mt-1">Faturas por ciclo de cada cartão, pagamentos e itens do período.</p>
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div>
+                <p class="small text-secondary mb-1">Cartões de crédito</p>
+                <h2 class="h5 mb-0 cc-statements-page-title">Faturas</h2>
+                <p class="small text-secondary mb-0 mt-1">Ciclos, vencimentos, pagamentos e itens por cartão.</p>
+            </div>
+            @if ($cardAccounts->isNotEmpty())
+                <a href="{{ route('accounts.index') }}" class="btn btn-outline-primary rounded-pill px-4 align-self-start align-self-md-center">
+                    Ver cartões
+                </a>
+            @endif
         </div>
     </x-slot>
 
     <div class="py-4 cc-statements-page">
-        <div class="container-xxl px-3 px-lg-4">
+        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
             @if (session('success'))
-                <div class="alert alert-success border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                <div class="alert alert-success border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
                     <span class="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                     </span>
@@ -18,13 +35,64 @@
             @endif
 
             @if ($errors->has('payment'))
-                <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3" role="alert">
+                <div class="alert alert-danger border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
                     <span class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </span>
                     <span class="pt-1">{{ $errors->first('payment') }}</span>
                 </div>
             @endif
+
+            <section class="cc-statements-hero card border-0 shadow-sm">
+                <div class="card-body p-4 p-lg-5">
+                    <div class="row g-4 align-items-center">
+                        <div class="col-lg-5">
+                            <span class="cc-statements-hero__badge">Visão geral</span>
+                            <h3 class="cc-statements-hero__title h4 mt-3 mb-2">
+                                @if($selectedCard)
+                                    {{ $selectedCard->name }}
+                                @else
+                                    Escolha um cartão para acompanhar as faturas.
+                                @endif
+                            </h3>
+                            <p class="text-secondary mb-0">
+                                Veja faturas em aberto, pagamentos parciais, vencimentos sugeridos e os itens que compõem cada ciclo.
+                            </p>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="cc-statements-summary-grid">
+                                <div class="cc-statements-summary-card cc-statements-summary-card--primary">
+                                    <span class="cc-statements-summary-card__label">Cartões</span>
+                                    <strong class="cc-statements-summary-card__value">{{ $cardAccounts->count() }}</strong>
+                                    <span class="cc-statements-summary-card__hint">cadastrados</span>
+                                </div>
+                                <div class="cc-statements-summary-card cc-statements-summary-card--warning">
+                                    <span class="cc-statements-summary-card__label">Em aberto</span>
+                                    <strong class="cc-statements-summary-card__money">R$ {{ number_format($openAmount, 2, ',', '.') }}</strong>
+                                    <span class="cc-statements-summary-card__hint">{{ $openSummaries->count() }} ciclo(s) atual/próximo</span>
+                                </div>
+                                <div class="cc-statements-summary-card">
+                                    <span class="cc-statements-summary-card__label">Listadas</span>
+                                    <strong class="cc-statements-summary-card__value">{{ $filterCardId !== null ? $invoiceCycles->count() : '—' }}</strong>
+                                    <span class="cc-statements-summary-card__hint">{{ $filterCardId !== null ? 'R$ '.number_format($listedTotal, 2, ',', '.') : 'selecione um cartão' }}</span>
+                                </div>
+                                <div class="cc-statements-summary-card cc-statements-summary-card--danger">
+                                    <span class="cc-statements-summary-card__label">Atenção</span>
+                                    <strong class="cc-statements-summary-card__value">{{ $pastOpenStatementAccountIds->count() }}</strong>
+                                    <span class="cc-statements-summary-card__hint">cartão(ões) com meses anteriores em aberto</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @if($filterCardId !== null)
+                        <div class="cc-statements-hero__strip mt-4">
+                            <span>{{ $listedPaid }} paga(s)</span>
+                            <span>{{ $listedPartial }} parcial(is)</span>
+                            <span>{{ max(0, $invoiceCycles->count() - $listedPaid) }} aberta(s) ou pendente(s)</span>
+                        </div>
+                    @endif
+                </div>
+            </section>
 
             <div class="card border-0 shadow-sm cc-statements-shell overflow-hidden">
                 <div class="card-body p-4 p-lg-5">
@@ -93,9 +161,15 @@
 
                         @if ($filterCardId !== null)
                             @if ($invoiceCycles->isEmpty())
-                        <div class="alert alert-info mb-0">
-                            Não há faturas com despesas neste cartão. Registre compras no <a href="{{ route('dashboard') }}">Painel</a> com este cartão ou escolha outro cartão.
-                        </div>
+                                <div class="cc-statements-empty-note">
+                                    <span class="cc-statements-empty-note__icon" aria-hidden="true">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h.01M11 15h2M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg>
+                                    </span>
+                                    <div>
+                                        <strong>Nenhuma fatura com despesas neste cartão</strong>
+                                        <span>Registre compras no <a href="{{ route('dashboard') }}">Painel</a> com este cartão ou escolha outro cartão.</span>
+                                    </div>
+                                </div>
                             @else
                         <div class="vstack gap-3">
                                     @foreach ($invoiceCycles as $cycle)
@@ -131,54 +205,84 @@
                                             $payAmtPlaceholder = 'Padrão: R$ '.number_format($payDefaultAmount, 2, ',', '.');
                                             if ($isPaid) {
                                                 $statementHeaderClass = 'cc-statement-header--paid';
+                                                $statementStatusLabel = 'Paga';
+                                                $statementStatusClass = 'cc-statement-status--paid';
                                             } elseif ($hasPayments) {
                                                 $statementHeaderClass = 'cc-statement-header--partial';
+                                                $statementStatusLabel = 'Parcial';
+                                                $statementStatusClass = 'cc-statement-status--partial';
                                             } else {
                                                 $statementHeaderClass = 'cc-statement-header--open';
+                                                $statementStatusLabel = 'Aberta';
+                                                $statementStatusClass = 'cc-statement-status--open';
                                             }
                                         @endphp
                                         <div
                                             id="statement-cycle-{{ $cycle->account->id }}-{{ $cycle->reference_year }}-{{ $cycle->reference_month }}"
-                                            class="card shadow-sm border-secondary-subtle cc-statement-card"
+                                            class="card shadow-sm cc-statement-card"
                                         >
-                                            <div class="card-header cc-statement-header d-flex flex-wrap justify-content-between align-items-start gap-2 py-3 border-0 {{ $statementHeaderClass }}">
-                                                <div class="min-w-0">
-                                                    <div class="fw-semibold">{{ $cycle->account->name }}</div>
-                                                    <div class="small text-secondary d-flex flex-wrap align-items-center gap-2">
-                                                        <span>Ref. {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}</span>
-                                                        @if ($meta?->is_avulsa)
-                                                            <span class="badge text-bg-secondary">Avulsa</span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="text-md-end">
-                                                    <div class="fs-5 fw-semibold text-nowrap">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</div>
-                                                    <div class="small text-secondary">Total no cartão</div>
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="row g-3 g-lg-4">
-                                                    <div class="col-md-4 col-lg-3">
-                                                        <div class="small text-secondary text-uppercase mb-1" style="letter-spacing: 0.02em; font-size: 0.7rem;">Vencimento</div>
-                                                        <div class="small">
-                                                            @if ($dueForDisplay)
-                                                                @if ($dueIsSuggestion)
-                                                                    <span class="text-secondary" title="Conforme o cartão em Contas; confirme em Editar ou ao registrar pagamento">Sug. {{ $dueForDisplay->format('d/m/Y') }}</span>
-                                                                @else
-                                                                    {{ $dueForDisplay->format('d/m/Y') }}
-                                                                @endif
-                                                            @else
-                                                                <span class="text-secondary">—</span>
+                                            <div class="card-header cc-statement-header d-flex flex-wrap justify-content-between align-items-start gap-3 py-3 border-0 {{ $statementHeaderClass }}">
+                                                <div class="min-w-0 d-flex align-items-start gap-3">
+                                                    <span class="cc-statement-icon" aria-hidden="true">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                                    </span>
+                                                    <div class="min-w-0">
+                                                        <div class="fw-semibold text-truncate">{{ $cycle->account->name }}</div>
+                                                        <div class="small text-secondary d-flex flex-wrap align-items-center gap-2">
+                                                            <span>Ref. {{ sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year) }}</span>
+                                                            <span class="cc-statement-status {{ $statementStatusClass }}">{{ $statementStatusLabel }}</span>
+                                                            @if ($meta?->is_avulsa)
+                                                                <span class="cc-statement-status cc-statement-status--muted">Avulsa</span>
                                                             @endif
                                                         </div>
                                                     </div>
+                                                </div>
+                                                <div class="text-md-end">
+                                                    <div class="cc-statement-total text-nowrap">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</div>
+                                                    <div class="small text-secondary">Total no cartão</div>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-4">
+                                                <div class="row g-3 g-lg-4 align-items-stretch">
+                                                    <div class="col-md-4 col-lg-3">
+                                                        <div class="cc-statement-metric h-100">
+                                                            <span class="cc-statement-metric__label">Vencimento</span>
+                                                            <strong class="cc-statement-metric__value">
+                                                                @if ($dueForDisplay)
+                                                                    @if ($dueIsSuggestion)
+                                                                        <span class="text-secondary" title="Conforme o cartão em Contas; confirme em Editar ou ao registrar pagamento">Sug. {{ $dueForDisplay->format('d/m/Y') }}</span>
+                                                                    @else
+                                                                        {{ $dueForDisplay->format('d/m/Y') }}
+                                                                    @endif
+                                                                @else
+                                                                    <span class="text-secondary">—</span>
+                                                                @endif
+                                                            </strong>
+                                                        </div>
+                                                    </div>
                                                     <div class="col-md-8 col-lg-6">
-                                                        <div class="small text-secondary text-uppercase mb-1" style="letter-spacing: 0.02em; font-size: 0.7rem;">Pagamento</div>
-                                                        <div class="small">
-                                                            @if ($isPaid)
-                                                                <span class="badge text-bg-success">Paga</span>
-                                                                <div class="text-secondary mt-1">{{ $meta->paid_at?->format('d/m/Y') }}</div>
-                                                                @if ($hasPayments)
+                                                        <div class="cc-statement-metric h-100">
+                                                            <span class="cc-statement-metric__label">Pagamento</span>
+                                                            <div class="small">
+                                                                @if ($isPaid)
+                                                                    <span class="cc-statement-status cc-statement-status--paid">Paga</span>
+                                                                    <div class="text-secondary mt-1">{{ $meta->paid_at?->format('d/m/Y') }}</div>
+                                                                    @if ($hasPayments)
+                                                                        <ul class="list-unstyled mb-0 mt-2">
+                                                                            @foreach ($meta->paymentTransactions as $ptx)
+                                                                                <li>
+                                                                                    <a href="{{ route('dashboard', ['period' => sprintf('%04d-%02d', $ptx->reference_year, $ptx->reference_month)]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
+                                                                                    — R$ {{ number_format((float) $ptx->amount, 2, ',', '.') }}
+                                                                                </li>
+                                                                            @endforeach
+                                                                        </ul>
+                                                                    @endif
+                                                                @elseif ($hasPayments)
+                                                                    <span class="cc-statement-status cc-statement-status--partial">Parcial</span>
+                                                                    <div class="text-secondary mt-1">
+                                                                        Pago: R$ {{ number_format((float) $meta->paymentsTotal(), 2, ',', '.') }}
+                                                                        · Pendente: R$ {{ number_format($remaining, 2, ',', '.') }}
+                                                                    </div>
                                                                     <ul class="list-unstyled mb-0 mt-2">
                                                                         @foreach ($meta->paymentTransactions as $ptx)
                                                                             <li>
@@ -187,32 +291,18 @@
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>
+                                                                @else
+                                                                    <span class="cc-statement-status cc-statement-status--open">Aberta</span>
                                                                 @endif
-                                                            @elseif ($hasPayments)
-                                                                <span class="badge text-bg-info text-dark">Parcial</span>
-                                                                <div class="text-secondary mt-1">
-                                                                    Pago: R$ {{ number_format((float) $meta->paymentsTotal(), 2, ',', '.') }}
-                                                                    · Pendente: R$ {{ number_format($remaining, 2, ',', '.') }}
-                                                                </div>
-                                                                <ul class="list-unstyled mb-0 mt-2">
-                                                                    @foreach ($meta->paymentTransactions as $ptx)
-                                                                        <li>
-                                                                            <a href="{{ route('dashboard', ['period' => sprintf('%04d-%02d', $ptx->reference_year, $ptx->reference_month)]) }}">{{ $ptx->date->format('d/m/Y') }}</a>
-                                                                            — R$ {{ number_format((float) $ptx->amount, 2, ',', '.') }}
-                                                                        </li>
-                                                                    @endforeach
-                                                                </ul>
-                                                            @else
-                                                                <span class="badge text-bg-warning text-dark">Aberta</span>
-                                                            @endif
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="col-lg-3">
-                                                        <div class="d-flex flex-wrap flex-lg-nowrap gap-2 justify-content-lg-end">
+                                                        <div class="cc-statement-actions h-100">
                                                             @if ($showPaymentForms)
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-sm btn-outline-secondary text-nowrap"
+                                                                    class="btn btn-sm btn-outline-secondary rounded-pill text-nowrap"
                                                                     title="Registrar um pagamento parcial ou total desta fatura"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#payStatementModal"
@@ -225,7 +315,7 @@
                                                             @endif
                                                             <button
                                                                 type="button"
-                                                                class="btn btn-sm btn-outline-primary text-nowrap"
+                                                                class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
                                                                 title="Alterar vencimento ou dados da fatura avulsa"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#editStatementModal"
@@ -249,13 +339,13 @@
                                                                 >
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir esta fatura avulsa">Excluir</button>
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill text-nowrap" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir esta fatura avulsa">Excluir</button>
                                                                 </form>
                                                             @endif
                                                             @unless ($meta?->is_avulsa)
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-sm btn-outline-secondary text-nowrap"
+                                                                    class="btn btn-sm btn-outline-secondary rounded-pill text-nowrap"
                                                                     title="Ver lançamentos que compõem esta fatura"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#statementItemsModal"
@@ -307,11 +397,14 @@
 
                         <div class="modal fade" id="payStatementModal" tabindex="-1" aria-labelledby="payStatementModalLabel" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-                                <div class="modal-content">
+                                <div class="modal-content cc-statement-form-modal">
                                     <form id="payStatementForm" method="POST" action="#">
                                         @csrf
-                                        <div class="modal-header">
-                                            <h2 class="modal-title h5 mb-0" id="payStatementModalLabel">Pagamento da fatura</h2>
+                                        <div class="modal-header cc-statement-form-modal__head">
+                                            <div>
+                                                <span class="cc-statement-form-modal__kicker">Fatura</span>
+                                                <h2 class="modal-title h5 mb-0" id="payStatementModalLabel">Pagamento da fatura</h2>
+                                            </div>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                         </div>
                                         <div class="modal-body">
@@ -353,7 +446,7 @@
                                             </div>
                                             <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente no <a href="{{ route('dashboard') }}">Painel</a>.</p>
                                         </div>
-                                        <div class="modal-footer">
+                                        <div class="modal-footer cc-statement-form-modal__footer">
                                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem registrar pagamento" data-bs-dismiss="modal">Cancelar</button>
                                             <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar o pagamento desta fatura como lançamento">Criar lançamento</x-primary-button>
                                         </div>
@@ -364,12 +457,15 @@
 
                         <div class="modal fade" id="editStatementModal" tabindex="-1" aria-labelledby="editStatementModalLabel" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content">
+                                <div class="modal-content cc-statement-form-modal">
                                     <form id="editStatementForm" method="POST" action="#">
                                         @csrf
                                         @method('PUT')
-                                        <div class="modal-header">
-                                            <h2 class="modal-title h5 mb-0" id="editStatementModalLabel">Editar fatura</h2>
+                                        <div class="modal-header cc-statement-form-modal__head">
+                                            <div>
+                                                <span class="cc-statement-form-modal__kicker">Ciclo</span>
+                                                <h2 class="modal-title h5 mb-0" id="editStatementModalLabel">Editar fatura</h2>
+                                            </div>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                         </div>
                                         <div class="modal-body">
@@ -389,7 +485,7 @@
                                                 Esta fatura avulsa não pode mais ser editada após registrar pagamentos.
                                             </p>
                                         </div>
-                                        <div class="modal-footer">
+                                        <div class="modal-footer cc-statement-form-modal__footer">
                                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem salvar alterações" data-bs-dismiss="modal">Cancelar</button>
                                             <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar vencimento e dados da fatura">Salvar</x-primary-button>
                                         </div>
@@ -400,12 +496,15 @@
 
                         <div class="modal fade" id="newAvulsaStatementModal" tabindex="-1" aria-labelledby="newAvulsaStatementModalLabel" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content">
+                                <div class="modal-content cc-statement-form-modal">
                                     <form method="POST" action="{{ route('credit-card-statements.store-avulsa', [$cardAccounts->firstWhere('id', $filterCardId)]) }}">
                                         @csrf
                                         <input type="hidden" name="_form" value="cc-statement-avulsa">
-                                        <div class="modal-header">
-                                            <h2 class="modal-title h5 mb-0" id="newAvulsaStatementModalLabel">Cadastrar fatura avulsa</h2>
+                                        <div class="modal-header cc-statement-form-modal__head">
+                                            <div>
+                                                <span class="cc-statement-form-modal__kicker">Manual</span>
+                                                <h2 class="modal-title h5 mb-0" id="newAvulsaStatementModalLabel">Cadastrar fatura avulsa</h2>
+                                            </div>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                         </div>
                                         <div class="modal-body">
@@ -439,7 +538,7 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="modal-footer">
+                                        <div class="modal-footer cc-statement-form-modal__footer">
                                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem criar fatura" data-bs-dismiss="modal">Cancelar</button>
                                             <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar a fatura avulsa com o total indicado">Cadastrar</x-primary-button>
                                         </div>
