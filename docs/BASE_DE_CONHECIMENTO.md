@@ -45,7 +45,7 @@ bootstrap/app.php       # aliases de middleware; exceção CSRF `stripe/*`; redi
 config/duozen.php       # trial, admins, isentos, flags de faturamento (`DUOZEN_*` no `.env`)
 routes/web.php          # rotas da app + require auth.php
 routes/auth.php         # Breeze
-database/migrations/   # baseline `2026_04_23_000000_initial_schema.php` + ajustes incrementais para bancos existentes
+database/migrations/   # baseline `2026_04_23_000000_initial_schema.php` com o schema atual consolidado
 database/factories/
 database/seeders/DatabaseSeeder.php
 resources/views/        # layouts, dashboard, couple, categories, transactions, welcome, auth/*, partials/subscription-public-info (texto trial/plano na landing e registro)
@@ -259,7 +259,7 @@ Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base** e são bloquead
 3. Casal pode ficar sem usuários no registro (não há delete automático ao sair o último).
 4. Navbar usa `route('dashboard')`; usuários sem casal são empurrados para `couple.index` pelo middleware.
 5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). O Cashier mantém o estado atualizado via webhooks; a rota **billing success** também sincroniza a assinatura a partir da sessão de Checkout (útil quando o webhook não atinge o ambiente, p.ex. `localhost` sem Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1.
-6. **Migrações:** baseline em `database/migrations/2026_04_23_000000_initial_schema.php` (instalação nova) + migrations incrementais para bancos existentes. `php artisan migrate` é bloqueado se essa baseline estiver pendente em um banco que já tem tabelas, para evitar recriação acidental; nesse caso, fazer backup e marcar a baseline como executada antes de aplicar apenas os ajustes necessários.
+6. **Migrações:** baseline única em `database/migrations/2026_04_23_000000_initial_schema.php` (instalação nova), consolidando o schema atual como ponto de partida do projeto. `php artisan migrate` é bloqueado se essa baseline estiver pendente em um banco que já tem tabelas, para evitar recriação acidental; nesse caso, fazer backup e marcar a baseline como executada antes de qualquer ajuste aditivo necessário no banco existente.
 
 ---
 
