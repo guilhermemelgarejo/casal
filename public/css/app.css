@@ -672,6 +672,15 @@ body .modal .modal-content {
     overflow: hidden;
 }
 
+body .modal-dialog-scrollable .modal-content > form {
+    max-height: 100%;
+    min-height: 0;
+}
+
+body .modal-dialog-scrollable .modal-content > form > .modal-body {
+    overflow-y: auto;
+}
+
 body .modal .modal-header {
     background: linear-gradient(
         135deg,
