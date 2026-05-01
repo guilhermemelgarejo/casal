@@ -4,6 +4,7 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
     const bs = typeof bootstrap !== 'undefined' ? bootstrap : window.bootstrap;
+    const nativeFormSubmit = HTMLFormElement.prototype.submit;
 
     if (bs?.Tooltip) {
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
@@ -83,6 +84,89 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         fp.setDate(dateStr, false, 'Y-m-d');
+    };
+
+    const shouldUseSubmitLoading = (form) => {
+        if (!form || form.matches('[data-loading="false"], [data-no-loading]')) {
+            return false;
+        }
+        const target = String(form.getAttribute('target') || '').trim();
+        return target === '' || target === '_self';
+    };
+
+    const submitButtonsForForm = (form) =>
+        Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])'));
+
+    const visibleSubmitButtonForForm = (form) =>
+        submitButtonsForForm(form).find((button) => !button.disabled && button.offsetParent !== null) || null;
+
+    const setSubmitButtonLoading = (button) => {
+        if (!button || button.dataset.duozenSubmitLoading === '1') {
+            return;
+        }
+
+        button.dataset.duozenSubmitLoading = '1';
+        button.classList.add('duozen-submit-loading');
+
+        if (button.tagName === 'INPUT') {
+            button.dataset.duozenOriginalValue = button.value;
+            button.value = button.getAttribute('data-loading-text') || 'Aguarde...';
+            return;
+        }
+
+        button.dataset.duozenOriginalHtml = button.innerHTML;
+        const loadingText = button.getAttribute('data-loading-text') || 'Aguarde...';
+        button.innerHTML = `<span class="spinner-border spinner-border-sm duozen-submit-loading__spinner" aria-hidden="true"></span><span class="duozen-submit-loading__label">${loadingText}</span>`;
+    };
+
+    const setFormLoading = (form, submitter = null) => {
+        if (!shouldUseSubmitLoading(form) || form.dataset.duozenSubmitting === '1') {
+            return;
+        }
+
+        form.dataset.duozenSubmitting = '1';
+        form.classList.add('duozen-form-submitting');
+
+        const button =
+            submitter && form.contains(submitter) && submitter.matches('button, input')
+                ? submitter
+                : visibleSubmitButtonForForm(form);
+        const submitButtons = submitButtonsForForm(form).filter((button) => !button.disabled);
+        submitButtons.forEach((button) => {
+            button.dataset.duozenDisabledByLoading = '1';
+            button.disabled = true;
+        });
+
+        setSubmitButtonLoading(button);
+    };
+
+    const resetFormLoading = (form) => {
+        if (!form || form.dataset.duozenSubmitting !== '1') {
+            return;
+        }
+
+        delete form.dataset.duozenSubmitting;
+        form.classList.remove('duozen-form-submitting');
+        submitButtonsForForm(form).forEach((button) => {
+            if (button.dataset.duozenDisabledByLoading === '1') {
+                button.disabled = false;
+                delete button.dataset.duozenDisabledByLoading;
+            }
+            if (button.dataset.duozenSubmitLoading !== '1') {
+                return;
+            }
+            delete button.dataset.duozenSubmitLoading;
+            button.classList.remove('duozen-submit-loading');
+            if (button.tagName === 'INPUT') {
+                button.value = button.dataset.duozenOriginalValue || button.value;
+                delete button.dataset.duozenOriginalValue;
+                return;
+            }
+            if (button.dataset.duozenOriginalHtml != null) {
+                button.innerHTML = button.dataset.duozenOriginalHtml;
+                delete button.dataset.duozenOriginalHtml;
+            }
+        });
     };
 
     const catForm = document.getElementById('category-form');
@@ -2062,4 +2146,38 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardFilterForm.querySelector('#dashboard-period')?.addEventListener('change', submitDashboardFilter);
         dashboardFilterForm.querySelector('#dashboard-account')?.addEventListener('change', submitDashboardFilter);
     }
+
+    document.addEventListener('click', (e) => {
+        const button = e.target.closest('button, input');
+        if (!button || !button.form || !button.matches('button[type="submit"], input[type="submit"], button:not([type])')) {
+            return;
+        }
+        button.form._duozenSubmitter = button;
+    });
+
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('form');
+        if (!form || e.defaultPrevented || !shouldUseSubmitLoading(form)) {
+            return;
+        }
+
+        if (form.dataset.duozenSubmitting === '1') {
+            e.preventDefault();
+            return;
+        }
+
+        setFormLoading(form, e.submitter || form._duozenSubmitter || null);
+    });
+
+    HTMLFormElement.prototype.submit = function submitWithLoading() {
+        setFormLoading(this, this._duozenSubmitter || null);
+        nativeFormSubmit.call(this);
+    };
+
+    window.addEventListener('pageshow', (e) => {
+        if (!e.persisted) {
+            return;
+        }
+        document.querySelectorAll('form.duozen-form-submitting').forEach(resetFormLoading);
+    });
 });

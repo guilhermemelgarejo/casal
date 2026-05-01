@@ -90,6 +90,17 @@ body {
     font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;
 }
 
+.duozen-submit-loading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.duozen-submit-loading__spinner {
+    flex: 0 0 auto;
+}
+
 /* SweetAlert2 — botões empilhados com espaçamento (app.js + data-confirm) */
 .swal2-popup .swal2-actions {
     display: flex !important;
