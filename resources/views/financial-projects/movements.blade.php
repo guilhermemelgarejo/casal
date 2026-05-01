@@ -1,17 +1,15 @@
 @php
-    try {
-        $periodLabel = \Carbon\Carbon::createFromFormat('Y-m', $period)->locale(app()->getLocale())->translatedFormat('F \d\e Y');
-    } catch (\Throwable $e) {
-        $periodLabel = $period;
+    if ($period) {
+        try {
+            $periodLabel = \Carbon\Carbon::createFromFormat('Y-m', $period)->locale(app()->getLocale())->translatedFormat('F \d\e Y');
+        } catch (\Throwable $e) {
+            $periodLabel = $period;
+        }
+    } else {
+        $periodLabel = 'todo o período';
     }
 
-    $totalAportes = (float) $movements
-        ->filter(fn ($movement) => in_array(($movement['kind'] ?? ''), ['aporte', 'juros'], true))
-        ->sum(fn ($movement) => abs((float) ($movement['amount'] ?? 0)));
-    $totalRetiradas = (float) $movements
-        ->filter(fn ($movement) => ($movement['kind'] ?? '') === 'retirada')
-        ->sum(fn ($movement) => abs((float) ($movement['amount'] ?? 0)));
-    $saldoPeriodo = (float) $movements->sum(fn ($movement) => (float) ($movement['amount'] ?? 0));
+    $periodLabelDisplay = ucfirst($periodLabel);
 @endphp
 
 <x-app-layout>
@@ -20,7 +18,7 @@
             <div>
                 <p class="small text-secondary mb-1">Cofrinhos</p>
                 <h2 class="h5 mb-0 cofrinhos-page-title">Movimentações - {{ $cofrinho->name }}</h2>
-                <p class="small text-secondary mb-0 mt-1">{{ ucfirst($periodLabel) }}</p>
+                <p class="small text-secondary mb-0 mt-1">{{ $periodLabelDisplay }}</p>
             </div>
             <a href="{{ route('cofrinhos.index') }}" class="btn btn-outline-secondary rounded-pill px-4">Voltar para cofrinhos</a>
         </div>
@@ -44,7 +42,7 @@
                                     <strong class="text-danger">R$ {{ number_format($totalRetiradas, 2, ',', '.') }}</strong>
                                 </div>
                                 <div class="cofrinhos-mini-stat">
-                                    <span>Saldo do mês</span>
+                                    <span>Saldo do período</span>
                                     <strong class="{{ $saldoPeriodo < 0 ? 'text-danger' : 'text-success' }}">
                                         {{ $saldoPeriodo < 0 ? '-' : '+' }}R$ {{ number_format(abs($saldoPeriodo), 2, ',', '.') }}
                                     </strong>
@@ -59,7 +57,7 @@
                                         id="cofrinho-movements-period"
                                         type="text"
                                         name="period"
-                                        value="{{ $period }}"
+                                        value="{{ $period ?? '' }}"
                                         class="form-control form-control-sm rounded-pill"
                                         data-duozen-flatpickr="month"
                                         autocomplete="off"
@@ -67,7 +65,7 @@
                                 </div>
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">Aplicar</button>
-                                    @if(request()->has('period'))
+                                    @if($period)
                                         <a href="{{ route('cofrinhos.movements', $cofrinho) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Limpar</a>
                                     @endif
                                 </div>
@@ -82,7 +80,7 @@
                     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
                         <div>
                             <h3 class="h6 mb-1">Histórico de movimentações</h3>
-                            <p class="small text-secondary mb-0">{{ $movements->count() }} registro(s) em {{ ucfirst($periodLabel) }}</p>
+                            <p class="small text-secondary mb-0">{{ $movements->total() }} registro(s) em {{ $periodLabelDisplay }}</p>
                         </div>
                     </div>
                 </div>
@@ -137,7 +135,7 @@
                                                 <div class="cofrinhos-empty-state__icon mx-auto mb-3" aria-hidden="true">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 8c-3.866 0-7 1.343-7 3s3.134 3 7 3 7-1.343 7-3-3.134-3-7-3zM5 11v4c0 1.657 3.134 3 7 3s7-1.343 7-3v-4" /></svg>
                                                 </div>
-                                                <p class="h6 mb-1">Nenhuma movimentação neste período</p>
+                                                <p class="h6 mb-1">Nenhuma movimentação encontrada</p>
                                                 <p class="small text-secondary mb-0">Aportes, retiradas e juros lançados para este cofrinho aparecerão aqui.</p>
                                             </div>
                                         </td>
@@ -146,6 +144,11 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($movements->hasPages())
+                        <div class="mt-4">
+                            {{ $movements->links() }}
+                        </div>
+                    @endif
                 </div>
             </section>
         </div>

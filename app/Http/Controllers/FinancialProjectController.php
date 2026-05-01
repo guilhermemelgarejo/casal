@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -57,13 +58,18 @@ class FinancialProjectController extends Controller
             'period' => ['nullable', 'string', 'regex:/^\d{4}\-\d{2}$/'],
         ]);
 
-        $period = (string) ($validated['period'] ?? now()->format('Y-m'));
-        [$year, $month] = array_map('intval', explode('-', $period));
+        $period = $request->filled('period') ? (string) ($validated['period'] ?? '') : null;
+        [$year, $month] = $period !== null
+            ? array_map('intval', explode('-', $period))
+            : [null, null];
 
         $transactionRows = $cofrinho->transactions()
             ->with(['accountModel:id,name', 'user:id,name'])
-            ->where('reference_month', $month)
-            ->where('reference_year', $year)
+            ->when($period !== null, function ($query) use ($month, $year) {
+                $query
+                    ->where('reference_month', $month)
+                    ->where('reference_year', $year);
+            })
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get()
@@ -91,8 +97,11 @@ class FinancialProjectController extends Controller
             ->where('couple_id', Auth::user()->couple_id)
             ->where('financial_project_id', $cofrinho->id)
             ->where('type', 'interest')
-            ->whereMonth('date', $month)
-            ->whereYear('date', $year)
+            ->when($period !== null, function ($query) use ($month, $year) {
+                $query
+                    ->whereMonth('date', $month)
+                    ->whereYear('date', $year);
+            })
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get()
@@ -111,12 +120,31 @@ class FinancialProjectController extends Controller
                 ];
             });
 
-        $movements = $this->sortMovements($transactionRows->concat($interestRows));
+        $allMovements = $this->sortMovements($transactionRows->concat($interestRows));
+        $page = max((int) $request->query('page', 1), 1);
+        $perPage = 50;
+        $movements = new LengthAwarePaginator(
+            $allMovements->forPage($page, $perPage)->values(),
+            $allMovements->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->except('page'),
+            ]
+        );
 
         return view('financial-projects.movements', [
             'cofrinho' => $cofrinho,
             'period' => $period,
             'movements' => $movements,
+            'totalAportes' => (float) $allMovements
+                ->filter(fn ($movement) => in_array(($movement['kind'] ?? ''), ['aporte', 'juros'], true))
+                ->sum(fn ($movement) => abs((float) ($movement['amount'] ?? 0))),
+            'totalRetiradas' => (float) $allMovements
+                ->filter(fn ($movement) => ($movement['kind'] ?? '') === 'retirada')
+                ->sum(fn ($movement) => abs((float) ($movement['amount'] ?? 0))),
+            'saldoPeriodo' => (float) $allMovements->sum(fn ($movement) => (float) ($movement['amount'] ?? 0)),
         ]);
     }
 

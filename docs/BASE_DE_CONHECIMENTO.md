@@ -133,13 +133,13 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 
 - `index`, `store`, `update`, `destroy` para CRUD de cofrinhos.
 - `storeInterest` / `destroyInterest` para lançar/remover juros (`financial_project_entries`, `type=interest`) sem criar lançamento em conta.
-- **`movements`** (`GET /cofrinhos/{cofrinho}/movimentacoes`): histórico por cofrinho com filtro opcional **`period=YYYY-MM`**; combina no mesmo resultado:
+- **`movements`** (`GET /cofrinhos/{cofrinho}/movimentacoes`): histórico por cofrinho com filtro opcional **`period=YYYY-MM`**; sem `period`, mostra **todo o período** por padrão; a lista é paginada em **50** registros por página. Combina no mesmo resultado:
   - **aportes** (`transactions.type=expense`, sinal positivo),
   - **retiradas** (`transactions.type=income`, sinal negativo),
   - **juros** (`financial_project_entries.type=interest`, sinal positivo).
   Ordenação por data decrescente (desempate por id), com isolamento por `couple_id`.
 - **UI** (`resources/views/financial-projects/index.blade.php`): wrapper `.cofrinhos-page`; cabeçalho com CTA **Novo cofrinho**; hero `.cofrinhos-hero` com resumo agregado (total guardado, quantidade de cofrinhos, metas concluídas) e dica de lançamento; cartões `.cofrinhos-project-card` com avatar, badge de estado, valor guardado, barra `.cofrinhos-progress`, métricas de falta/avanço e ações rápidas (**Aporte**, **Retirada**, juros, movimentações, editar, excluir). Modais de criar/editar/juros usam cabeçalho `.cofrinhos-juros-modal-head`.
-- **UI de movimentações** (`resources/views/financial-projects/movements.blade.php`): wrapper `.cofrinhos-movements-page`; resumo do período em `.cofrinhos-movements-hero` (aportes + juros, retiradas, saldo do mês), filtro de mês via flatpickr (`data-duozen-flatpickr="month"`) em `.cofrinhos-filter-shell`, tabela `.cofrinhos-movements-table` com data/tipo/descrição/conta/usuário/valor, hover em linhas e estado vazio **`.cofrinhos-empty-state`** com ícone.
+- **UI de movimentações** (`resources/views/financial-projects/movements.blade.php`): wrapper `.cofrinhos-movements-page`; resumo do período em `.cofrinhos-movements-hero` (aportes + juros, retiradas, saldo do período), filtro opcional de mês via flatpickr (`data-duozen-flatpickr="month"`) em `.cofrinhos-filter-shell`, tabela paginada `.cofrinhos-movements-table` com data/tipo/descrição/conta/usuário/valor, hover em linhas e estado vazio **`.cofrinhos-empty-state`** com ícone.
 
 ### `TransactionController`
 

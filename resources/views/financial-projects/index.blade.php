@@ -325,7 +325,7 @@
                                         + Juros
                                     </button>
                                     <a
-                                        href="{{ route('cofrinhos.movements', ['cofrinho' => $p->id, 'period' => now()->format('Y-m')]) }}"
+                                        href="{{ route('cofrinhos.movements', $p) }}"
                                         class="btn btn-outline-dark btn-sm rounded-pill"
                                     >
                                         Movimentações

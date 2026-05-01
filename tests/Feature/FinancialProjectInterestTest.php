@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Couple;
 use App\Models\FinancialProject;
 use App\Models\FinancialProjectEntry;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -56,6 +57,114 @@ class FinancialProjectInterestTest extends TestCase
 
         $this->assertSame(10.50, $project->fresh()->savedProgress());
         $this->assertSame($before, (float) $account->fresh()->balance);
+    }
+
+    public function test_movements_default_to_all_periods(): void
+    {
+        ['user' => $user, 'account' => $account, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Aporte de março',
+            'amount' => '100.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-03-10',
+            'reference_month' => 3,
+            'reference_year' => 2026,
+        ]);
+
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '5.00',
+            'date' => '2026-04-10',
+            'note' => 'Juros de abril',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('cofrinhos.movements', $project))
+            ->assertOk()
+            ->assertSee('Todo o período')
+            ->assertSee('Aporte de março')
+            ->assertSee('Juros de abril');
+    }
+
+    public function test_movements_filter_by_period_when_selected(): void
+    {
+        ['user' => $user, 'account' => $account, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Aporte de março',
+            'amount' => '100.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-03-10',
+            'reference_month' => 3,
+            'reference_year' => 2026,
+        ]);
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Aporte de abril',
+            'amount' => '150.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('cofrinhos.movements', ['cofrinho' => $project, 'period' => '2026-04']))
+            ->assertOk()
+            ->assertSee('Aporte de abril')
+            ->assertDontSee('Aporte de março');
+    }
+
+    public function test_movements_are_paginated_in_50_records(): void
+    {
+        ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '1.00',
+            'date' => '2026-04-10',
+            'note' => 'Registro fora da primeira página',
+        ]);
+
+        for ($i = 1; $i <= 50; $i++) {
+            FinancialProjectEntry::create([
+                'couple_id' => $user->couple_id,
+                'user_id' => $user->id,
+                'financial_project_id' => $project->id,
+                'type' => 'interest',
+                'amount' => '1.00',
+                'date' => '2026-04-10',
+                'note' => "Registro visível {$i}",
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('cofrinhos.movements', $project))
+            ->assertOk()
+            ->assertSee('51 registro(s)')
+            ->assertSee('Registro visível 50')
+            ->assertDontSee('Registro fora da primeira página');
     }
 
     public function test_cannot_delete_interest_of_another_couple(): void
