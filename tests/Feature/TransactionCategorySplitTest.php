@@ -157,4 +157,44 @@ class TransactionCategorySplitTest extends TestCase
         $this->assertNotNull($tx);
         $this->assertSame(5, $tx->categorySplits()->count());
     }
+
+    public function test_store_aceita_investimentos_sem_cofrinho(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => Category::NAME_INVESTMENTS,
+            'type' => 'expense',
+            'color' => '#0d9488',
+            'system_key' => Category::SYSTEM_KEY_INVESTMENTS,
+        ]);
+        $account = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta',
+            'kind' => Account::KIND_REGULAR,
+            'color' => '#333333',
+        ]);
+
+        $this->actingAs($user)->post(route('transactions.store'), [
+            'funding' => 'account',
+            'payment_method' => 'Pix',
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '100.00'],
+            ],
+            'account_id' => $account->id,
+            'description' => 'Investimento sem cofrinho',
+            'amount' => '100.00',
+            'type' => 'expense',
+            'date' => '2026-04-09',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+        ])->assertSessionHasNoErrors();
+
+        $tx = Transaction::query()->where('couple_id', $couple->id)->first();
+        $this->assertNotNull($tx);
+        $this->assertNull($tx->financial_project_id);
+        $this->assertSame(1, $tx->categorySplits()->count());
+        $this->assertEqualsWithDelta(100.0, (float) $tx->categorySplits()->where('category_id', $category->id)->value('amount'), 0.001);
+    }
 }

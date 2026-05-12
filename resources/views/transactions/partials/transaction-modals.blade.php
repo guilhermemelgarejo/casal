@@ -191,7 +191,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <p class="form-text mb-0">Só para lançamentos em conta corrente com categoria <strong>Investimentos</strong> ou <strong>Retirada de cofrinho</strong>.</p>
+                                <p class="form-text mb-0">Opcional para <strong>Investimentos</strong>; obrigatório para <strong>Retirada de cofrinho</strong>.</p>
                                 <x-input-error :messages="$errors->get('financial_project_id')" class="mt-2" />
                             </div>
                         @endif
@@ -440,7 +440,7 @@
                                     <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total.</p>
                                     @if($txFormMode !== 'cards_only')
                                         <p class="small text-secondary mb-2 border-start border-3 border-primary-subtle ps-2">
-                                            <strong>Cofrinho:</strong> em conta corrente, use a categoria <strong>Investimentos</strong> (despesa) ou <strong>Retirada de cofrinho</strong> (receita) e indique o cofrinho na seção seguinte.
+                                            <strong>Cofrinho:</strong> em conta corrente, <strong>Investimentos</strong> pode ser usado como despesa comum ou aporte; <strong>Retirada de cofrinho</strong> exige indicar o cofrinho.
                                         </p>
                                     @endif
                                     <div id="tx-category-allocations-wrap">
@@ -504,7 +504,7 @@
                                     <section class="tx-form-section border-top pt-3 mt-2" id="tx-cofrinho-wrapper" aria-labelledby="tx-section-cofrinho-heading">
                                         <h3 class="tx-form-section-title" id="tx-section-cofrinho-heading">Cofrinho</h3>
                                         <p class="small text-secondary mb-3">
-                                            Só em <strong>conta corrente</strong> (não em cartão). <strong>Aporte:</strong> despesa + categoria Investimentos. <strong>Retirada:</strong> receita + categoria Retirada de cofrinho.
+                                            Só em <strong>conta corrente</strong> (não em cartão). <strong>Aporte:</strong> opcional para despesa + categoria Investimentos. <strong>Retirada:</strong> receita + categoria Retirada de cofrinho.
                                         </p>
                                         @if(($financialProjects ?? collect())->isNotEmpty())
                                             <x-input-label for="financial_project_id" value="Qual cofrinho?" />
@@ -516,7 +516,7 @@
                                                     </option>
                                                 @endforeach
                                             </select>
-                                            <p class="form-text mb-0">Obrigatório se escolher <strong>Investimentos</strong> ou <strong>Retirada de cofrinho</strong> nas categorias.</p>
+                                            <p class="form-text mb-0">Opcional para <strong>Investimentos</strong>; obrigatório para <strong>Retirada de cofrinho</strong>.</p>
                                             <x-input-error :messages="$errors->get('financial_project_id')" class="mt-2" />
                                         @else
                                             <x-cofrinho-promo variant="micro" class="mt-1" />

@@ -1069,9 +1069,6 @@ class TransactionController extends Controller
             if ($txType !== 'expense') {
                 return ['errors' => ['category_allocations' => ['Investimentos exige um lançamento do tipo despesa.']]];
             }
-            if ($fpId === null) {
-                return ['errors' => ['financial_project_id' => ['Selecione o cofrinho para o aporte.']]];
-            }
         }
         if ($hasW) {
             if ($ctx['isCredit']) {
