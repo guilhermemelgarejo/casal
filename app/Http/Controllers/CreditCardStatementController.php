@@ -534,7 +534,7 @@ class CreditCardStatementController extends Controller
 
     private function authorizeCreditCardAccount(Account $account): void
     {
-        if ($account->couple_id !== Auth::user()->couple_id || ! $account->isCreditCard()) {
+        if ((int) $account->couple_id !== (int) Auth::user()->couple_id || ! $account->isCreditCard()) {
             abort(403);
         }
     }
@@ -707,6 +707,18 @@ class CreditCardStatementController extends Controller
             ->groupBy('account_id', 'reference_month', 'reference_year')
             ->selectRaw('account_id, reference_month, reference_year')
             ->get();
+
+        $avulsaCandidates = CreditCardStatement::query()
+            ->where('couple_id', $coupleId)
+            ->whereIn('account_id', $cardIds)
+            ->where('is_avulsa', true)
+            ->whereRaw('(reference_year * 12 + reference_month) < ?', [$currentOrdinal])
+            ->selectRaw('account_id, reference_month, reference_year')
+            ->get();
+
+        $candidates = $candidates->concat($avulsaCandidates)
+            ->unique(fn ($c) => ((int) $c->account_id).'-'.((int) $c->reference_year).'-'.((int) $c->reference_month))
+            ->values();
 
         if ($candidates->isEmpty()) {
             return collect();

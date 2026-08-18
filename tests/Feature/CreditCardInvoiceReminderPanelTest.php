@@ -297,4 +297,30 @@ class CreditCardInvoiceReminderPanelTest extends TestCase
             $this->travelBack();
         }
     }
+
+    public function test_painel_mostra_lembrete_de_fatura_avulsa_em_aberto(): void
+    {
+        extract($this->seedCoupleWithCard());
+
+        $this->travelTo(Carbon::create(2026, 4, 15, 12, 0, 0, config('app.timezone')));
+        try {
+            CreditCardStatement::create([
+                'couple_id' => $couple->id,
+                'account_id' => $card->id,
+                'reference_month' => 4,
+                'reference_year' => 2026,
+                'spent_total' => '250.00',
+                'due_date' => '2026-04-10',
+                'is_avulsa' => true,
+            ]);
+
+            $this->actingAs($user)
+                ->get(route('dashboard', ['period' => '2026-04']))
+                ->assertOk()
+                ->assertSee('rt-reminder-strip', false)
+                ->assertSee('R$ 250,00', false);
+        } finally {
+            $this->travelBack();
+        }
+    }
 }

@@ -45,6 +45,17 @@ final class CreditCardInvoiceReminders
             ->selectRaw('account_id, reference_month, reference_year')
             ->get();
 
+        $avulsaCandidates = CreditCardStatement::query()
+            ->where('couple_id', $coupleId)
+            ->whereIn('account_id', $cardIds)
+            ->where('is_avulsa', true)
+            ->selectRaw('account_id, reference_month, reference_year')
+            ->get();
+
+        $candidates = $candidates->concat($avulsaCandidates)
+            ->unique(fn ($c) => $c->account_id.'-'.$c->reference_year.'-'.$c->reference_month)
+            ->values();
+
         if ($candidates->isEmpty()) {
             return collect();
         }
