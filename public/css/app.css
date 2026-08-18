@@ -859,20 +859,29 @@ body {
 }
 
 /* Modais Bootstrap — visual unificado (todas as páginas com layout app) */
+body .modal .modal-dialog {
+    max-height: calc(100vh - (var(--bs-modal-margin) * 2));
+}
+
 body .modal .modal-content {
     border-radius: var(--bs-border-radius-xl);
     border: none;
     box-shadow: 0 0.625rem 2.5rem rgba(15, 23, 42, 0.14);
+    max-height: calc(100vh - (var(--bs-modal-margin) * 2));
     overflow: hidden;
 }
 
-body .modal-dialog-scrollable .modal-content > form {
-    max-height: 100%;
+body .modal .modal-content > form {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
     min-height: 0;
 }
 
-body .modal-dialog-scrollable .modal-content > form > .modal-body {
+body .modal .modal-body,
+body .modal .modal-content > form > .modal-body {
     overflow-y: auto;
+    min-height: 0;
 }
 
 body .modal .modal-header {
