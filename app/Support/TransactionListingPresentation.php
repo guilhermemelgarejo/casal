@@ -146,7 +146,7 @@ class TransactionListingPresentation
                 continue;
             }
 
-            $sorted = $group->sortBy(fn (Transaction $t) => [$t->date->timestamp, $t->id])->values();
+            $sorted = $group->sortBy(fn (Transaction $t) => [($t->date?->timestamp ?? 0), $t->id])->values();
             $first = $sorted->first();
             $first->loadMissing('accountModel');
             if (! $first->accountModel?->isCreditCard()) {
