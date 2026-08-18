@@ -263,6 +263,9 @@ class RecurringTransactionController extends Controller
             if ($category->isCreditCardInvoicePayment()) {
                 return ['errors' => ['category_allocations' => ['Não é possível usar a categoria de quitação de fatura.']]];
             }
+            if ($category->isInternalTransferCategory()) {
+                return ['errors' => ['category_allocations' => ['Não é possível usar categorias reservadas a transferências entre contas.']]];
+            }
             if ($category->type !== $type) {
                 return ['errors' => ['category_allocations' => ['Todas as categorias devem ser do mesmo tipo (Receita ou Despesa).']]];
             }

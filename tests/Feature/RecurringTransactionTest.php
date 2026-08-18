@@ -495,4 +495,33 @@ class RecurringTransactionTest extends TestCase
                 ->doesntExist()
         );
     }
+
+    public function test_store_rejeita_categoria_de_transferencia_interna(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        Category::ensureInternalTransferCategoriesForCouple((int) $couple->id);
+        $transferCategory = Category::query()
+            ->where('couple_id', $couple->id)
+            ->where('system_key', Category::SYSTEM_KEY_INTERNAL_TRANSFER_EXPENSE)
+            ->firstOrFail();
+
+        $response = $this->actingAs($user)->post(route('recurring-transactions.store'), [
+            'description' => 'Transferência recorrente',
+            'amount' => '100.00',
+            'type' => 'expense',
+            'funding' => 'account',
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'day_of_month' => 10,
+            'category_allocations' => [
+                ['category_id' => $transferCategory->id, 'amount' => '100.00'],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('category_allocations');
+        $this->assertDatabaseMissing('recurring_transactions', [
+            'description' => 'Transferência recorrente',
+        ]);
+    }
 }
