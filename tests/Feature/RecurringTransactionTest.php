@@ -524,4 +524,163 @@ class RecurringTransactionTest extends TestCase
             'description' => 'Transferência recorrente',
         ]);
     }
+
+    public function test_recorrente_multiplo_aparece_no_lembrete_mesmo_apos_ter_lancamento_no_mes(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        $rt = RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'description' => 'Gasolina',
+            'amount' => '150.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'generation_mode' => RecurringTransaction::MODE_REMINDER,
+            'is_multiple' => true,
+            'day_of_month' => null,
+            'is_active' => true,
+        ]);
+        $rt->syncCategorySplits([
+            ['category_id' => $category->id, 'amount' => '150.00'],
+        ]);
+
+        $this->travelTo(Carbon::create(2026, 4, 10, 10, 0, 0, config('app.timezone')));
+
+        try {
+            $this->assertTrue($rt->fresh()->shouldShowReminder(Carbon::now()));
+            $this->assertFalse($rt->fresh()->isReminderOverdueForCalendarMonth(Carbon::now()));
+
+            $this->createTransactionWithSplits([
+                'couple_id' => $couple->id,
+                'user_id' => $user->id,
+                'account_id' => $account->id,
+                'description' => 'Gasolina',
+                'amount' => '150.00',
+                'payment_method' => 'Pix',
+                'type' => 'expense',
+                'date' => '2026-04-10',
+                'reference_month' => 4,
+                'reference_year' => 2026,
+                'recurring_transaction_id' => $rt->id,
+            ], [
+                ['category_id' => $category->id, 'amount' => '150.00'],
+            ]);
+
+            // Mesmo após lançamento gerado no mês, recorrente múltiplo continua aparecendo como lembrete/atalho
+            $this->assertTrue($rt->fresh()->shouldShowReminder(Carbon::now()));
+            $this->assertFalse($rt->fresh()->isReminderOverdueForCalendarMonth(Carbon::now()));
+        } finally {
+            $this->travelBack();
+        }
+    }
+
+    public function test_recorrente_multiplo_preenche_data_com_dia_atual(): void
+    {
+        ['couple' => $couple, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        $rt = RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'description' => 'Almoço',
+            'amount' => '35.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'generation_mode' => RecurringTransaction::MODE_REMINDER,
+            'is_multiple' => true,
+            'day_of_month' => null,
+            'is_active' => true,
+        ]);
+        $rt->syncCategorySplits([
+            ['category_id' => $category->id, 'amount' => '35.00'],
+        ]);
+
+        $this->travelTo(Carbon::create(2026, 4, 18, 12, 30, 0, config('app.timezone')));
+
+        try {
+            $payload = $rt->toTransactionPrefillPayload(Carbon::now());
+            $this->assertSame('2026-04-18', $payload['date']);
+            $this->assertSame('35.00', $payload['amount']);
+            $this->assertSame((int) $rt->id, $payload['recurring_template_id']);
+        } finally {
+            $this->travelBack();
+        }
+    }
+
+    public function test_store_and_update_recorrente_multiplo(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        // Criar modelo múltiplo sem day_of_month obrigatório
+        $this->actingAs($user)->post(route('recurring-transactions.store'), [
+            '_form' => 'recurring-transactions',
+            'description' => 'Café da manhã',
+            'amount' => '20.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'is_multiple' => '1',
+            'is_active' => '1',
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '20.00'],
+            ],
+        ])->assertRedirect();
+
+        $rt = RecurringTransaction::query()->where('couple_id', $couple->id)->first();
+        $this->assertNotNull($rt);
+        $this->assertSame('Café da manhã', $rt->description);
+        $this->assertTrue($rt->is_multiple);
+        $this->assertNull($rt->day_of_month);
+
+        // Atualizar modelo
+        $this->actingAs($user)->put(route('recurring-transactions.update', $rt), [
+            '_form' => 'recurring-transactions',
+            'description' => 'Café e lanche',
+            'amount' => '25.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'is_multiple' => '1',
+            'is_active' => '1',
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '25.00'],
+            ],
+        ])->assertRedirect();
+
+        $rt->refresh();
+        $this->assertSame('Café e lanche', $rt->description);
+        $this->assertSame('25.00', (string) $rt->amount);
+        $this->assertTrue($rt->is_multiple);
+    }
+
+    public function test_painel_lembretes_exibe_recorrente_multiplo_com_badge_e_texto_hoje(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'description' => 'Mercado Express',
+            'amount' => '60.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'generation_mode' => RecurringTransaction::MODE_REMINDER,
+            'is_multiple' => true,
+            'day_of_month' => null,
+            'is_active' => true,
+        ])->syncCategorySplits([
+            ['category_id' => $category->id, 'amount' => '60.00'],
+        ]);
+
+        $html = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('Mercado Express', $html);
+        $this->assertStringContainsString('Múltiplo', $html);
+        $this->assertStringContainsString('Atalho frequente · Data padrão: hoje', $html);
+    }
 }

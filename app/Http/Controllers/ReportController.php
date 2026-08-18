@@ -215,7 +215,8 @@ class ReportController extends Controller
             ->map(fn (RecurringTransaction $rt) => [
                 'description' => (string) $rt->description,
                 'amount' => (float) $rt->amount,
-                'day_of_month' => (int) $rt->day_of_month,
+                'is_multiple' => (bool) $rt->is_multiple,
+                'day_of_month' => $rt->day_of_month !== null ? (int) $rt->day_of_month : null,
                 'account_name' => (string) ($rt->account?->name ?? 'Sem conta'),
             ])
             ->values();

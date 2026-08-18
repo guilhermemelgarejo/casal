@@ -82,8 +82,17 @@
                                             <li class="rt-reminder-list__item">
                                                 <div class="rt-reminder-list__row rt-reminder-list__row--invoice">
                                                     <span class="rt-reminder-list__name min-w-0">
-                                                        <span class="d-block text-truncate">{{ $rec->description }}</span>
-                                                        <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
+                                                        <span class="d-flex align-items-center gap-2">
+                                                            <span class="d-block text-truncate">{{ $rec->description }}</span>
+                                                            @if($rec->is_multiple)
+                                                                <span class="badge rounded-pill text-bg-info text-dark-emphasis flex-shrink-0" style="font-size: 0.68rem;">Múltiplo</span>
+                                                            @endif
+                                                        </span>
+                                                        @if($rec->is_multiple)
+                                                            <span class="d-block small text-secondary text-truncate">Atalho frequente · Data padrão: hoje</span>
+                                                        @else
+                                                            <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
+                                                        @endif
                                                     </span>
                                                     <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
                                                     <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>

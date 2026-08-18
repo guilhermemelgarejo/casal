@@ -674,9 +674,14 @@
                             <tbody>
                                 @forelse($pendingRecurringRows as $row)
                                     <tr>
-                                        <td>{{ $row['description'] }}</td>
+                                        <td>
+                                            <span>{{ $row['description'] }}</span>
+                                            @if(!empty($row['is_multiple']))
+                                                <span class="badge rounded-pill text-bg-info text-dark-emphasis ms-1" style="font-size: 0.68rem;">Múltiplo</span>
+                                            @endif
+                                        </td>
                                         <td class="text-end">{{ $money($row['amount']) }}</td>
-                                        <td class="text-end">{{ $row['day_of_month'] }}</td>
+                                        <td class="text-end">{{ !empty($row['is_multiple']) ? 'Dia atual' : ($row['day_of_month'] ?? '—') }}</td>
                                         <td class="text-end">{{ $row['account_name'] }}</td>
                                     </tr>
                                 @empty

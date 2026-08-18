@@ -1837,12 +1837,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ) {
                     referenceMonth.value = String(parseInt(String(prefill.reference_month), 10));
                     referenceYear.value = String(parseInt(String(prefill.reference_year), 10));
-                } else if (prefill.date) {
-                    const d = new Date(`${prefill.date}T12:00:00`);
-                    if (!Number.isNaN(d.getTime())) {
-                        referenceMonth.value = String(d.getMonth() + 1);
-                        referenceYear.value = String(d.getFullYear());
-                    }
+                } else {
+                    syncCreditReferencePlusOneMonth();
                 }
             }
             const wrap = document.getElementById('tx-category-allocations-wrap');

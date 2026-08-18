@@ -81,6 +81,11 @@ class RecurringTransactionController extends Controller
             return back()->withErrors($accountError)->withInput();
         }
 
+        $isMultiple = $request->boolean('is_multiple', false);
+        $dayOfMonth = $isMultiple
+            ? ($request->filled('day_of_month') ? (int) $request->day_of_month : null)
+            : (int) $request->day_of_month;
+
         $rt = RecurringTransaction::create([
             'couple_id' => $couple->id,
             'description' => (string) $request->description,
@@ -92,7 +97,8 @@ class RecurringTransactionController extends Controller
                 ? null
                 : (string) $request->payment_method,
             'generation_mode' => RecurringTransaction::MODE_REMINDER,
-            'day_of_month' => (int) $request->day_of_month,
+            'is_multiple' => $isMultiple,
+            'day_of_month' => $dayOfMonth,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -126,6 +132,11 @@ class RecurringTransactionController extends Controller
             return back()->withErrors($accountError)->withInput();
         }
 
+        $isMultiple = $request->boolean('is_multiple', false);
+        $dayOfMonth = $isMultiple
+            ? ($request->filled('day_of_month') ? (int) $request->day_of_month : null)
+            : (int) $request->day_of_month;
+
         $recurringTransaction->update([
             'description' => (string) $request->description,
             'amount' => number_format($amountCents / 100, 2, '.', ''),
@@ -136,7 +147,8 @@ class RecurringTransactionController extends Controller
                 ? null
                 : (string) $request->payment_method,
             'generation_mode' => RecurringTransaction::MODE_REMINDER,
-            'day_of_month' => (int) $request->day_of_month,
+            'is_multiple' => $isMultiple,
+            'day_of_month' => $dayOfMonth,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -176,7 +188,14 @@ class RecurringTransactionController extends Controller
                 Rule::exists('accounts', 'id')->where('couple_id', $coupleId),
             ],
             'payment_method' => ['nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
-            'day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
+            'is_multiple' => ['sometimes', 'boolean'],
+            'day_of_month' => [
+                Rule::requiredIf(! $request->boolean('is_multiple')),
+                'nullable',
+                'integer',
+                'min:1',
+                'max:31',
+            ],
             'is_active' => ['sometimes', 'boolean'],
             'category_allocations' => 'required|array|max:5',
             'category_allocations.*.category_id' => 'nullable|exists:categories,id',

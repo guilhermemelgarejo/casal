@@ -25,6 +25,7 @@ class RecurringTransaction extends Model
         'account_id',
         'payment_method',
         'generation_mode',
+        'is_multiple',
         'day_of_month',
         'is_active',
     ];
@@ -33,6 +34,7 @@ class RecurringTransaction extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'is_multiple' => 'boolean',
             'day_of_month' => 'integer',
             'is_active' => 'boolean',
         ];
@@ -61,7 +63,7 @@ class RecurringTransaction extends Model
     public function effectiveDayInMonth(int $year, int $month): int
     {
         $dim = (int) Carbon::createFromDate($year, $month, 1)->daysInMonth;
-        $want = max(1, min(31, (int) $this->day_of_month));
+        $want = max(1, min(31, (int) ($this->day_of_month ?? 1)));
 
         return min($want, $dim);
     }
@@ -77,12 +79,17 @@ class RecurringTransaction extends Model
 
     /**
      * Lembrete no painel e em /recorrentes: modelo ativo, ainda sem lançamento vinculado neste mês civil
-     * (desde o dia 1). O atributo `day_of_month` continua a definir a data sugerida no pré-preenchimento em Lançamentos.
+     * (desde o dia 1) ou recorrente múltiplo (sempre visível como atalho frequente).
+     * O atributo `day_of_month` continua a definir a data sugerida no pré-preenchimento para modelos mensais.
      */
     public function shouldShowReminder(Carbon $now): bool
     {
         if (! $this->is_active) {
             return false;
+        }
+
+        if ($this->is_multiple) {
+            return true;
         }
 
         $y = (int) $now->year;
@@ -97,9 +104,14 @@ class RecurringTransaction extends Model
     /**
      * Lembrete considerado vencido para o mês civil de `$now`: o dia atual já passou do dia sugerido
      * (`day_of_month` limitado ao último dia do mês — ver {@see effectiveDayInMonth()}).
+     * Recorrentes múltiplos não possuem vencimento fixo no mês.
      */
     public function isReminderOverdueForCalendarMonth(Carbon $now): bool
     {
+        if ($this->is_multiple) {
+            return false;
+        }
+
         $effective = $this->effectiveDayInMonth((int) $now->year, (int) $now->month);
 
         return (int) $now->day > $effective;
@@ -122,7 +134,8 @@ class RecurringTransaction extends Model
             'funding' => $this->funding,
             'account_id' => (int) $this->account_id,
             'payment_method' => $this->payment_method,
-            'day_of_month' => (int) $this->day_of_month,
+            'day_of_month' => $this->day_of_month !== null ? (int) $this->day_of_month : null,
+            'is_multiple' => $this->is_multiple ? 1 : 0,
             'is_active' => $this->is_active ? 1 : 0,
             'splits' => $this->categorySplits->map(fn ($s) => [
                 'category_id' => (int) $s->category_id,
@@ -140,10 +153,14 @@ class RecurringTransaction extends Model
     {
         $this->loadMissing('categorySplits');
 
-        $y = (int) $now->year;
-        $m = (int) $now->month;
-        $day = $this->effectiveDayInMonth($y, $m);
-        $date = Carbon::createFromDate($y, $m, $day)->toDateString();
+        if ($this->is_multiple) {
+            $date = Carbon::now()->toDateString();
+        } else {
+            $y = (int) $now->year;
+            $m = (int) $now->month;
+            $day = $this->effectiveDayInMonth($y, $m);
+            $date = Carbon::createFromDate($y, $m, $day)->toDateString();
+        }
 
         $splits = [];
         foreach ($this->categorySplits as $s) {

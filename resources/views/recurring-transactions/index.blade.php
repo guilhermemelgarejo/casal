@@ -145,7 +145,9 @@
                             @foreach($items as $item)
                                 @php
                                     $accent = $item->account?->color ?? ($item->type === 'income' ? '#198754' : '#0d6efd');
-                                    $pendingThisMonth = $item->is_active && ! $item->hasGeneratedForCalendarMonth(now()->year, now()->month);
+                                    $isMultiple = (bool) $item->is_multiple;
+                                    $pendingThisMonth = $item->is_active && ! $isMultiple && ! $item->hasGeneratedForCalendarMonth(now()->year, now()->month);
+                                    $monthCount = $isMultiple ? $item->generatedTransactions()->whereYear('date', now()->year)->whereMonth('date', now()->month)->count() : 0;
                                     $isCard = $item->funding === \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD;
                                 @endphp
                                 <div class="col-12 col-lg-6">
@@ -168,12 +170,21 @@
                                                         <span class="rt-item-card__type {{ $item->type === 'income' ? 'rt-item-card__type--income' : 'rt-item-card__type--expense' }}">
                                                             {{ $item->type === 'income' ? 'Receita' : 'Despesa' }}
                                                         </span>
+                                                        @if($isMultiple)
+                                                            <span class="badge rounded-pill text-bg-info text-dark-emphasis" style="font-size: 0.72rem;">Múltiplo</span>
+                                                        @endif
                                                         @if($item->is_active)
                                                             <span class="rt-item-card__badge rt-item-card__badge--ok">Ativo</span>
                                                         @else
                                                             <span class="rt-item-card__badge">Inativo</span>
                                                         @endif
-                                                        @if($pendingThisMonth)
+                                                        @if($isMultiple)
+                                                            @if($monthCount > 0)
+                                                                <span class="rt-item-card__badge rt-item-card__badge--done">{{ $monthCount }}x no mês</span>
+                                                            @else
+                                                                <span class="rt-item-card__badge rt-item-card__badge--pending">Disponível</span>
+                                                            @endif
+                                                        @elseif($pendingThisMonth)
                                                             <span class="rt-item-card__badge rt-item-card__badge--pending">Pendente no mês</span>
                                                         @elseif($item->is_active)
                                                             <span class="rt-item-card__badge rt-item-card__badge--done">Registrado no mês</span>
@@ -181,7 +192,11 @@
                                                     </div>
                                                     <p class="rt-item-card__meta small mb-0">
                                                         <span class="rt-item-card__amount">R$ {{ number_format((float) $item->amount, 2, ',', '.') }}</span>
-                                                        <span class="text-secondary">· Dia {{ $item->day_of_month }}</span>
+                                                        @if($isMultiple)
+                                                            <span class="text-secondary">· Atalho (dia atual)</span>
+                                                        @else
+                                                            <span class="text-secondary">· Dia {{ $item->day_of_month }}</span>
+                                                        @endif
                                                         <span class="text-secondary">· {{ $item->account?->name ?? 'Conta' }}</span>
                                                         @if($item->funding === \App\Models\RecurringTransaction::FUNDING_ACCOUNT && $item->payment_method)
                                                             <span class="text-secondary">· {{ $item->payment_method }}</span>
@@ -208,7 +223,7 @@
                                             </div>
 
                                             <div class="rt-item-card__toolbar d-flex flex-wrap align-items-center gap-2 justify-content-end flex-shrink-0 ms-auto">
-                                                @if(!$item->hasGeneratedForCalendarMonth(now()->year, now()->month))
+                                                @if($isMultiple || !$item->hasGeneratedForCalendarMonth(now()->year, now()->month))
                                                     <a href="{{ route('dashboard', ['prefill_recurring' => $item->id, 'period' => now()->format('Y-m')]) }}" class="btn btn-sm rt-item-card__btn-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
                                                 @endif
                                                 <button
@@ -268,7 +283,7 @@
                         </div>
 
                         <div class="row g-3">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label" for="rt-type">Tipo</label>
                                 <select name="type" id="rt-type" class="form-select @error('type') is-invalid @enderror" required>
                                     <option value="expense" @selected(old('type', 'expense') === 'expense')>Despesa</option>
@@ -276,7 +291,7 @@
                                 </select>
                                 @error('type')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label" for="rt-funding">Origem</label>
                                 <select name="funding" id="rt-funding" class="form-select @error('funding') is-invalid @enderror" required>
                                     <option value="{{ \App\Models\RecurringTransaction::FUNDING_ACCOUNT }}" @selected(old('funding', \App\Models\RecurringTransaction::FUNDING_ACCOUNT) === \App\Models\RecurringTransaction::FUNDING_ACCOUNT)>Conta corrente</option>
@@ -284,12 +299,25 @@
                                 </select>
                                 @error('funding')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <label class="form-label" for="rt-is-multiple">Frequência</label>
+                                <select name="is_multiple" id="rt-is-multiple" class="form-select @error('is_multiple') is-invalid @enderror">
+                                    <option value="0" @selected(old('is_multiple', '0') === '0')>Mensal (1x no mês)</option>
+                                    <option value="1" @selected(old('is_multiple') === '1')>Recorrente múltiplo</option>
+                                </select>
+                                @error('is_multiple')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-md-3" id="rt-day-wrap">
                                 <label class="form-label" for="rt-day">Dia do mês</label>
                                 <input type="number" name="day_of_month" id="rt-day" class="form-control @error('day_of_month') is-invalid @enderror" min="1" max="31" value="{{ old('day_of_month', 5) }}" required>
                                 @error('day_of_month')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                                <div class="form-text">Em meses mais curtos, o sistema usa o último dia possível.</div>
                             </div>
+                        </div>
+
+                        <div class="form-text mt-n1" id="rt-day-hint">Em meses mais curtos, o sistema usa o último dia possível.</div>
+                        <div class="form-text mt-n1 d-none text-primary-emphasis" id="rt-multiple-hint">
+                            <span class="badge rounded-pill text-bg-info text-dark-emphasis me-1">Múltiplo</span>
+                            Atalho contínuo para lançar várias vezes no mês. Ao abrir o formulário, a data padrão virá preenchida no <strong>dia atual</strong>.
                         </div>
 
                         <div class="row g-3">
@@ -370,6 +398,11 @@
                 const form = document.getElementById('formRecurring');
                 const methodWrap = document.getElementById('rt-method-wrap');
                 const fundingEl = document.getElementById('rt-funding');
+                const isMultipleEl = document.getElementById('rt-is-multiple');
+                const dayWrap = document.getElementById('rt-day-wrap');
+                const dayInput = document.getElementById('rt-day');
+                const dayHint = document.getElementById('rt-day-hint');
+                const multipleHint = document.getElementById('rt-multiple-hint');
                 const paymentWrap = document.getElementById('rt-payment-wrap');
                 const paymentSelect = document.getElementById('rt-payment-method');
                 const accountSelect = document.getElementById('rt-account');
@@ -381,6 +414,17 @@
                 const editById =
                     rawEditMap && typeof rawEditMap === 'object' && !Array.isArray(rawEditMap) ? rawEditMap : {};
                 const amountInput = document.getElementById('rt-amount');
+
+                function syncMultipleUi() {
+                    if (!isMultipleEl) return;
+                    const isMultiple = isMultipleEl.value === '1';
+                    if (dayWrap) dayWrap.classList.toggle('d-none', isMultiple);
+                    if (dayHint) dayHint.classList.toggle('d-none', isMultiple);
+                    if (multipleHint) multipleHint.classList.toggle('d-none', !isMultiple);
+                    if (dayInput) {
+                        dayInput.required = !isMultiple;
+                    }
+                }
 
                 function setFundingUi() {
                     const funding = fundingEl.value;
@@ -536,10 +580,12 @@
                     form.reset();
                     document.getElementById('rt-type').value = 'expense';
                     document.getElementById('rt-funding').value = @json(\App\Models\RecurringTransaction::FUNDING_ACCOUNT);
+                    if (isMultipleEl) isMultipleEl.value = '0';
                     document.getElementById('rt-day').value = '5';
                     document.getElementById('rt-active').checked = true;
                     resetCategoryRows();
                     setFundingUi();
+                    syncMultipleUi();
                 }
 
                 function openEdit(payload) {
@@ -552,9 +598,11 @@
                     document.getElementById('rt-amount').value = payload.amount || '';
                     document.getElementById('rt-type').value = payload.type || 'expense';
                     document.getElementById('rt-funding').value = payload.funding || @json(\App\Models\RecurringTransaction::FUNDING_ACCOUNT);
-                    document.getElementById('rt-day').value = String(payload.day_of_month || 1);
+                    if (isMultipleEl) isMultipleEl.value = Number(payload.is_multiple) === 1 ? '1' : '0';
+                    document.getElementById('rt-day').value = payload.day_of_month ? String(payload.day_of_month) : '5';
                     document.getElementById('rt-active').checked = Number(payload.is_active) === 1;
                     setFundingUi();
+                    syncMultipleUi();
                     accountSelect.value = String(payload.account_id || '');
                     if (paymentSelect) {
                         paymentSelect.value = payload.payment_method || '';
@@ -569,6 +617,9 @@
                 typeSelect.addEventListener('change', () => {
                     filterCategoryOptions();
                 });
+                if (isMultipleEl) {
+                    isMultipleEl.addEventListener('change', syncMultipleUi);
+                }
 
                 if (amountInput) {
                     const onAmountChange = () => {
@@ -609,10 +660,12 @@
 
                 @if ($errors->any() && old('_form') === 'recurring-transactions')
                     setFundingUi();
+                    syncMultipleUi();
                     const m = new bootstrap.Modal(modalEl);
                     m.show();
                 @else
                     setFundingUi();
+                    syncMultipleUi();
                 @endif
             })();
         </script>
