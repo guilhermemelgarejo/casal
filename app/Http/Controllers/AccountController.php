@@ -107,8 +107,12 @@ class AccountController extends Controller
 
     public function destroy(Account $account)
     {
-        if ($account->couple_id !== Auth::user()->couple_id) {
+        if ((int) $account->couple_id !== (int) Auth::user()->couple_id) {
             abort(403);
+        }
+
+        if ($account->transactions()->exists()) {
+            return back()->with('error', 'Não é possível excluir esta conta porque existem lançamentos vinculados a ela.');
         }
 
         $account->delete();

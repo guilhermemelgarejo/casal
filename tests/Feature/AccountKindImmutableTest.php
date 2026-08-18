@@ -64,4 +64,33 @@ class AccountKindImmutableTest extends TestCase
         $this->assertSame(Account::KIND_CREDIT_CARD, $account->kind);
         $this->assertSame('Visa Gold', $account->name);
     }
+
+    public function test_nao_permite_excluir_conta_com_lancamentos(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $account = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta Corrente',
+            'kind' => Account::KIND_REGULAR,
+            'color' => '#111111',
+        ]);
+
+        $couple->transactions()->create([
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'description' => 'Depósito',
+            'amount' => '100.00',
+            'type' => 'income',
+            'date' => '2026-08-01',
+            'reference_month' => 8,
+            'reference_year' => 2026,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('accounts.destroy', $account));
+        $response->assertSessionHas('error');
+
+        $this->assertDatabaseHas('accounts', ['id' => $account->id]);
+    }
 }
