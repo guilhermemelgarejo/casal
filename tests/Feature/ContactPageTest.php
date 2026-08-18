@@ -18,7 +18,7 @@ class ContactPageTest extends TestCase
         $response = $this->get(route('contact.show'));
 
         $response->assertOk();
-        $response->assertSee('Entre em contato sobre o');
+        $response->assertSee('Fale sobre o');
     }
 
     public function test_visitante_pode_enviar_mensagem_de_contato(): void

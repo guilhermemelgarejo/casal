@@ -71,32 +71,37 @@ class CreditCardStatementTest extends TestCase
 
     public function test_index_lista_fatura_a_partir_de_lancamento_no_cartao(): void
     {
-        extract($this->seedCoupleWithAccounts());
+        Carbon::setTestNow('2026-04-15 12:00:00');
+        try {
+            extract($this->seedCoupleWithAccounts());
 
-        $this->actingAs($user)->get(route('credit-card-statements.index'))
-            ->assertOk()
-            ->assertSee('Escolher cartão', false)
-            ->assertSee('cc-picker-grid', false);
+            $this->actingAs($user)->get(route('credit-card-statements.index'))
+                ->assertOk()
+                ->assertSee('Escolher cartão', false)
+                ->assertSee('cc-picker-grid', false);
 
-        $this->cardExpense($user, $card, $category, 4, 2026, '150.50');
+            $this->cardExpense($user, $card, $category, 4, 2026, '150.50');
 
-        $this->actingAs($user)->get(route('credit-card-statements.index'))
-            ->assertOk()
-            ->assertSee('R$ 150,50', false)
-            ->assertDontSee('id="statement-cycle-', false)
-            ->assertDontSee('Itens da fatura', false);
+            $this->actingAs($user)->get(route('credit-card-statements.index'))
+                ->assertOk()
+                ->assertSee('R$ 150,50', false)
+                ->assertDontSee('id="statement-cycle-', false)
+                ->assertDontSee('Itens da fatura', false);
 
-        $html = $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
-            ->assertOk()
-            ->assertSee('R$ 150,50', false)
-            ->assertSee('04/2026', false)
-            ->assertSee('Itens da fatura', false)
-            ->assertSee('id="statement-cycle-', false)
-            ->assertSee('data-statement-cycle-key=', false)
-            ->assertSee('window.__invoiceCycleLinesByKey', false)
-            ->getContent();
+            $html = $this->actingAs($user)->get(route('credit-card-statements.index', ['account_id' => $card->id]))
+                ->assertOk()
+                ->assertSee('R$ 150,50', false)
+                ->assertSee('04/2026', false)
+                ->assertSee('Itens da fatura', false)
+                ->assertSee('id="statement-cycle-', false)
+                ->assertSee('data-statement-cycle-key=', false)
+                ->assertSee('window.__invoiceCycleLinesByKey', false)
+                ->getContent();
 
-        $this->assertStringContainsString($card->id.'-2026-4', $html);
+            $this->assertStringContainsString($card->id.'-2026-4', $html);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_index_filtra_por_cartao(): void
