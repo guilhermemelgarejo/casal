@@ -237,4 +237,9 @@ class Category extends Model
     {
         return $this->hasMany(Budget::class);
     }
+
+    public function recurringTransactionCategorySplits()
+    {
+        return $this->hasMany(RecurringTransactionCategorySplit::class);
+    }
 }

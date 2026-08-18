@@ -136,4 +136,31 @@ class CategoryCrudTest extends TestCase
             'name' => 'Livre',
         ]);
     }
+
+    public function test_nao_pode_excluir_categoria_vinculada_a_lancamentos(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Supermercado',
+            'type' => 'expense',
+        ]);
+
+        $tx = $couple->transactions()->create([
+            'user_id' => $user->id,
+            'description' => 'Compras',
+            'amount' => '50.00',
+            'type' => 'expense',
+            'date' => '2026-08-10',
+            'reference_month' => 8,
+            'reference_year' => 2026,
+        ]);
+        $tx->syncCategorySplits([['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $this->actingAs($user)->delete(route('categories.destroy', $category))
+            ->assertSessionHasErrors('category');
+
+        $this->assertDatabaseHas('categories', ['id' => $category->id]);
+    }
 }

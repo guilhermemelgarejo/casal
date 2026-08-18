@@ -120,6 +120,15 @@ class CategoryController extends Controller
             ]);
         }
 
+        if ($category->transactionCategorySplits()->exists()
+            || $category->budgets()->exists()
+            || $category->recurringTransactionCategorySplits()->exists()
+        ) {
+            return back()->withErrors([
+                'category' => 'Esta categoria possui movimentações, orçamentos ou modelos recorrentes vinculados e não pode ser excluída.',
+            ]);
+        }
+
         $category->delete();
 
         return back()->with('success', 'Categoria excluída!');
