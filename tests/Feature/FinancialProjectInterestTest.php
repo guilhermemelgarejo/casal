@@ -237,4 +237,25 @@ class FinancialProjectInterestTest extends TestCase
         $this->assertSame('Outro', $otherProject->name);
         $this->assertSame('100.00', number_format((float) $otherProject->target_amount, 2, '.', ''));
     }
+
+    public function test_cannot_delete_project_with_interest_entries(): void
+    {
+        ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '15.00',
+            'date' => '2026-08-01',
+            'note' => 'Rendimento',
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('cofrinhos.destroy', $project))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('financial_projects', ['id' => $project->id]);
+    }
 }

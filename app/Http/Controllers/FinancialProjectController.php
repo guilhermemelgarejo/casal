@@ -171,8 +171,8 @@ class FinancialProjectController extends Controller
     {
         $this->authorizeCofrinho($cofrinho);
 
-        if ($cofrinho->transactions()->exists()) {
-            return redirect()->route('cofrinhos.index')->with('error', 'Não é possível excluir: há lançamentos vinculados a este cofrinho.');
+        if ($cofrinho->transactions()->exists() || $cofrinho->entries()->exists()) {
+            return redirect()->route('cofrinhos.index')->with('error', 'Não é possível excluir: há lançamentos ou rendimentos vinculados a este cofrinho.');
         }
         $cofrinho->delete();
 
