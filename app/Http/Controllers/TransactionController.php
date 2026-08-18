@@ -134,7 +134,7 @@ class TransactionController extends Controller
 
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
         $raw = (float) $amountNormalized;
-        $isRefund = $transaction->refund_of_transaction_id !== null;
+        $isRefund = $transaction->refund_of_transaction_id !== null || (float) $transaction->amount < -0.001;
         $signed = $isRefund ? (-1 * abs($raw)) : abs($raw);
         $newAmountCentsAbs = (int) round(abs($signed) * 100);
         if ($newAmountCentsAbs < 1) {
@@ -511,7 +511,7 @@ class TransactionController extends Controller
 
         $oldSplitCents = [];
         foreach ($splits as $sp) {
-            $oldSplitCents[] = (int) round(((float) $sp->amount) * 100);
+            $oldSplitCents[] = (int) round(abs((float) $sp->amount) * 100);
         }
 
         $oldSum = array_sum($oldSplitCents);

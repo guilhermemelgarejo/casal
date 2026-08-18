@@ -348,4 +348,49 @@ class TransactionAmountUpdateTest extends TestCase
         $parcel->refresh();
         $this->assertSame('Smart TV (Parcela 1/2)', $parcel->description);
     }
+
+    public function test_edicao_de_estorno_avulso_preserva_sinal_negativo(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Outros',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $refund = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Estorno avulso',
+            'amount' => '-40.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-05',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'refund_of_transaction_id' => null,
+        ], [['category_id' => $category->id, 'amount' => '-40.00']]);
+
+        $this->actingAs($user)->put(route('transactions.update', $refund), [
+            'description' => 'Estorno ajustado',
+            'amount' => '60.00',
+        ])->assertSessionHasNoErrors();
+
+        $refund->refresh();
+        $this->assertSame('Estorno ajustado', $refund->description);
+        $this->assertSame('-60.00', number_format((float) $refund->amount, 2, '.', ''));
+        $splits = $refund->categorySplits()->get();
+        $this->assertSame('-60.00', number_format((float) $splits[0]->amount, 2, '.', ''));
+    }
 }
