@@ -681,6 +681,6 @@ class RecurringTransactionTest extends TestCase
 
         $this->assertStringContainsString('Mercado Express', $html);
         $this->assertStringContainsString('Múltiplo', $html);
-        $this->assertStringContainsString('Atalho frequente · Data padrão: hoje', $html);
+        $this->assertStringContainsString('Atalho', $html);
     }
 }

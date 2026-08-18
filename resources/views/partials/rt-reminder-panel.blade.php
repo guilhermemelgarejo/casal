@@ -7,25 +7,36 @@
 --}}
 @php
     $invoiceReminders = $invoiceReminders ?? collect();
-    $hasRecurring = $reminders->isNotEmpty();
+    $monthlyReminders = $reminders->filter(fn ($rec) => ! ($rec instanceof \App\Models\RecurringTransaction && $rec->is_multiple));
+    $multipleReminders = $reminders->filter(fn ($rec) => $rec instanceof \App\Models\RecurringTransaction && $rec->is_multiple);
+
+    $hasMonthly = $monthlyReminders->isNotEmpty();
+    $hasMultiple = $multipleReminders->isNotEmpty();
+    $hasRecurring = $hasMonthly || $hasMultiple;
     $hasInvoices = $invoiceReminders->isNotEmpty();
     $showPanel = $hasRecurring || $hasInvoices;
-    $bothReminderKinds = $hasRecurring && $hasInvoices;
+
+    $activeColumnsCount = ($hasMonthly ? 1 : 0) + ($hasMultiple ? 1 : 0) + ($hasInvoices ? 1 : 0);
+    $bothReminderKinds = $activeColumnsCount > 1;
 
     if (! isset($title)) {
         if ($bothReminderKinds) {
             $title = 'Lembretes';
         } elseif ($hasInvoices) {
             $title = 'Faturas em aberto';
+        } elseif ($hasMultiple && ! $hasMonthly) {
+            $title = 'Atalhos de lançamentos';
         } else {
             $title = 'Lembretes deste mês';
         }
     }
     if (! isset($description)) {
         if ($bothReminderKinds) {
-            $description = 'Há <strong class="fw-medium text-body">modelos recorrentes</strong> sem lançamento no mês civil atual e <strong class="fw-medium text-body">faturas de cartão</strong> com saldo em aberto.';
+            $description = 'Há modelos recorrentes, atalhos rápidos e/ou faturas de cartão com pendências.';
         } elseif ($hasInvoices) {
             $description = 'Cartões com fatura não quitada ou com pagamento parcial. Itens <strong class="fw-medium text-body">vencidos</strong> aparecem primeiro.';
+        } elseif ($hasMultiple && ! $hasMonthly) {
+            $description = 'Modelos recorrentes múltiplos prontos para lançamento rápido com data no dia atual.';
         } else {
             $description = 'Ainda sem lançamento vinculado ao modelo no mês civil atual. Use o <strong class="fw-medium text-body">Painel</strong> para pré-preencher e confirmar.';
         }
@@ -69,12 +80,14 @@
                         </div>
                         <p class="rt-reminder-card__lead small text-secondary mb-0">{!! $description !!}</p>
 
-                        <div class="rt-reminder-columns @if($bothReminderKinds) rt-reminder-columns--split @endif">
-                            @if($hasRecurring)
+                        <div class="rt-reminder-columns @if($activeColumnsCount === 2) rt-reminder-columns--split rt-reminder-columns--cols-2 @elseif($activeColumnsCount >= 3) rt-reminder-columns--split rt-reminder-columns--cols-3 @endif">
+                            @if($hasMonthly)
                                 <div class="rt-reminder-col rt-reminder-col--recurring min-w-0">
-                                    <p class="rt-reminder-subhead small fw-semibold text-secondary mb-1 text-uppercase">Recorrentes</p>
+                                    <p class="rt-reminder-subhead small fw-semibold text-secondary mb-1 text-uppercase">
+                                        {{ $hasMultiple ? 'Recorrentes mensais' : 'Recorrentes' }}
+                                    </p>
                                     <ul class="list-unstyled rt-reminder-list mb-0">
-                                        @foreach($reminders as $rec)
+                                        @foreach($monthlyReminders as $rec)
                                             @php
                                                 $predDay = $rec->effectiveDayInMonth($reminderCivilYear, $reminderCivilMonth);
                                                 $predDateLabel = sprintf('%02d/%02d/%04d', $predDay, $reminderCivilMonth, $reminderCivilYear);
@@ -82,17 +95,31 @@
                                             <li class="rt-reminder-list__item">
                                                 <div class="rt-reminder-list__row rt-reminder-list__row--invoice">
                                                     <span class="rt-reminder-list__name min-w-0">
+                                                        <span class="d-block text-truncate">{{ $rec->description }}</span>
+                                                        <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
+                                                    </span>
+                                                    <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
+                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
+                            @if($hasMultiple)
+                                <div class="rt-reminder-col rt-reminder-col--multiples min-w-0">
+                                    <p class="rt-reminder-subhead small fw-semibold text-secondary mb-1 text-uppercase">Recorrentes múltiplos</p>
+                                    <ul class="list-unstyled rt-reminder-list mb-0">
+                                        @foreach($multipleReminders as $rec)
+                                            <li class="rt-reminder-list__item">
+                                                <div class="rt-reminder-list__row rt-reminder-list__row--invoice">
+                                                    <span class="rt-reminder-list__name min-w-0">
                                                         <span class="d-flex align-items-center gap-2">
                                                             <span class="d-block text-truncate">{{ $rec->description }}</span>
-                                                            @if($rec->is_multiple)
-                                                                <span class="badge rounded-pill text-bg-info text-dark-emphasis flex-shrink-0" style="font-size: 0.68rem;">Múltiplo</span>
-                                                            @endif
+                                                            <span class="badge rounded-pill text-bg-info text-dark-emphasis flex-shrink-0" style="font-size: 0.68rem;">Múltiplo</span>
                                                         </span>
-                                                        @if($rec->is_multiple)
-                                                            <span class="d-block small text-secondary text-truncate">Atalho frequente · Data padrão: hoje</span>
-                                                        @else
-                                                            <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
-                                                        @endif
+                                                        <span class="d-block small text-secondary text-truncate">Atalho</span>
                                                     </span>
                                                     <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
                                                     <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
