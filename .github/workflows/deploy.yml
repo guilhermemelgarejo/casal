@@ -90,6 +90,9 @@ jobs:
           server-dir: ${{ secrets.FTP_SERVER_DIR || './' }}
           local-dir: .deploy_payload/
           dangerous-clean-slate: false
+          port: 21
+          timeout: 60000
+          security: loose
           exclude: |
             **/.git*
             **/.git*/**
