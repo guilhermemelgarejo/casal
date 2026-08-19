@@ -25,7 +25,10 @@ if (file_exists($envFile)) {
     }
 }
 
-$providedToken = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? $_GET['token'] ?? $_POST['token'] ?? null;
+// Obter token de headers ou parâmetros
+$headers = function_exists('getallheaders') ? getallheaders() : [];
+$headerToken = $headers['X-Deploy-Token'] ?? $headers['x-deploy-token'] ?? $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? null;
+$providedToken = $_GET['token'] ?? $_POST['token'] ?? $headerToken ?? null;
 
 if (empty($configuredToken)) {
     http_response_code(500);
@@ -51,7 +54,7 @@ $startTime = microtime(true);
 $logs = [];
 $zipPath = __DIR__ . '/release.zip';
 
-// 2. Extrair release.zip se existir
+// 2. Extrair release.zip e limpar arquivos temporários
 if (file_exists($zipPath)) {
     $zip = new ZipArchive();
     $res = $zip->open($zipPath);
@@ -65,6 +68,13 @@ if (file_exists($zipPath)) {
     }
 } else {
     $logs['unzip'] = 'Nenhum release.zip pendente de extração.';
+}
+
+// Limpeza adicional de arquivos residuais de sincronização
+$ftpSyncFile = __DIR__ . '/.ftp-deploy-sync-state.json';
+if (file_exists($ftpSyncFile)) {
+    @unlink($ftpSyncFile);
+    $logs['cleanup_sync_state'] = 'Arquivo temporário .ftp-deploy-sync-state.json removido.';
 }
 
 // 3. Criar symlink do storage via PHP nativo (compatível com hospedagens sem exec())
