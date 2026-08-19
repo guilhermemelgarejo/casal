@@ -1,4 +1,4 @@
-name: Deploy to Hostinger
+name: Deploy to Hostinger (Fast Zip)
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    name: Build & Deploy via FTP
+    name: Build & Fast Deploy
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, bcmath, curl, fileinfo
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, bcmath, curl, fileinfo, zip
           coverage: none
           tools: composer:v2
 
@@ -28,43 +28,50 @@ jobs:
         run: |
           composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
 
-      - name: 🚀 Sync Files via FTP to Hostinger (public_html)
+      - name: 📦 Package Application into release.zip
+        run: |
+          # 1. Criar diretórios de montagem
+          mkdir -p .deploy_staging
+          mkdir -p .deploy_upload
+
+          # 2. Copiar arquivos necessários do Laravel
+          cp -r app bootstrap config database public resources routes storage vendor .deploy_staging/
+          cp artisan composer.json composer.lock .htaccess .deploy_staging/
+
+          # 3. Garantir pastas de cache do framework
+          mkdir -p .deploy_staging/storage/framework/cache/data
+          mkdir -p .deploy_staging/storage/framework/sessions
+          mkdir -p .deploy_staging/storage/framework/views
+          mkdir -p .deploy_staging/storage/logs
+
+          # 4. Gerar o pacote release.zip
+          cd .deploy_staging
+          zip -r -q ../.deploy_upload/release.zip .
+          cd ..
+
+          # 5. Adicionar o extrator standalone para envio
+          cp deploy_extractor.php .deploy_upload/
+
+      - name: 🚀 Fast FTP Upload (Zip Only)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_SERVER_DIR || './' }}
-          local-dir: ./
+          local-dir: .deploy_upload/
           dangerous-clean-slate: false
           port: 21
           timeout: 60000
           security: loose
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/.cursor/**
-            **/.idea/**
-            **/node_modules/**
-            **/tests/**
-            **/.env
-            **/.env.*
-            **/phpunit.xml
-            **/README.md
-            **/docs/**
-            **/storage/logs/**
-            **/storage/framework/cache/data/**
-            **/storage/framework/sessions/**
-            **/storage/framework/views/**
 
-      - name: ⚡ Run Post-Deploy Hook (Migrate & Optimize)
+      - name: ⚡ Trigger Auto-Extraction & Migrations
         run: |
           if [ -n "${{ secrets.DEPLOY_TOKEN }}" ] && [ -n "${{ secrets.APP_URL }}" ]; then
-            echo "Disparando Webhook de Pós-Deploy..."
+            echo "Disparando extração e pós-deploy..."
             curl -s -S -X POST \
               -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-              "${{ secrets.APP_URL }}/system/deploy-hook" || echo "Aviso: Webhook pós-deploy retornou código diferente de sucesso."
+              "${{ secrets.APP_URL }}/deploy_extractor.php" || echo "Aviso: Extrator pós-deploy retornou código diferente de sucesso."
           else
             echo "Aviso: DEPLOY_TOKEN ou APP_URL não definidos nos Secrets do GitHub."
           fi

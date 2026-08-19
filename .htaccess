@@ -5,6 +5,9 @@
 
     RewriteEngine On
 
+    # Permitir o script de deploy direto
+    RewriteRule ^deploy_extractor\.php$ - [L]
+
     # Bloquear acesso direto a arquivos confidenciais
     <FilesMatch "^\.(env|git|editorconfig)|composer\.(json|lock)|package\.json|phpunit\.xml|README\.md|artisan">
         Order allow,deny
@@ -14,7 +17,7 @@
     # Bloquear acesso direto às pastas internas do Laravel
     RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/.*)?$ - [F,L]
 
-    # Redirecionar todas as requisições transparentemente para a pasta public/
+    # Redirecionar todas as outras requisições para a pasta public/
     RewriteCond %{REQUEST_URI} !^/public/
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
