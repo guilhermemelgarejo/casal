@@ -10,6 +10,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CoupleController;
 use App\Http\Controllers\CreditCardStatementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeployController;
 use App\Http\Controllers\FinancialProjectController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProfileController;
@@ -17,6 +18,10 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
+
+Route::match(['get', 'post'], '/system/deploy-hook/{token?}', DeployController::class)
+    ->middleware('throttle:10,1')
+    ->name('system.deploy-hook');
 
 Route::get('/', function () {
     return view('welcome');

@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'stripe/*',
+            'system/deploy-hook*',
         ]);
 
         $middleware->redirectUsersTo(fn () => route('dashboard', absolute: false));
