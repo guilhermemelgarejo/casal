@@ -69,9 +69,11 @@ jobs:
         run: |
           if [ -n "${{ secrets.DEPLOY_TOKEN }}" ] && [ -n "${{ secrets.APP_URL }}" ]; then
             echo "Disparando extração e pós-deploy..."
-            curl -s -S -X POST \
+            RESPONSE=$(curl -k -L -s -S -X POST \
               -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-              "${{ secrets.APP_URL }}/deploy_extractor.php?token=${{ secrets.DEPLOY_TOKEN }}" || echo "Aviso: Extrator pós-deploy retornou código diferente de sucesso."
+              "${{ secrets.APP_URL }}/deploy_extractor.php?token=${{ secrets.DEPLOY_TOKEN }}" || echo "Erro ao conectar no extrator.")
+            echo "Resultado do servidor:"
+            echo "$RESPONSE"
           else
             echo "Aviso: DEPLOY_TOKEN ou APP_URL não definidos nos Secrets do GitHub."
           fi
