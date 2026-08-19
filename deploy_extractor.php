@@ -5,7 +5,7 @@
  * Descompacta release.zip, limpa arquivos temporários, limpa caches e executa migrações.
  */
 
-// 1. Ler o DEPLOY_TOKEN do .env
+// 1. Ler o DEPLOY_TOKEN do .env (suporta espaços antes e depois do igual)
 $envFile = __DIR__ . '/.env';
 $configuredToken = null;
 
@@ -16,18 +16,22 @@ if (file_exists($envFile)) {
         if (str_starts_with($line, '#')) {
             continue;
         }
-        if (str_starts_with($line, 'DEPLOY_TOKEN=')) {
-            $configuredToken = trim(substr($line, strlen('DEPLOY_TOKEN=')));
-            $configuredToken = trim($configuredToken, " \"'\t\n\r\0\x0B");
+        if (preg_match('/^DEPLOY_TOKEN\s*=\s*(.*)$/i', $line, $matches)) {
+            $configuredToken = trim($matches[1], " \"'\t\n\r\0\x0B");
             break;
         }
     }
 }
 
-// Obter token fornecido
+// 2. Obter token fornecido (com prioridade no header para preservar caracteres especiais como + e &)
 $headers = function_exists('getallheaders') ? getallheaders() : [];
-$headerToken = $headers['X-Deploy-Token'] ?? $headers['x-deploy-token'] ?? $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? null;
-$providedToken = $_GET['token'] ?? $_POST['token'] ?? $headerToken ?? null;
+$headerToken = $headers['X-Deploy-Token'] 
+    ?? $headers['x-deploy-token'] 
+    ?? $headers['X-DEPLOY-TOKEN'] 
+    ?? $_SERVER['HTTP_X_DEPLOY_TOKEN'] 
+    ?? null;
+
+$providedToken = $headerToken ?? $_POST['token'] ?? $_GET['token'] ?? null;
 $providedToken = $providedToken ? trim($providedToken, " \"'\t\n\r\0\x0B") : null;
 
 if (empty($configuredToken)) {
@@ -35,7 +39,7 @@ if (empty($configuredToken)) {
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'error',
-        'message' => 'DEPLOY_TOKEN não encontrado no arquivo .env da hospedagem.',
+        'message' => 'DEPLOY_TOKEN não encontrado ou vazio no arquivo .env da hospedagem.',
     ]);
     exit;
 }
@@ -45,7 +49,7 @@ if (!$providedToken || !hash_equals((string) $configuredToken, (string) $provide
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'error',
-        'message' => 'Acesso não autorizado: token de deploy inválido ou divergente.',
+        'message' => 'Acesso não autorizado: o token enviado pelo GitHub não é igual ao DEPLOY_TOKEN do .env.',
     ]);
     exit;
 }
@@ -54,7 +58,7 @@ $startTime = microtime(true);
 $logs = [];
 $zipPath = __DIR__ . '/release.zip';
 
-// 2. Extrair release.zip
+// 3. Extrair release.zip
 if (file_exists($zipPath)) {
     $zip = new ZipArchive();
     $res = $zip->open($zipPath);
@@ -70,7 +74,7 @@ if (file_exists($zipPath)) {
     $logs['unzip'] = 'Nenhum release.zip pendente de extração.';
 }
 
-// 3. Limpeza forçada de arquivos residuais e temporários
+// 4. Limpeza forçada de arquivos residuais e temporários
 if (file_exists($zipPath)) {
     @unlink($zipPath);
 }
@@ -81,7 +85,7 @@ if (file_exists($ftpSyncFile)) {
     $logs['cleanup_sync_state'] = 'Arquivo .ftp-deploy-sync-state.json removido.';
 }
 
-// 4. Limpar caches compilados antigos de views e bootstrap
+// 5. Limpar caches compilados antigos de views e bootstrap
 $oldViews = glob(__DIR__ . '/storage/framework/views/*.php');
 if ($oldViews) {
     foreach ($oldViews as $viewFile) {
@@ -100,7 +104,7 @@ if ($oldCache) {
     $logs['clear_bootstrap_cache'] = 'Bootstrap cache antigo limpo.';
 }
 
-// 5. Criar symlink do storage via PHP nativo
+// 6. Criar symlink do storage via PHP nativo
 $storageTarget = __DIR__ . '/storage/app/public';
 $storageLink = __DIR__ . '/public/storage';
 if (!file_exists($storageLink) && !is_link($storageLink) && file_exists($storageTarget)) {
@@ -112,7 +116,7 @@ if (!file_exists($storageLink) && !is_link($storageLink) && file_exists($storage
     }
 }
 
-// 6. Inicializar Laravel e executar comandos Artisan
+// 7. Inicializar Laravel e executar comandos Artisan
 try {
     if (file_exists(__DIR__ . '/vendor/autoload.php') && file_exists(__DIR__ . '/bootstrap/app.php')) {
         require __DIR__ . '/vendor/autoload.php';

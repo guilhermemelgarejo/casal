@@ -70,7 +70,9 @@ jobs:
           if [ -n "${{ secrets.DEPLOY_TOKEN }}" ] && [ -n "${{ secrets.APP_URL }}" ]; then
             echo "Disparando extração e pós-deploy..."
             BASE_URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/*$::')
-            RESPONSE=$(curl -k -L -s -S "$BASE_URL/deploy_extractor.php?token=${{ secrets.DEPLOY_TOKEN }}" || echo "Erro ao conectar no extrator.")
+            RESPONSE=$(curl -k -L -s -S \
+              -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
+              "$BASE_URL/deploy_extractor.php?token=${{ secrets.DEPLOY_TOKEN }}" || echo "Erro ao conectar no extrator.")
             echo "Resultado do servidor:"
             echo "$RESPONSE"
           else
