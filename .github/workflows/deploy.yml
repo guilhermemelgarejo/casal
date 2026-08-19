@@ -26,7 +26,7 @@ jobs:
 
       - name: 📦 Install Composer Dependencies (Production)
         run: |
-          composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress --no-audit
+          composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
 
       - name: 🏗️ Prepare Deploy Structure (casal_core + public_html)
         run: |
