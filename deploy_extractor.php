@@ -2,11 +2,10 @@
 
 /**
  * DuoZen Auto Deploy & Release Extractor
- * Este script é acionado de forma segura pelo GitHub Actions para descompactar o release.zip
- * e executar as migrações e caches do Laravel na Hostinger.
+ * Descompacta release.zip, limpa arquivos temporários, limpa caches e executa migrações.
  */
 
-// 1. Ler o DEPLOY_TOKEN do arquivo .env local
+// 1. Ler o DEPLOY_TOKEN do .env
 $envFile = __DIR__ . '/.env';
 $configuredToken = null;
 
@@ -19,23 +18,24 @@ if (file_exists($envFile)) {
         }
         if (str_starts_with($line, 'DEPLOY_TOKEN=')) {
             $configuredToken = trim(substr($line, strlen('DEPLOY_TOKEN=')));
-            $configuredToken = trim($configuredToken, "\"' \t\n\r\0\x0B");
+            $configuredToken = trim($configuredToken, " \"'\t\n\r\0\x0B");
             break;
         }
     }
 }
 
-// Obter token de headers ou parâmetros
+// Obter token fornecido
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 $headerToken = $headers['X-Deploy-Token'] ?? $headers['x-deploy-token'] ?? $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? null;
 $providedToken = $_GET['token'] ?? $_POST['token'] ?? $headerToken ?? null;
+$providedToken = $providedToken ? trim($providedToken, " \"'\t\n\r\0\x0B") : null;
 
 if (empty($configuredToken)) {
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'error',
-        'message' => 'DEPLOY_TOKEN não encontrado ou não configurado no arquivo .env da hospedagem.',
+        'message' => 'DEPLOY_TOKEN não encontrado no arquivo .env da hospedagem.',
     ]);
     exit;
 }
@@ -45,7 +45,7 @@ if (!$providedToken || !hash_equals((string) $configuredToken, (string) $provide
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'error',
-        'message' => 'Acesso não autorizado: token de deploy inválido.',
+        'message' => 'Acesso não autorizado: token de deploy inválido ou divergente.',
     ]);
     exit;
 }
@@ -54,7 +54,7 @@ $startTime = microtime(true);
 $logs = [];
 $zipPath = __DIR__ . '/release.zip';
 
-// 2. Extrair release.zip e limpar arquivos temporários
+// 2. Extrair release.zip
 if (file_exists($zipPath)) {
     $zip = new ZipArchive();
     $res = $zip->open($zipPath);
@@ -70,14 +70,37 @@ if (file_exists($zipPath)) {
     $logs['unzip'] = 'Nenhum release.zip pendente de extração.';
 }
 
-// Limpeza adicional de arquivos residuais de sincronização
+// 3. Limpeza forçada de arquivos residuais e temporários
+if (file_exists($zipPath)) {
+    @unlink($zipPath);
+}
+
 $ftpSyncFile = __DIR__ . '/.ftp-deploy-sync-state.json';
 if (file_exists($ftpSyncFile)) {
     @unlink($ftpSyncFile);
-    $logs['cleanup_sync_state'] = 'Arquivo temporário .ftp-deploy-sync-state.json removido.';
+    $logs['cleanup_sync_state'] = 'Arquivo .ftp-deploy-sync-state.json removido.';
 }
 
-// 3. Criar symlink do storage via PHP nativo (compatível com hospedagens sem exec())
+// 4. Limpar caches compilados antigos de views e bootstrap
+$oldViews = glob(__DIR__ . '/storage/framework/views/*.php');
+if ($oldViews) {
+    foreach ($oldViews as $viewFile) {
+        @unlink($viewFile);
+    }
+    $logs['clear_compiled_views'] = count($oldViews) . ' views compiladas antigas removidas.';
+}
+
+$oldCache = glob(__DIR__ . '/bootstrap/cache/*.php');
+if ($oldCache) {
+    foreach ($oldCache as $cacheFile) {
+        if (basename($cacheFile) !== '.gitignore') {
+            @unlink($cacheFile);
+        }
+    }
+    $logs['clear_bootstrap_cache'] = 'Bootstrap cache antigo limpo.';
+}
+
+// 5. Criar symlink do storage via PHP nativo
 $storageTarget = __DIR__ . '/storage/app/public';
 $storageLink = __DIR__ . '/public/storage';
 if (!file_exists($storageLink) && !is_link($storageLink) && file_exists($storageTarget)) {
@@ -89,7 +112,7 @@ if (!file_exists($storageLink) && !is_link($storageLink) && file_exists($storage
     }
 }
 
-// 4. Inicializar Laravel e executar comandos Artisan
+// 6. Inicializar Laravel e executar comandos Artisan
 try {
     if (file_exists(__DIR__ . '/vendor/autoload.php') && file_exists(__DIR__ . '/bootstrap/app.php')) {
         require __DIR__ . '/vendor/autoload.php';
@@ -107,7 +130,7 @@ try {
             $logs['migrate_error'] = $e->getMessage();
         }
 
-        // Limpeza e geração de cache em produção
+        // Limpeza e recriação de caches em produção
         try {
             \Illuminate\Support\Facades\Artisan::call('optimize:clear');
             \Illuminate\Support\Facades\Artisan::call('config:cache');
