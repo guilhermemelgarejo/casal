@@ -14,8 +14,8 @@
         Deny from all
     </FilesMatch>
 
-    # Bloquear acesso direto às pastas internas do Laravel
-    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/.*)?$ - [F,L]
+    # Bloquear acesso direto às pastas privadas do Laravel
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|tests)(/.*)?$ - [F,L]
 
     # Redirecionar todas as outras requisições para a pasta public/
     RewriteCond %{REQUEST_URI} !^/public/
