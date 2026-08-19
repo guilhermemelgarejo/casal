@@ -60,11 +60,12 @@ class DeployController extends Controller
         // 2. Criar symlink do storage se não existir
         try {
             $storagePublicPath = public_path('storage');
-            if (!file_exists($storagePublicPath) && !is_link($storagePublicPath)) {
-                Artisan::call('storage:link');
+            $storageTargetPath = storage_path('app/public');
+            if (!file_exists($storagePublicPath) && !is_link($storagePublicPath) && file_exists($storageTargetPath)) {
+                @symlink($storageTargetPath, $storagePublicPath);
                 $logs['storage_link'] = [
                     'status' => 'created',
-                    'output' => trim(Artisan::output()),
+                    'output' => 'Symlink do storage criado com sucesso via PHP nativo.',
                 ];
             } else {
                 $logs['storage_link'] = [

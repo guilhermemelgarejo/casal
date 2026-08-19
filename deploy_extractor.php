@@ -17,7 +17,7 @@ if (file_exists($envFile)) {
         if (str_starts_with($line, '#')) {
             continue;
         }
-        if (str_starts_with($line, 'DEPLOY_TOKEN=' )) {
+        if (str_starts_with($line, 'DEPLOY_TOKEN=')) {
             $configuredToken = trim(substr($line, strlen('DEPLOY_TOKEN=')));
             $configuredToken = trim($configuredToken, "\"' \t\n\r\0\x0B");
             break;
@@ -67,7 +67,19 @@ if (file_exists($zipPath)) {
     $logs['unzip'] = 'Nenhum release.zip pendente de extração.';
 }
 
-// 3. Inicializar Laravel e executar comandos Artisan
+// 3. Criar symlink do storage via PHP nativo (compatível com hospedagens sem exec())
+$storageTarget = __DIR__ . '/storage/app/public';
+$storageLink = __DIR__ . '/public/storage';
+if (!file_exists($storageLink) && !is_link($storageLink) && file_exists($storageTarget)) {
+    try {
+        @symlink($storageTarget, $storageLink);
+        $logs['storage_link'] = 'Symlink do storage criado com sucesso.';
+    } catch (\Throwable $e) {
+        $logs['storage_link_error'] = $e->getMessage();
+    }
+}
+
+// 4. Inicializar Laravel e executar comandos Artisan
 try {
     if (file_exists(__DIR__ . '/vendor/autoload.php') && file_exists(__DIR__ . '/bootstrap/app.php')) {
         require __DIR__ . '/vendor/autoload.php';
@@ -78,29 +90,26 @@ try {
         $kernel->bootstrap();
 
         // Migrações do banco
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        $logs['migrate'] = trim(\Illuminate\Support\Facades\Artisan::output());
-
-        // Symlink do storage
-        $storageLink = __DIR__ . '/public/storage';
-        if (!file_exists($storageLink) && !is_link($storageLink)) {
-            \Illuminate\Support\Facades\Artisan::call('storage:link');
-            $logs['storage_link'] = trim(\Illuminate\Support\Facades\Artisan::output());
-        } else {
-            $logs['storage_link'] = 'Symlink do storage já existe.';
+        try {
+            \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            $logs['migrate'] = trim(\Illuminate\Support\Facades\Artisan::output());
+        } catch (\Throwable $e) {
+            $logs['migrate_error'] = $e->getMessage();
         }
 
         // Limpeza e geração de cache em produção
-        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-        \Illuminate\Support\Facades\Artisan::call('config:cache');
-        \Illuminate\Support\Facades\Artisan::call('route:cache');
-        \Illuminate\Support\Facades\Artisan::call('view:cache');
-        $logs['cache'] = 'Configurações, rotas e views cacheadas com sucesso.';
-    } else {
-        $logs['laravel_init'] = 'Arquivos do Laravel ainda não encontrados para execução de migrações.';
+        try {
+            \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+            \Illuminate\Support\Facades\Artisan::call('config:cache');
+            \Illuminate\Support\Facades\Artisan::call('route:cache');
+            \Illuminate\Support\Facades\Artisan::call('view:cache');
+            $logs['cache'] = 'Caches de configuração, rotas e views gerados com sucesso.';
+        } catch (\Throwable $e) {
+            $logs['cache_error'] = $e->getMessage();
+        }
     }
 } catch (\Throwable $e) {
-    $logs['artisan_error'] = $e->getMessage();
+    $logs['laravel_init_error'] = $e->getMessage();
 }
 
 $duration = round(microtime(true) - $startTime, 3);
