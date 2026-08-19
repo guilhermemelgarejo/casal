@@ -1,0 +1,20 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Bloquear acesso direto a arquivos confidenciais
+    <FilesMatch "^\.(env|git|editorconfig)|composer\.(json|lock)|package\.json|phpunit\.xml|README\.md|artisan">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+
+    # Bloquear acesso direto às pastas internas do Laravel
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/.*)?$ - [F,L]
+
+    # Redirecionar todas as requisições transparentemente para a pasta public/
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
