@@ -16,7 +16,6 @@
 /.vscode
 /.zed
 /.cursor/
-/composer.lock
 /auth.json
 /node_modules
 /public/build
