@@ -8,17 +8,14 @@
     # Permitir o script de deploy direto
     RewriteRule ^deploy_extractor\.php$ - [L]
 
-    # Forçar o redirecionamento dos assets de public/vendor (Bootstrap, SweetAlert, Flatpickr)
-    RewriteRule ^vendor/(.*)$ public/vendor/$1 [L]
-
     # Bloquear acesso direto a arquivos confidenciais
     <FilesMatch "^\.(env|git|editorconfig|ftp)|composer\.(json|lock)|package\.json|phpunit\.xml|README\.md|artisan|\.zip$">
         Order allow,deny
         Deny from all
     </FilesMatch>
 
-    # Bloquear acesso direto às pastas privadas do Laravel
-    RewriteRule ^(app|bootstrap|config|database|resources|routes|tests)(/.*)?$ - [F,L]
+    # Bloquear acesso direto às pastas privadas do Laravel (incluindo o vendor do Composer)
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|tests|vendor)(/.*)?$ - [F,L]
 
     # Redirecionar todas as outras requisições para a pasta public/
     RewriteCond %{REQUEST_URI} !^/public/
