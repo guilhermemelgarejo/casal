@@ -1523,6 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const refundOf = rel?.getAttribute?.('data-tx-refund-of');
                 const refundAccountId = rel?.getAttribute?.('data-tx-refund-account-id');
                 const refundLabel = rel?.getAttribute?.('data-tx-refund-label');
+                const refundCategoryId = rel?.getAttribute?.('data-tx-refund-category-id');
 
                 if (refundOf) {
                     if (titleEl) {
@@ -1566,6 +1567,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     const desc = document.getElementById('description');
                     if (desc && refundLabel) {
                         desc.value = `Estorno: ${refundLabel}`;
+                    }
+                    const allocWrap = document.getElementById('tx-category-allocations-wrap');
+                    if (allocWrap) {
+                        const rows = allocWrap.querySelectorAll('.tx-cat-alloc-row');
+                        rows.forEach((row, idx) => {
+                            const cat = row.querySelector('.js-tx-split-cat');
+                            const am = row.querySelector('.js-tx-split-amount');
+                            if (am) {
+                                am.value = '';
+                            }
+                            if (idx === 0) {
+                                row.classList.remove('d-none');
+                                if (cat) {
+                                    cat.value = refundCategoryId ? String(refundCategoryId) : '';
+                                }
+                            } else {
+                                row.classList.add('d-none');
+                                if (cat) {
+                                    cat.value = '';
+                                }
+                            }
+                        });
+                        if (typeof txFilterSplitCats === 'function') {
+                            txFilterSplitCats(false);
+                        }
+                        syncTxAllocRemoveButtons();
                     }
                     syncRefundUi();
                     return;

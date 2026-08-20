@@ -142,5 +142,95 @@ class CreditCardRefundTest extends TestCase
         $this->assertSame($purchase->id, (int) $refund->refund_of_transaction_id);
         $this->assertEquals(-30.0, (float) $refund->categorySplits()->value('amount'));
     }
+
+    public function test_botao_estorno_inclui_categoria_se_compra_tem_apenas_uma_categoria(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Cartão',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000000',
+        ]);
+
+        $cat = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Supermercado',
+            'type' => 'expense',
+            'color' => '#222222',
+        ]);
+
+        $purchase = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Mercado Mensal',
+            'amount' => '150.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => now()->startOfMonth()->toDateString(),
+            'reference_month' => (int) now()->month,
+            'reference_year' => (int) now()->year,
+            'installment_parent_id' => null,
+        ], [['category_id' => $cat->id, 'amount' => '150.00']]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('data-tx-refund-of="'.$purchase->id.'"', false);
+        $response->assertSee('data-tx-refund-category-id="'.$cat->id.'"', false);
+    }
+
+    public function test_botao_estorno_nao_inclui_categoria_se_compra_tem_multiplas_categorias(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Cartão',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000000',
+        ]);
+
+        $cat1 = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Supermercado',
+            'type' => 'expense',
+            'color' => '#222222',
+        ]);
+
+        $cat2 = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Farmácia',
+            'type' => 'expense',
+            'color' => '#333333',
+        ]);
+
+        $purchase = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Compras Variadas',
+            'amount' => '200.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => now()->startOfMonth()->toDateString(),
+            'reference_month' => (int) now()->month,
+            'reference_year' => (int) now()->year,
+            'installment_parent_id' => null,
+        ], [
+            ['category_id' => $cat1->id, 'amount' => '120.00'],
+            ['category_id' => $cat2->id, 'amount' => '80.00'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('data-tx-refund-of="'.$purchase->id.'"', false);
+        $response->assertDontSee('data-tx-refund-category-id="', false);
+    }
 }
 

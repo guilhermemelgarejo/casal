@@ -34,6 +34,8 @@
             ->map(fn ($sp) => ['category_id' => (int) $sp->category_id, 'amount' => number_format((float) $sp->amount, 2, '.', '')])
             ->values()
             ->all();
+        $uniqueRefundCatIds = $transaction->categorySplits->pluck('category_id')->unique()->values();
+        $singleRefundCategoryId = $uniqueRefundCatIds->count() === 1 ? (int) $uniqueRefundCatIds->first() : null;
         $txCopyPrefill = \App\Support\TransactionListingPresentation::transactionCopyPrefillPayload($transaction);
     @endphp
     <div
@@ -132,6 +134,7 @@
                         data-tx-refund-of="{{ $transaction->installmentRootId() }}"
                         data-tx-refund-account-id="{{ (int) $transaction->account_id }}"
                         data-tx-refund-label="{{ e($ccRowMeta['base_description'] ?? $transaction->baseDescriptionWithoutInstallmentSuffix()) }}"
+                        @if($singleRefundCategoryId !== null) data-tx-refund-category-id="{{ $singleRefundCategoryId }}" @endif
                     >
                         {{-- Estorno: seta em arco (reverter / devolução), distinta de “adicionar” (+) --}}
                         <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 0 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/></svg>
