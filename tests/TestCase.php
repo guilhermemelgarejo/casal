@@ -14,6 +14,42 @@ use RuntimeException;
 
 abstract class TestCase extends BaseTestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        static $registered = false;
+        if (! $registered) {
+            $registered = true;
+            static::clearCachedConfig();
+            register_shutdown_function(function () {
+                static::clearCachedConfig();
+            });
+        }
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        parent::tearDownAfterClass();
+        static::clearCachedConfig();
+    }
+
+    protected static function clearCachedConfig(): void
+    {
+        $cachePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'bootstrap' . DIRECTORY_SEPARATOR . 'cache';
+        $files = [
+            $cachePath . DIRECTORY_SEPARATOR . 'config.php',
+            $cachePath . DIRECTORY_SEPARATOR . 'routes-v7.php',
+            $cachePath . DIRECTORY_SEPARATOR . 'events.php',
+        ];
+
+        foreach ($files as $file) {
+            if (file_exists($file)) {
+                @unlink($file);
+            }
+        }
+    }
+
     protected function setUpTraits()
     {
         $this->forceInMemorySqliteForTestProcess();

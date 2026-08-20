@@ -11,18 +11,18 @@
 <div class="card border-0 accounts-item-card shadow-sm" style="--account-accent: {{ $account->color }}">
     <div class="accounts-item-card__accent" aria-hidden="true"></div>
     <div class="card-body p-0">
-        <div class="accounts-item-card__top px-3 px-sm-4 pt-3 pb-3">
-            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-                <div class="d-flex align-items-start gap-3 min-w-0 flex-grow-1">
+        <div class="accounts-item-card__top px-3 px-sm-4 pt-3 pb-2">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-3 min-w-0 flex-grow-1">
                     <div class="accounts-item-card__avatar flex-shrink-0 text-white" style="background-color: {{ $account->color }}">
                         @if ($isCard)
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                         @else
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
                         @endif
                     </div>
                     <div class="min-w-0 flex-grow-1">
-                        <div class="d-flex flex-wrap align-items-center gap-2 gap-sm-3 mb-1">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                             <h3 class="accounts-item-card__title mb-0 text-truncate">{{ $account->name }}</h3>
                             <span class="accounts-item-card__type {{ $isCard ? 'accounts-item-card__type--card' : 'accounts-item-card__type--regular' }}">
                                 {{ $typeLabel }}
@@ -57,10 +57,10 @@
             </div>
         </div>
 
-        <div class="accounts-item-card__body px-3 px-sm-4 pb-4">
+        <div class="accounts-item-card__body px-3 px-sm-4 pb-3">
             @if ($isCard)
                 @if($account->tracksCreditCardLimit())
-                    <div class="accounts-item-card__metrics">
+                    <div class="accounts-item-card__metrics mb-2">
                         <div class="accounts-metric">
                             <span class="accounts-metric__label">Limite total</span>
                             <span class="accounts-metric__value">R$ {{ number_format((float) $account->credit_card_limit_total, 2, ',', '.') }}</span>
@@ -71,23 +71,34 @@
                         </div>
                     </div>
                 @else
-                    <p class="accounts-item-card__hint mb-0 small">Sem limite configurado — o uso do cartão não é acompanhado nos lançamentos.</p>
+                    <p class="accounts-item-card__hint mb-2 small">Sem limite configurado — o uso do cartão não é acompanhado nos lançamentos.</p>
                 @endif
             @else
+                @php
+                    $accBal = (float) $account->balance;
+                @endphp
+                <div class="accounts-metric accounts-metric--solo mb-2">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <div>
+                            <span class="accounts-metric__label mb-0">Saldo atual</span>
+                            <span class="accounts-metric__value accounts-metric__value--lg {{ $accBal >= 0 ? 'accounts-metric__value--positive' : 'text-danger' }}">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
+                        </div>
+                        @if (count($account->getEffectivePaymentMethods()) > 0)
+                            <div class="accounts-item-card__chips d-none d-sm-flex">
+                                @foreach ($account->getEffectivePaymentMethods() as $pm)
+                                    <span class="accounts-pm-chip">{{ $pm }}</span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
                 @if (count($account->getEffectivePaymentMethods()) > 0)
-                    <div class="accounts-item-card__chips mb-3">
+                    <div class="accounts-item-card__chips d-flex d-sm-none mb-1">
                         @foreach ($account->getEffectivePaymentMethods() as $pm)
                             <span class="accounts-pm-chip">{{ $pm }}</span>
                         @endforeach
                     </div>
                 @endif
-                @php
-                    $accBal = (float) $account->balance;
-                @endphp
-                <div class="accounts-metric accounts-metric--solo">
-                    <span class="accounts-metric__label">Saldo atual</span>
-                    <span class="accounts-metric__value accounts-metric__value--lg {{ $accBal >= 0 ? 'accounts-metric__value--positive' : 'text-danger' }}">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
-                </div>
             @endif
         </div>
 

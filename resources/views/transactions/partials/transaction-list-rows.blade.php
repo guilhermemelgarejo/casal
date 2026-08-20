@@ -76,7 +76,7 @@
             </div>
             <div class="tx-list-row-cell tx-list-row-user tx-cell-truncate small" data-label="Registrado por">
                 <div class="text-truncate" title="{{ $registeredByTitle }}">
-                    <span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
+                    @if($registeredByLabel !== '')<span class="text-muted tx-user-prefix d-lg-none">por </span>@endif<span class="text-body">{{ $registeredByLabel !== '' ? $registeredByLabel : '—' }}</span>
                 </div>
             </div>
             <div class="tx-list-row-cell tx-list-row-payment small text-body-secondary tx-cell-truncate" data-label="Pagamento / conta">

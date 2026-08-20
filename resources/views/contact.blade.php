@@ -18,7 +18,7 @@
                         <img
                             src="{{ asset('images/duozen-logo.png') }}"
                             alt="{{ config('app.name', 'DuoZen') }}"
-                            style="height: 3.5rem; width: auto; max-height: 100%;"
+                            class="landing-navbar-logo"
                         />
                     </a>
                     <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">

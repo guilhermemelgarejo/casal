@@ -110,25 +110,23 @@
             <div class="row g-4 g-lg-3 gx-lg-4 align-items-start cat-lists-row">
                 <div class="col-12 col-lg-6">
                     <section class="h-100" aria-labelledby="cat-income-heading">
-                        <div class="cat-list-header cat-list-header--income mb-3">
-                            <div class="cat-list-header__income-top d-flex flex-nowrap align-items-center justify-content-between gap-3">
-                                <div class="cat-list-header__title-wrap min-w-0 flex-shrink-1">
-                                    <span class="cat-list-header__icon cat-list-header__icon--income" aria-hidden="true">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m7-7H5" /></svg>
+                        <div class="cat-list-header cat-list-header--income d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                            <div class="cat-list-header__title-wrap min-w-0">
+                                <span class="cat-list-header__icon cat-list-header__icon--income" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m7-7H5" /></svg>
+                                </span>
+                                <div class="min-w-0">
+                                    <span class="cat-section-kicker">Entradas</span>
+                                    <h3 class="h5 mb-0" id="cat-income-heading">Receitas</h3>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
+                                @if ($categoriesIncome->isNotEmpty())
+                                    <span class="cat-list-header__count badge bg-success-subtle text-success-emphasis border border-success-subtle">
+                                        {{ $categoriesIncome->count() }} {{ $categoriesIncome->count() === 1 ? 'categoria' : 'categorias' }}
                                     </span>
-                                    <div class="min-w-0">
-                                        <span class="cat-section-kicker">Entradas</span>
-                                        <h3 class="h5 mb-0" id="cat-income-heading">Receitas</h3>
-                                    </div>
-                                </div>
-                                <div class="cat-list-header__income-actions d-flex flex-nowrap align-items-center justify-content-end gap-2 flex-shrink-0">
-                                    @if ($categoriesIncome->isNotEmpty())
-                                        <span class="cat-list-header__count badge bg-success-subtle text-success-emphasis border border-success-subtle">
-                                            {{ $categoriesIncome->count() }} {{ $categoriesIncome->count() === 1 ? 'categoria' : 'categorias' }}
-                                        </span>
-                                    @endif
-                                    @include('budgets.partials.income-toolbar')
-                                </div>
+                                @endif
+                                @include('budgets.partials.income-toolbar')
                             </div>
                         </div>
 
@@ -150,7 +148,7 @@
 
                 <div class="col-12 col-lg-6">
                     <section class="h-100" aria-labelledby="cat-expense-heading">
-                        <div class="cat-list-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                        <div class="cat-list-header cat-list-header--expense d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                             <div class="cat-list-header__title-wrap min-w-0">
                                 <span class="cat-list-header__icon cat-list-header__icon--expense" aria-hidden="true">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" /></svg>

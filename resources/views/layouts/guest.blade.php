@@ -13,7 +13,7 @@
         @include('layouts.partials.assets')
     </head>
     <body class="bg-body-secondary">
-        <div class="min-vh-100 d-flex flex-column justify-content-center align-items-center py-4">
+        <div class="min-vh-100 d-flex flex-column justify-content-center align-items-center py-4 px-3">
             <div class="mb-0" style="position: relative; z-index: 0;">
                 <a href="{{ route('login') }}" class="d-inline-block text-secondary">
                     <img
@@ -24,7 +24,7 @@
                     />
                 </a>
             </div>
-            <div class="card shadow-sm w-100" style="max-width: 28rem; margin-top: -4rem; position: relative; z-index: 1;">
+            <div class="card shadow-sm w-100 guest-auth-card" style="max-width: 28rem; position: relative; z-index: 1;">
                 <div class="card-body p-4">
                     {{ $slot }}
                 </div>
