@@ -63,11 +63,11 @@
                     <div class="accounts-item-card__metrics mb-2">
                         <div class="accounts-metric">
                             <span class="accounts-metric__label">Limite total</span>
-                            <span class="accounts-metric__value">R$ {{ number_format((float) $account->credit_card_limit_total, 2, ',', '.') }}</span>
+                            <span class="accounts-metric__value duozen-privacy-blur">R$ {{ number_format((float) $account->credit_card_limit_total, 2, ',', '.') }}</span>
                         </div>
                         <div class="accounts-metric">
                             <span class="accounts-metric__label">Disponível</span>
-                            <span class="accounts-metric__value {{ (float) ($account->credit_card_limit_available ?? 0) < 0 ? 'text-danger' : 'accounts-metric__value--positive' }}">R$ {{ number_format((float) ($account->credit_card_limit_available ?? 0), 2, ',', '.') }}</span>
+                            <span class="accounts-metric__value {{ (float) ($account->credit_card_limit_available ?? 0) < 0 ? 'text-danger' : 'accounts-metric__value--positive' }} duozen-privacy-blur">R$ {{ number_format((float) ($account->credit_card_limit_available ?? 0), 2, ',', '.') }}</span>
                         </div>
                     </div>
                 @else
@@ -81,7 +81,7 @@
                     <div class="d-flex align-items-center justify-content-between gap-2">
                         <div>
                             <span class="accounts-metric__label mb-0">Saldo atual</span>
-                            <span class="accounts-metric__value accounts-metric__value--lg {{ $accBal >= 0 ? 'accounts-metric__value--positive' : 'text-danger' }}">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
+                            <span class="accounts-metric__value accounts-metric__value--lg {{ $accBal >= 0 ? 'accounts-metric__value--positive' : 'text-danger' }} duozen-privacy-blur">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
                         </div>
                         @if (count($account->getEffectivePaymentMethods()) > 0)
                             <div class="accounts-item-card__chips d-none d-sm-flex">

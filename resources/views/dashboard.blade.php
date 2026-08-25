@@ -119,12 +119,12 @@
                     <div class="dashboard-summary-grid mt-4">
                         <article class="dashboard-summary-card dashboard-summary-card--success">
                             <span class="dashboard-summary-card__label">Receitas</span>
-                            <strong class="dashboard-summary-card__value text-success">{{ $money($totalIncome) }}</strong>
-                            <span class="dashboard-summary-card__hint">renda planejada: {{ $money($plannedIncomeResolved ?? 0) }}</span>
+                            <strong class="dashboard-summary-card__value text-success duozen-privacy-blur">{{ $money($totalIncome) }}</strong>
+                            <span class="dashboard-summary-card__hint">renda planejada: <span class="duozen-privacy-blur">{{ $money($plannedIncomeResolved ?? 0) }}</span></span>
                         </article>
                         <article class="dashboard-summary-card dashboard-summary-card--danger">
                             <span class="dashboard-summary-card__label">Despesas</span>
-                            <strong class="dashboard-summary-card__value text-danger">{{ $money($totalExpense) }}</strong>
+                            <strong class="dashboard-summary-card__value text-danger duozen-privacy-blur">{{ $money($totalExpense) }}</strong>
                             <span class="dashboard-summary-card__hint">{{ number_format($spendingPressurePct, 1, ',', '.') }}% da renda planejada</span>
                             <div class="progress dashboard-summary-progress mt-2" role="progressbar" aria-label="Pressão de gastos">
                                 <div class="progress-bar {{ $spendingPressurePct >= $thresholdPercentage ? 'bg-danger' : ($spendingPressurePct >= 60 ? 'bg-warning' : 'bg-success') }}" style="width: {{ $spendingPressureBar }}%"></div>
@@ -132,7 +132,7 @@
                         </article>
                         <article class="dashboard-summary-card dashboard-summary-card--primary">
                             <span class="dashboard-summary-card__label">Resultado</span>
-                            <strong class="dashboard-summary-card__value {{ $netResult >= 0 ? 'text-success' : 'text-danger' }}">{{ $money($netResult) }}</strong>
+                            <strong class="dashboard-summary-card__value {{ $netResult >= 0 ? 'text-success' : 'text-danger' }} duozen-privacy-blur">{{ $money($netResult) }}</strong>
                             <span class="dashboard-summary-card__hint">{{ $periodTransactionCount }} lançamento(s) no filtro</span>
                         </article>
                         <article class="dashboard-summary-card dashboard-summary-card--warning">
@@ -159,7 +159,7 @@
                     </span>
                     <div class="min-w-0">
                         <span class="dashboard-balance-panel__label">Saldo da conta filtrada</span>
-                        <strong class="dashboard-balance-panel__value {{ $filteredRegularAccountBalance >= 0 ? 'text-body' : 'text-danger' }}">R$ {{ number_format($filteredRegularAccountBalance, 2, ',', '.') }}</strong>
+                        <strong class="dashboard-balance-panel__value {{ $filteredRegularAccountBalance >= 0 ? 'text-body' : 'text-danger' }} duozen-privacy-blur">R$ {{ number_format($filteredRegularAccountBalance, 2, ',', '.') }}</strong>
                         <span class="dashboard-balance-panel__hint">Considera todos os lançamentos da conta, não apenas o período filtrado.</span>
                     </div>
                 </div>
@@ -179,8 +179,8 @@
                     <div class="pt-0">
                         <h3 class="h6 text-danger-emphasis mb-1">Atenção com os gastos</h3>
                         <p class="small mb-0 text-danger">
-                            Vocês já atingiram <strong>{{ number_format($thresholdPercentage, 0) }}%</strong> da renda mensal planejada (R$ {{ number_format($thresholdAmount, 2, ',', '.') }}).
-                            Atualmente os gastos somam <strong>R$ {{ number_format($totalExpense, 2, ',', '.') }}</strong>.
+                            Vocês já atingiram <strong>{{ number_format($thresholdPercentage, 0) }}%</strong> da renda mensal planejada (R$ <span class="duozen-privacy-blur">{{ number_format($thresholdAmount, 2, ',', '.') }}</span>).
+                            Atualmente os gastos somam <strong class="duozen-privacy-blur">R$ {{ number_format($totalExpense, 2, ',', '.') }}</strong>.
                         </p>
                     </div>
                 </div>

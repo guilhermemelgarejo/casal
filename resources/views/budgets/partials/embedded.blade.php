@@ -29,20 +29,19 @@
                 {{ $budgetCategoryCount }} {{ $budgetCategoryCount === 1 ? 'categoria planejável' : 'categorias planejáveis' }}
             </span>
         </div>
-
         <div class="row g-3 align-items-stretch">
             <div class="col-12 col-md-6 col-lg-5">
                 <div class="budget-summary-stat budget-summary-stat--main h-100 d-flex flex-column justify-content-between p-3">
                     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                         <span class="budget-summary-eyebrow">Planejamento total</span>
                         <span class="fw-bold {{ $budgetPercent > 100 ? 'text-danger' : 'text-primary' }}">
-                            R$ {{ number_format($totalBudgeted, 2, ',', '.') }}
+                            <span class="duozen-privacy-blur">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</span>
                         </span>
                     </div>
                     <div>
                         <div class="d-flex justify-content-between align-items-center small text-secondary mb-1">
                             <span>Progresso</span>
-                            <span>de R$ {{ number_format($income, 2, ',', '.') }}</span>
+                            <span>de <span class="duozen-privacy-blur">R$ {{ number_format($income, 2, ',', '.') }}</span></span>
                         </div>
                         <div class="progress rounded-pill" style="height: 10px;">
                             <div
@@ -69,7 +68,7 @@
             <div class="col-6 col-md-3 col-lg-3.5 flex-grow-1">
                 <div class="budget-summary-stat h-100 d-flex flex-column justify-content-center text-center p-3">
                     <span class="budget-summary-eyebrow mb-1">Disponível</span>
-                    <strong class="fs-4 fw-bold text-success">R$ {{ number_format(max(0, $income - $totalBudgeted), 2, ',', '.') }}</strong>
+                    <strong class="fs-4 fw-bold text-success"><span class="duozen-privacy-blur">R$ {{ number_format(max(0, $income - $totalBudgeted), 2, ',', '.') }}</span></strong>
                     <span class="small text-secondary mt-1">livre no plano</span>
                 </div>
             </div>

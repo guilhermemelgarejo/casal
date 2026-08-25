@@ -12,6 +12,59 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /* Controle de privacidade / desfoque de valores principais */
+    const PRIVACY_STORAGE_KEY = 'duozen_privacy_mode';
+    const initPrivacyMode = () => {
+        const isPrivacyActive = localStorage.getItem(PRIVACY_STORAGE_KEY) === 'true';
+        const applyPrivacyState = (active) => {
+            if (active) {
+                document.documentElement.classList.add('duozen-privacy-active');
+                document.body?.classList.add('duozen-privacy-active');
+            } else {
+                document.documentElement.classList.remove('duozen-privacy-active');
+                document.body?.classList.remove('duozen-privacy-active');
+            }
+
+            document.querySelectorAll('.app-navbar-privacy-toggle').forEach((btn) => {
+                const iconVisible = btn.querySelector('.privacy-icon-visible');
+                const iconHidden = btn.querySelector('.privacy-icon-hidden');
+                const label = btn.querySelector('.privacy-toggle-label');
+
+                if (iconVisible) iconVisible.classList.toggle('d-none', active);
+                if (iconHidden) iconHidden.classList.toggle('d-none', !active);
+                if (label) label.textContent = active ? 'Exibir' : 'Ocultar';
+
+                const newTitle = active ? 'Exibir valores' : 'Ocultar valores';
+                btn.setAttribute('title', newTitle);
+                btn.setAttribute('aria-label', newTitle);
+
+                const tooltipInst = bs?.Tooltip?.getInstance(btn);
+                if (tooltipInst) {
+                    try {
+                        tooltipInst.setContent({ '.tooltip-inner': newTitle });
+                    } catch (err) {
+                        btn.setAttribute('data-bs-original-title', newTitle);
+                    }
+                }
+            });
+        };
+
+        applyPrivacyState(isPrivacyActive);
+
+        document.querySelectorAll('.app-navbar-privacy-toggle').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const currentActive = localStorage.getItem(PRIVACY_STORAGE_KEY) === 'true';
+                const nextActive = !currentActive;
+                try {
+                    localStorage.setItem(PRIVACY_STORAGE_KEY, nextActive ? 'true' : 'false');
+                } catch (err) {}
+                applyPrivacyState(nextActive);
+            });
+        });
+    };
+    initPrivacyMode();
+
     const hasFlatpickr = typeof flatpickr !== 'undefined';
     const hasMonthSelectPlugin = typeof monthSelectPlugin !== 'undefined';
     const flatpickrLocalePt = hasFlatpickr && flatpickr.l10ns && flatpickr.l10ns.pt ? 'pt' : null;

@@ -6606,4 +6606,32 @@ body.duozen-onboarding-active {
     min-height: 32px;
 }
 
+/* Modo de privacidade (ocultação / desfoque de valores principais) */
+.duozen-privacy-blur {
+    display: inline-block;
+}
 
+html.duozen-privacy-active .duozen-privacy-blur,
+body.duozen-privacy-active .duozen-privacy-blur {
+    filter: blur(6.5px);
+    user-select: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+.app-navbar-privacy-toggle {
+    color: var(--bs-secondary-color, #6c757d);
+    background-color: transparent;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.app-navbar-privacy-toggle:hover,
+.app-navbar-privacy-toggle:focus {
+    color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.08);
+}
+
+.app-navbar-privacy-toggle--mobile {
+    font-size: 0.8rem;
+    border-color: var(--bs-border-color);
+}
