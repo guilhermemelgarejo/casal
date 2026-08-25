@@ -29,8 +29,8 @@
                 <div class="d-flex justify-content-between align-items-end mb-2 flex-wrap gap-2">
                     <span class="budget-summary-eyebrow">Planejamento total</span>
                     <span class="fw-bold {{ $budgetPercent > 100 ? 'text-danger' : 'text-primary' }}">
-                        R$ {{ number_format($totalBudgeted, 2, ',', '.') }}
-                        <span class="small text-secondary fw-normal ms-1">de R$ {{ number_format($income, 2, ',', '.') }}</span>
+                        <span class="duozen-privacy-blur">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</span>
+                        <span class="small text-secondary fw-normal ms-1">de <span class="duozen-privacy-blur">R$ {{ number_format($income, 2, ',', '.') }}</span></span>
                     </span>
                 </div>
                 <div class="progress rounded-pill" style="height: 12px;">
@@ -55,7 +55,7 @@
                     <div class="col-6">
                         <div class="budget-summary-stat h-100 text-center">
                             <p class="budget-summary-eyebrow mb-1">Disponível</p>
-                            <p class="fw-bold text-success mb-0">R$ {{ number_format(max(0, $income - $totalBudgeted), 2, ',', '.') }}</p>
+                            <p class="fw-bold text-success mb-0 duozen-privacy-blur">R$ {{ number_format(max(0, $income - $totalBudgeted), 2, ',', '.') }}</p>
                         </div>
                     </div>
                 </div>

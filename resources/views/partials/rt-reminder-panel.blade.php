@@ -98,7 +98,7 @@
                                                         <span class="d-block text-truncate">{{ $rec->description }}</span>
                                                         <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
                                                     </span>
-                                                    <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
+                                                    <span class="rt-reminder-list__amount duozen-privacy-blur">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
                                                     <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
                                                 </div>
                                             </li>
@@ -121,7 +121,7 @@
                                                         </span>
                                                         <span class="d-block small text-secondary text-truncate">Atalho</span>
                                                     </span>
-                                                    <span class="rt-reminder-list__amount">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
+                                                    <span class="rt-reminder-list__amount duozen-privacy-blur">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
                                                     <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
                                                 </div>
                                             </li>
@@ -148,7 +148,7 @@
                                                             <span class="d-block small text-secondary text-truncate">{{ $inv['due_label'] }}</span>
                                                         @endif
                                                     </span>
-                                                    <span class="rt-reminder-list__amount">R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}</span>
+                                                    <span class="rt-reminder-list__amount duozen-privacy-blur">R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}</span>
                                                     <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir o cartão e o período desta fatura">Ver fatura</a>
                                                 </div>
                                             </li>

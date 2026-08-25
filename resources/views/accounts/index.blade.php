@@ -83,7 +83,7 @@
                                 </div>
                                 <div class="accounts-summary-card accounts-summary-card--success">
                                     <span class="accounts-summary-card__label">Saldo em contas</span>
-                                    <strong class="accounts-summary-card__money {{ $regularBalanceTotal < 0 ? 'text-danger' : '' }}">R$ {{ number_format($regularBalanceTotal, 2, ',', '.') }}</strong>
+                                    <strong class="accounts-summary-card__money {{ $regularBalanceTotal < 0 ? 'text-danger' : '' }} duozen-privacy-blur">R$ {{ number_format($regularBalanceTotal, 2, ',', '.') }}</strong>
                                     <span class="accounts-summary-card__hint">somatório dos saldos</span>
                                 </div>
                                 <div class="accounts-summary-card">
@@ -93,8 +93,8 @@
                                 </div>
                                 <div class="accounts-summary-card accounts-summary-card--warning">
                                     <span class="accounts-summary-card__label">Limite disponível</span>
-                                    <strong class="accounts-summary-card__money {{ $creditLimitAvailable < 0 ? 'text-danger' : '' }}">R$ {{ number_format($creditLimitAvailable, 2, ',', '.') }}</strong>
-                                    <span class="accounts-summary-card__hint">de R$ {{ number_format($creditLimitTotal, 2, ',', '.') }}</span>
+                                    <strong class="accounts-summary-card__money {{ $creditLimitAvailable < 0 ? 'text-danger' : '' }} duozen-privacy-blur">R$ {{ number_format($creditLimitAvailable, 2, ',', '.') }}</strong>
+                                    <span class="accounts-summary-card__hint">de <span class="duozen-privacy-blur">R$ {{ number_format($creditLimitTotal, 2, ',', '.') }}</span></span>
                                 </div>
                             </div>
                         </div>

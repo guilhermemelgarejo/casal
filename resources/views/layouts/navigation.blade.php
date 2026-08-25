@@ -68,23 +68,26 @@
                         Contato
                     </x-nav-link>
                 </li>
-                @if(Auth::user()->couple_id)
-                    <li class="nav-item">
-                        <x-nav-link :href="route('billing.index')" :active="request()->routeIs('billing.*')">
-                            Assinatura
-                        </x-nav-link>
-                    </li>
-                @endif
-                @if(Auth::user()->isCasalAdmin())
-                    <li class="nav-item">
-                        <x-nav-link :href="route('admin.subscriptions.index')" :active="request()->routeIs('admin.*')">
-                            Admin
-                        </x-nav-link>
-                    </li>
-                @endif
             </ul>
 
-            <div class="d-none d-lg-flex align-items-center ms-lg-2">
+            <div class="d-none d-lg-flex align-items-center ms-lg-2 gap-2">
+                <button
+                    type="button"
+                    class="btn app-navbar-privacy-toggle rounded-circle p-2 d-inline-flex align-items-center justify-content-center text-secondary border-0"
+                    id="duozen-privacy-toggle"
+                    aria-label="Ocultar ou exibir valores"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="bottom"
+                    title="Ocultar valores"
+                >
+                    <svg class="privacy-icon-visible" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg class="privacy-icon-hidden d-none" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                    </svg>
+                </button>
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button
@@ -130,12 +133,29 @@
             </div>
 
             <div class="d-lg-none app-navbar-mobile border-top mt-2 pt-3 pb-1 w-100">
-                <div class="d-flex align-items-center gap-2 px-2 mb-2">
-                    <span class="app-navbar-user-avatar app-navbar-user-avatar--sm" aria-hidden="true">{{ \Illuminate\Support\Str::substr(Auth::user()->name, 0, 1) }}</span>
-                    <div class="min-w-0">
-                        <div class="small fw-semibold text-truncate">{{ Auth::user()->name }}</div>
-                        <div class="small text-secondary text-truncate">{{ Auth::user()->email }}</div>
+                <div class="d-flex align-items-center justify-content-between px-2 mb-2">
+                    <div class="d-flex align-items-center gap-2 min-w-0">
+                        <span class="app-navbar-user-avatar app-navbar-user-avatar--sm" aria-hidden="true">{{ \Illuminate\Support\Str::substr(Auth::user()->name, 0, 1) }}</span>
+                        <div class="min-w-0">
+                            <div class="small fw-semibold text-truncate">{{ Auth::user()->name }}</div>
+                            <div class="small text-secondary text-truncate">{{ Auth::user()->email }}</div>
+                        </div>
                     </div>
+                    <button
+                        type="button"
+                        class="btn app-navbar-privacy-toggle app-navbar-privacy-toggle--mobile btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1 px-3 py-1 flex-shrink-0"
+                        id="duozen-privacy-toggle-mobile"
+                        aria-label="Ocultar ou exibir valores"
+                    >
+                        <svg class="privacy-icon-visible" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        <svg class="privacy-icon-hidden d-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                        </svg>
+                        <span class="privacy-toggle-label small">Ocultar</span>
+                    </button>
                 </div>
                 <x-responsive-nav-link :href="route('profile.edit')">
                     Perfil

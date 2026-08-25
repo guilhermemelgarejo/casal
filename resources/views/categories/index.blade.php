@@ -84,21 +84,21 @@
                                 </div>
                                 <div class="cat-summary-card cat-summary-card--primary">
                                     <span class="cat-summary-card__label">Metas</span>
-                                    <strong class="cat-summary-card__money">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</strong>
+                                    <strong class="cat-summary-card__money duozen-privacy-blur">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</strong>
                                     <span class="cat-summary-card__hint">{{ $budgetableExpenseCount }} despesa(s) planejáveis</span>
                                 </div>
                                 <div class="cat-summary-card cat-summary-card--warning">
                                     <span class="cat-summary-card__label">Gasto real</span>
-                                    <strong class="cat-summary-card__money">R$ {{ number_format($totalSpent, 2, ',', '.') }}</strong>
+                                    <strong class="cat-summary-card__money duozen-privacy-blur">R$ {{ number_format($totalSpent, 2, ',', '.') }}</strong>
                                     <span class="cat-summary-card__hint">{{ number_format($budgetUsagePct, 1, ',', '.') }}% das metas</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="cat-hero__strip mt-4">
-                        <span>Renda: R$ {{ number_format($coupleIncome, 2, ',', '.') }}</span>
-                        <span>Planejado: R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</span>
-                        <span>Disponível no plano: R$ {{ number_format(max(0, $coupleIncome - $totalBudgeted), 2, ',', '.') }}</span>
+                        <span>Renda: <span class="duozen-privacy-blur">R$ {{ number_format($coupleIncome, 2, ',', '.') }}</span></span>
+                        <span>Planejado: <span class="duozen-privacy-blur">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</span></span>
+                        <span>Disponível no plano: <span class="duozen-privacy-blur">R$ {{ number_format(max(0, $coupleIncome - $totalBudgeted), 2, ',', '.') }}</span></span>
                     </div>
                 </div>
             </section>

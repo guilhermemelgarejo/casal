@@ -63,11 +63,11 @@
                     <div class="accounts-item-card__metrics">
                         <div class="accounts-metric">
                             <span class="accounts-metric__label">Limite total</span>
-                            <span class="accounts-metric__value">R$ {{ number_format((float) $account->credit_card_limit_total, 2, ',', '.') }}</span>
+                            <span class="accounts-metric__value duozen-privacy-blur">R$ {{ number_format((float) $account->credit_card_limit_total, 2, ',', '.') }}</span>
                         </div>
                         <div class="accounts-metric">
                             <span class="accounts-metric__label">Disponível</span>
-                            <span class="accounts-metric__value {{ (float) ($account->credit_card_limit_available ?? 0) < 0 ? 'text-danger' : 'accounts-metric__value--positive' }}">R$ {{ number_format((float) ($account->credit_card_limit_available ?? 0), 2, ',', '.') }}</span>
+                            <span class="accounts-metric__value {{ (float) ($account->credit_card_limit_available ?? 0) < 0 ? 'text-danger' : 'accounts-metric__value--positive' }} duozen-privacy-blur">R$ {{ number_format((float) ($account->credit_card_limit_available ?? 0), 2, ',', '.') }}</span>
                         </div>
                     </div>
                 @else
@@ -86,7 +86,7 @@
                 @endphp
                 <div class="accounts-metric accounts-metric--solo">
                     <span class="accounts-metric__label">Saldo atual</span>
-                    <span class="accounts-metric__value accounts-metric__value--lg {{ $accBal >= 0 ? 'accounts-metric__value--positive' : 'text-danger' }}">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
+                    <span class="accounts-metric__value accounts-metric__value--lg {{ $accBal >= 0 ? 'accounts-metric__value--positive' : 'text-danger' }} duozen-privacy-blur">R$ {{ number_format($accBal, 2, ',', '.') }}</span>
                 </div>
             @endif
         </div>

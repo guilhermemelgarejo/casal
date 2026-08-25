@@ -35,15 +35,15 @@
                             <div class="cofrinhos-movements-stats">
                                 <div class="cofrinhos-mini-stat">
                                     <span>Aportes + juros</span>
-                                    <strong class="text-success">R$ {{ number_format($totalAportes, 2, ',', '.') }}</strong>
+                                    <strong class="text-success duozen-privacy-blur">R$ {{ number_format($totalAportes, 2, ',', '.') }}</strong>
                                 </div>
                                 <div class="cofrinhos-mini-stat">
                                     <span>Retiradas</span>
-                                    <strong class="text-danger">R$ {{ number_format($totalRetiradas, 2, ',', '.') }}</strong>
+                                    <strong class="text-danger duozen-privacy-blur">R$ {{ number_format($totalRetiradas, 2, ',', '.') }}</strong>
                                 </div>
                                 <div class="cofrinhos-mini-stat">
                                     <span>Saldo do período</span>
-                                    <strong class="{{ $saldoPeriodo < 0 ? 'text-danger' : 'text-success' }}">
+                                    <strong class="{{ $saldoPeriodo < 0 ? 'text-danger' : 'text-success' }} duozen-privacy-blur">
                                         {{ $saldoPeriodo < 0 ? '-' : '+' }}R$ {{ number_format(abs($saldoPeriodo), 2, ',', '.') }}
                                     </strong>
                                 </div>

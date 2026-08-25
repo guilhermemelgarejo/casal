@@ -68,13 +68,13 @@
                                 </div>
                                 <div class="cc-statements-summary-card cc-statements-summary-card--warning">
                                     <span class="cc-statements-summary-card__label">Em aberto</span>
-                                    <strong class="cc-statements-summary-card__money">R$ {{ number_format($openAmount, 2, ',', '.') }}</strong>
+                                    <strong class="cc-statements-summary-card__money duozen-privacy-blur">R$ {{ number_format($openAmount, 2, ',', '.') }}</strong>
                                     <span class="cc-statements-summary-card__hint">{{ $openSummaries->count() }} ciclo(s) atual/próximo</span>
                                 </div>
                                 <div class="cc-statements-summary-card">
                                     <span class="cc-statements-summary-card__label">Listadas</span>
                                     <strong class="cc-statements-summary-card__value">{{ $filterCardId !== null ? $invoiceCycles->count() : '—' }}</strong>
-                                    <span class="cc-statements-summary-card__hint">{{ $filterCardId !== null ? 'R$ '.number_format($listedTotal, 2, ',', '.') : 'selecione um cartão' }}</span>
+                                    <span class="cc-statements-summary-card__hint">{{ $filterCardId !== null ? 'R$ ' : '' }}<span class="{{ $filterCardId !== null ? 'duozen-privacy-blur' : '' }}">{{ $filterCardId !== null ? number_format($listedTotal, 2, ',', '.') : 'selecione um cartão' }}</span></span>
                                 </div>
                                 <div class="cc-statements-summary-card cc-statements-summary-card--danger">
                                     <span class="cc-statements-summary-card__label">Atenção</span>
@@ -238,7 +238,7 @@
                                                     </div>
                                                 </div>
                                                 <div class="text-md-end">
-                                                    <div class="cc-statement-total text-nowrap">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</div>
+                                                    <div class="cc-statement-total text-nowrap duozen-privacy-blur">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</div>
                                                     <div class="small text-secondary">Total no cartão</div>
                                                 </div>
                                             </div>
@@ -280,8 +280,8 @@
                                                                 @elseif ($hasPayments)
                                                                     <span class="cc-statement-status cc-statement-status--partial">Parcial</span>
                                                                     <div class="text-secondary mt-1">
-                                                                        Pago: R$ {{ number_format((float) $meta->paymentsTotal(), 2, ',', '.') }}
-                                                                        · Pendente: R$ {{ number_format($remaining, 2, ',', '.') }}
+                                                                        Pago: <span class="duozen-privacy-blur">R$ {{ number_format((float) $meta->paymentsTotal(), 2, ',', '.') }}</span>
+                                                                        · Pendente: <span class="duozen-privacy-blur">R$ {{ number_format($remaining, 2, ',', '.') }}</span>
                                                                     </div>
                                                                     <ul class="list-unstyled mb-0 mt-2">
                                                                         @foreach ($meta->paymentTransactions as $ptx)

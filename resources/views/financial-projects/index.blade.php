@@ -101,7 +101,7 @@
                             <div class="cofrinhos-summary-grid">
                                 <div class="cofrinhos-summary-card cofrinhos-summary-card--primary">
                                     <span class="cofrinhos-summary-card__label">Total guardado</span>
-                                    <strong class="cofrinhos-summary-card__value">R$ {{ number_format($totalSaved, 2, ',', '.') }}</strong>
+                                    <strong class="cofrinhos-summary-card__value duozen-privacy-blur">R$ {{ number_format($totalSaved, 2, ',', '.') }}</strong>
                                     @if($totalPct !== null)
                                         <span class="cofrinhos-summary-card__hint">{{ number_format($totalPct, 1, ',', '.') }}% das metas definidas</span>
                                     @else
@@ -269,7 +269,7 @@
                                         @endif
                                     </div>
                                     @if($target !== null)
-                                        <p class="small text-secondary mb-0">Meta de R$ {{ number_format($target, 2, ',', '.') }}</p>
+                                        <p class="small text-secondary mb-0">Meta de <span class="duozen-privacy-blur">R$ {{ number_format($target, 2, ',', '.') }}</span></p>
                                     @else
                                         <p class="small text-secondary mb-0">Sem valor-alvo definido</p>
                                     @endif
@@ -277,7 +277,7 @@
                             </div>
                             <div class="card-body p-4 cofrinhos-project-card__body">
                                 <p class="dz-stat-label mb-1">Guardado agora</p>
-                                <p class="cofrinhos-project-card__amount mb-3">R$ {{ number_format($saved, 2, ',', '.') }}</p>
+                                <p class="cofrinhos-project-card__amount mb-3 duozen-privacy-blur">R$ {{ number_format($saved, 2, ',', '.') }}</p>
                                 @if($target !== null)
                                     @if($pct !== null)
                                         <div class="cofrinhos-progress mb-3" aria-label="Progresso de {{ number_format((float) $pct, 1, ',', '.') }}%">
@@ -287,7 +287,7 @@
                                     <div class="cofrinhos-project-card__metrics mb-3">
                                         <div class="cofrinhos-mini-stat">
                                             <span>Falta</span>
-                                            <strong>R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong>
+                                            <strong class="duozen-privacy-blur">R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong>
                                         </div>
                                         <div class="cofrinhos-mini-stat">
                                             <span>Avanço</span>

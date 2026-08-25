@@ -11,6 +11,15 @@
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
         @include('layouts.partials.assets')
+        <script>
+            (function () {
+                try {
+                    if (localStorage.getItem('duozen_privacy_mode') === 'true') {
+                        document.documentElement.classList.add('duozen-privacy-active');
+                    }
+                } catch (e) {}
+            })();
+        </script>
     </head>
     <body class="bg-body-secondary">
         <div class="min-vh-100 d-flex flex-column">

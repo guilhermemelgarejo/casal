@@ -145,7 +145,7 @@
                                         </div>
                                         <div class="couple-summary-stat">
                                             <span class="couple-summary-stat__label">Renda mensal</span>
-                                            <strong class="couple-summary-stat__money">R$ {{ number_format((float) $couple->monthly_income, 2, ',', '.') }}</strong>
+                                            <strong class="couple-summary-stat__money duozen-privacy-blur">R$ {{ number_format((float) $couple->monthly_income, 2, ',', '.') }}</strong>
                                             <span class="couple-summary-stat__hint">base para alertas</span>
                                         </div>
                                         <div class="couple-summary-stat couple-summary-stat--warning">

@@ -39,9 +39,9 @@
             @endunless
             @if ($pickerSummary)
                 <div class="cc-pick-card-ref small opacity-75">{{ $pickerSummary['ref_label'] }}</div>
-                <div class="cc-pick-card-amount lh-sm {{ $compact ? 'fs-6' : 'fs-5' }} fw-bold mt-1">R$ {{ $pickerSummary['spent_total_str'] }}</div>
+                <div class="cc-pick-card-amount lh-sm {{ $compact ? 'fs-6' : 'fs-5' }} fw-bold mt-1 duozen-privacy-blur">R$ {{ $pickerSummary['spent_total_str'] }}</div>
                 @if (! empty($pickerSummary['partial']) && $pickerSummary['remaining'] > 0.005 && $pickerSummary['remaining'] + 0.01 < $pickerSummary['spent_total'])
-                    <div class="cc-pick-card-pending small opacity-90 mt-1">Pendente R$ {{ $pickerSummary['remaining_str'] }}</div>
+                    <div class="cc-pick-card-pending small opacity-90 mt-1">Pendente <span class="duozen-privacy-blur">R$ {{ $pickerSummary['remaining_str'] }}</span></div>
                 @endif
             @else
                 <div class="cc-pick-card-none small opacity-75 {{ $compact ? 'mt-1' : 'mt-2' }}">Sem fatura em aberto</div>

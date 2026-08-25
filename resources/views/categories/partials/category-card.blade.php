@@ -77,9 +77,9 @@
                 @if ($budget)
                     <div class="d-flex justify-content-between align-items-center gap-2 mb-1 small">
                         <span class="text-secondary text-truncate">
-                            <span class="tabular-nums">{{ number_format($spent, 2, ',', '.') }}</span>
+                            <span class="tabular-nums duozen-privacy-blur">{{ number_format($spent, 2, ',', '.') }}</span>
                             <span class="text-secondary opacity-75"> / </span>
-                            <span class="tabular-nums fw-medium text-body">{{ number_format((float) $budget->amount, 2, ',', '.') }}</span>
+                            <span class="tabular-nums fw-medium text-body duozen-privacy-blur">{{ number_format((float) $budget->amount, 2, ',', '.') }}</span>
                             <span class="d-none d-sm-inline text-secondary"> · {{ number_format($usagePercent, 0) }}%</span>
                         </span>
                         <span class="flex-shrink-0 fw-semibold tabular-nums {{ $spent > (float) $budget->amount ? 'text-danger' : 'text-body-secondary' }}">
