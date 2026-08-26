@@ -162,9 +162,6 @@
                 <x-responsive-nav-link :href="route('profile.edit')">
                     Perfil
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('contact.show')">
-                    Contato
-                </x-responsive-nav-link>
                 @if(Auth::user()->couple_id)
                     <x-responsive-nav-link :href="route('billing.index')">
                         Assinatura
