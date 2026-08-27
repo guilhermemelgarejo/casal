@@ -197,6 +197,7 @@ class TransactionListingPresentation
                     'description' => $t->description,
                     'description_edit_base' => $t->baseDescriptionWithoutInstallmentSuffix(),
                     'date' => $t->date->format('d/m/Y'),
+                    'date_form' => $t->date->format('Y-m-d'),
                     'ref_label' => $refLabel,
                     'statement_url' => $statementUrl,
                     'amount' => (float) $t->amount,

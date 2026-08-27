@@ -805,6 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const action = btn.getAttribute('data-tx-action') || '';
             const amt = btn.getAttribute('data-tx-amount') || '';
             const desc = btn.getAttribute('data-tx-description') || '';
+            const dateVal = btn.getAttribute('data-tx-date') || '';
             const precheck = btn.getAttribute('data-tx-precheck') || '';
             const txType = btn.getAttribute('data-tx-type') || '';
             const allocRaw = btn.getAttribute('data-tx-allocations') || '';
@@ -818,6 +819,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const descInput = txEditForm.querySelector('[name="description"]');
             if (descInput) {
                 descInput.value = desc;
+            }
+            const dateInput = txEditForm.querySelector('[name="date"]');
+            if (dateInput) {
+                window.duozenFlatpickrSetDate(dateInput, dateVal);
             }
 
             const allocWrap = txEditForm.querySelector('#edit-tx-category-allocations-wrap');
@@ -1258,9 +1263,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const descBase = escapeHtmlTx(
                         row.description_edit_base != null ? String(row.description_edit_base) : String(row.description || ''),
                     );
+                    const txDate = escapeHtmlTx(row.date_form || '');
                     const peerCount = Array.isArray(group.rows) ? group.rows.length : 0;
                     const txType = escapeHtmlTx(row.type || '');
-                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-precheck="${precheck}" data-tx-peer-count="${peerCount}" data-tx-root-id="${escapeHtmlTx(String(group.rootId || rootId))}" data-tx-type="${txType}" data-tx-allocations="${allocEnc}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
+                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-date="${txDate}" data-tx-precheck="${precheck}" data-tx-peer-count="${peerCount}" data-tx-root-id="${escapeHtmlTx(String(group.rootId || rootId))}" data-tx-type="${txType}" data-tx-allocations="${allocEnc}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
                 }
 
                 if (skipAllowed && skipUrl) {

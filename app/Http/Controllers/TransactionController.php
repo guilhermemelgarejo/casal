@@ -106,6 +106,12 @@ class TransactionController extends Controller
             ]);
         }
 
+        if (! $request->filled('date')) {
+            $request->merge([
+                'date' => $transaction->date?->format('Y-m-d') ?? date('Y-m-d'),
+            ]);
+        }
+
         $suffix = $transaction->installmentParcelSuffixFromDescription();
         $descriptionMax = $suffix !== null ? max(1, 255 - mb_strlen($suffix)) : 255;
 
@@ -113,6 +119,7 @@ class TransactionController extends Controller
             $request->validate([
                 'amount' => ['required', 'numeric'],
                 'description' => ['required', 'string', 'max:'.$descriptionMax],
+                'date' => ['required', 'date'],
                 'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
                 'category_allocations' => 'nullable|array|max:5',
                 'category_allocations.*.category_id' => 'nullable|exists:categories,id',
@@ -150,6 +157,11 @@ class TransactionController extends Controller
 
         $descriptionChanged = (string) $transaction->description !== $newDescriptionFull;
         $hasCategoryAllocations = is_array($request->input('category_allocations'));
+
+        $newDate = Carbon::parse($request->date);
+        $newDateStr = $newDate->toDateString();
+        $oldDateStr = $transaction->date?->toDateString();
+        $dateChanged = $oldDateStr !== $newDateStr;
 
         $blockReason = $this->transactionEditBlockedReason($transaction, $amountChanged);
         if ($blockReason !== null) {
@@ -255,7 +267,7 @@ class TransactionController extends Controller
             $financialProjectId = $fpResolved['financial_project_id'] ?? null;
         }
 
-        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged) {
+        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged && ! $dateChanged) {
             if ((int) ($transaction->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 // Continua para persistir o cofrinho.
             } else {
@@ -266,7 +278,7 @@ class TransactionController extends Controller
             }
         }
 
-        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId) {
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId, $dateChanged, $newDateStr, $newDate) {
             if ($descriptionChanged) {
                 $transaction->description = $newDescriptionFull;
             }
@@ -276,9 +288,33 @@ class TransactionController extends Controller
             if ((int) ($transaction->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 $transaction->financial_project_id = $financialProjectId;
             }
-            if ($amountChanged || $descriptionChanged || (int) ($transaction->getOriginal('financial_project_id') ?? 0) !== (int) ($financialProjectId ?? 0)) {
+            if ($dateChanged) {
+                $transaction->date = $newDateStr;
+                $transaction->loadMissing('accountModel');
+                if (! $transaction->accountModel?->isCreditCard()) {
+                    $transaction->reference_month = (int) $newDate->month;
+                    $transaction->reference_year = (int) $newDate->year;
+                }
+            }
+            if ($amountChanged || $descriptionChanged || $dateChanged || (int) ($transaction->getOriginal('financial_project_id') ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 $transaction->save();
             }
+
+            if ($dateChanged) {
+                $transaction->loadMissing('accountModel');
+                if ($transaction->accountModel?->isCreditCard()) {
+                    $group = $this->installmentGroupTransactionsFor($transaction);
+                    if ($group->count() > 1) {
+                        foreach ($group as $tx) {
+                            if ($tx->id !== $transaction->id) {
+                                $tx->date = $newDateStr;
+                                $tx->save();
+                            }
+                        }
+                    }
+                }
+            }
+
             if ($categoryChanged && $splitRows !== null) {
                 if ($applyToAllInstallments) {
                     $group = $this->installmentGroupTransactionsFor($transaction);
@@ -330,7 +366,7 @@ class TransactionController extends Controller
         session()->forget('edit_transaction_id');
         $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
-        $msg = $this->transactionUpdateFlashMessage($amountChanged, $descriptionChanged, $categoryChanged);
+        $msg = $this->transactionUpdateFlashMessage($amountChanged, $descriptionChanged, $categoryChanged, $dateChanged);
 
         return back()->with('success', $msg);
     }
@@ -405,19 +441,18 @@ class TransactionController extends Controller
         return null;
     }
 
-    private function transactionUpdateFlashMessage(bool $amountChanged, bool $descriptionChanged, bool $categoryChanged): string
-    {
-        if ($amountChanged && $descriptionChanged && $categoryChanged) {
+    private function transactionUpdateFlashMessage(
+        bool $amountChanged,
+        bool $descriptionChanged,
+        bool $categoryChanged,
+        bool $dateChanged = false
+    ): string {
+        $changesCount = ($amountChanged ? 1 : 0) + ($descriptionChanged ? 1 : 0) + ($categoryChanged ? 1 : 0) + ($dateChanged ? 1 : 0);
+        if ($changesCount > 1) {
             return 'Lançamento atualizado.';
         }
-        if ($amountChanged && $descriptionChanged) {
-            return 'Lançamento atualizado.';
-        }
-        if ($amountChanged && $categoryChanged) {
-            return 'Valor e categorias atualizados.';
-        }
-        if ($descriptionChanged && $categoryChanged) {
-            return 'Descrição e categorias atualizadas.';
+        if ($dateChanged) {
+            return 'Data do lançamento atualizada.';
         }
         if ($amountChanged) {
             return 'Valor do lançamento atualizado.';
@@ -425,8 +460,11 @@ class TransactionController extends Controller
         if ($descriptionChanged) {
             return 'Descrição atualizada.';
         }
+        if ($categoryChanged) {
+            return 'Categorias atualizadas.';
+        }
 
-        return 'Categorias atualizadas.';
+        return 'Lançamento atualizado.';
     }
 
     /**

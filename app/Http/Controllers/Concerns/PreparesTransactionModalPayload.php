@@ -111,6 +111,7 @@ trait PreparesTransactionModalPayload
                     'action' => route('transactions.update', $editTx),
                     'amount' => old('amount', $editTx->amount),
                     'description' => old('description', $editTx->baseDescriptionWithoutInstallmentSuffix()),
+                    'date' => old('date', $editTx->date?->format('Y-m-d')),
                     'edit' => TransactionListingPresentation::transactionAmountEditMeta($editTx),
                     'category_allocations' => $editAllocRows,
                     'financial_project_id' => old('financial_project_id', $editTx->financial_project_id),

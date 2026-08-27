@@ -56,7 +56,7 @@
                     <input type="hidden" name="return_from_installment_modal" id="input-return-from-installment-modal" value="0">
                     <input type="hidden" name="installment_scope" id="edit-tx-installment-scope" value="single">
                     <div class="modal-body">
-                        <p class="small text-secondary mb-3">Altere a descrição, o valor e/ou as categorias. Se mudar só o valor, as categorias são ajustadas na mesma proporção. Em cartão de crédito, o total da fatura é recalculado. Em parcelas, edita-se só o texto base; o sufixo <span class="text-nowrap">(Parcela x/y)</span> mantém-se.</p>
+                        <p class="small text-secondary mb-3">Altere a data, a descrição, o valor e/ou as categorias. Se mudar só o valor, as categorias são ajustadas na mesma proporção. Em cartão de crédito, o total da fatura é recalculado. Em parcelas, edita-se só o texto base; o sufixo <span class="text-nowrap">(Parcela x/y)</span> mantém-se.</p>
                         <div class="mb-3">
                             <x-input-label for="edit-tx-description" value="Descrição" />
                             <x-text-input
@@ -69,19 +69,35 @@
                             />
                             <x-input-error :messages="$errors->get('description')" class="mt-2" />
                         </div>
-                        <div>
-                            <x-input-label for="edit-tx-amount" value="Valor (R$)" />
-                            <x-text-input
-                                id="edit-tx-amount"
-                                name="amount"
-                                type="number"
-                                step="0.01"
-                                class="mt-1"
-                                required
-                                value="{{ ($editTransactionModalMeta ?? [])['amount'] ?? '' }}"
-                                placeholder="0,00"
-                            />
-                            <x-input-error :messages="$errors->get('amount')" class="mt-2" />
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <x-input-label for="edit-tx-amount" value="Valor (R$)" />
+                                <x-text-input
+                                    id="edit-tx-amount"
+                                    name="amount"
+                                    type="number"
+                                    step="0.01"
+                                    class="mt-1"
+                                    required
+                                    value="{{ ($editTransactionModalMeta ?? [])['amount'] ?? '' }}"
+                                    placeholder="0,00"
+                                />
+                                <x-input-error :messages="$errors->get('amount')" class="mt-2" />
+                            </div>
+                            <div class="col-6">
+                                <x-input-label for="edit-tx-date" value="Data" />
+                                <x-text-input
+                                    id="edit-tx-date"
+                                    name="date"
+                                    type="text"
+                                    data-duozen-flatpickr="date"
+                                    class="mt-1"
+                                    autocomplete="off"
+                                    value="{{ old('date', ($editTransactionModalMeta ?? [])['date'] ?? date('Y-m-d')) }}"
+                                    required
+                                />
+                                <x-input-error :messages="$errors->get('date')" class="mt-2" />
+                            </div>
                         </div>
 
                         <div class="form-check mt-3 d-none" id="edit-tx-scope-all-wrap">
@@ -211,7 +227,7 @@
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
             'category_allocations', 'recurring_template_id', 'refund_of_transaction_id',
         ]);
-        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations') || $errors->has('financial_project_id'));
+        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('date') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations') || $errors->has('financial_project_id'));
         $txAllocVisibleRows = 1;
         for ($r = 0; $r < 5; $r++) {
             $ov = old('category_allocations.'.$r.'.category_id');

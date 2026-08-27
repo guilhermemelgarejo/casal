@@ -393,4 +393,111 @@ class TransactionAmountUpdateTest extends TestCase
         $splits = $refund->categorySplits()->get();
         $this->assertSame('-60.00', number_format((float) $splits[0]->amount, 2, '.', ''));
     }
+
+    public function test_atualiza_data_em_conta_regular_e_sincroniza_mes_referencia(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $checking = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta',
+            'kind' => Account::KIND_REGULAR,
+            'color' => '#111',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Mercado',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $tx = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $checking->id,
+            'description' => 'Mercado',
+            'amount' => '150.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-04-05',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+        ], [['category_id' => $category->id, 'amount' => '150.00']]);
+
+        $this->actingAs($user)->put(route('transactions.update', $tx), [
+            'description' => 'Mercado',
+            'amount' => '150.00',
+            'date' => '2026-05-12',
+        ])->assertSessionHasNoErrors();
+
+        $tx->refresh();
+        $this->assertSame('2026-05-12', $tx->date->toDateString());
+        $this->assertSame(5, (int) $tx->reference_month);
+        $this->assertSame(2026, (int) $tx->reference_year);
+    }
+
+    public function test_atualiza_data_em_cartao_e_sincroniza_com_demais_parcelas(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Loja',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $parent = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'TV (Parcela 1/2)',
+            'amount' => '50.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'installment_parent_id' => null,
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $child = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'TV (Parcela 2/2)',
+            'amount' => '50.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 5,
+            'reference_year' => 2026,
+            'installment_parent_id' => $parent->id,
+        ], [['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $this->actingAs($user)->put(route('transactions.update', $parent), [
+            'description' => 'TV',
+            'amount' => '50.00',
+            'date' => '2026-04-15',
+        ])->assertSessionHasNoErrors();
+
+        $parent->refresh();
+        $child->refresh();
+
+        $this->assertSame('2026-04-15', $parent->date->toDateString());
+        $this->assertSame('2026-04-15', $child->date->toDateString());
+        // Faturas de referência permanecem intactas
+        $this->assertSame(4, (int) $parent->reference_month);
+        $this->assertSame(5, (int) $child->reference_month);
+    }
 }
