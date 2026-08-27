@@ -202,7 +202,10 @@ return new class extends Migration
             $table->decimal('asset_avg_price', 15, 4)->nullable();
             $table->decimal('target_amount', 12, 2)->nullable();
             $table->string('color', 32)->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->index(['couple_id', 'is_active']);
         });
 
         Schema::create('couple_planned_income', function (Blueprint $table) {

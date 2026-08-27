@@ -212,7 +212,8 @@ class TransactionController extends Controller
                 ['isCredit' => (bool) $transaction->accountModel?->isCreditCard()],
                 $allocParsed['pairs'],
                 (int) Auth::user()->couple_id,
-                (string) $transaction->type
+                (string) $transaction->type,
+                (int) ($transaction->financial_project_id ?? 0)
             );
             if (isset($fpResolved['errors'])) {
                 return back()
@@ -256,7 +257,8 @@ class TransactionController extends Controller
                 ['isCredit' => (bool) $transaction->accountModel?->isCreditCard()],
                 $pairs,
                 (int) Auth::user()->couple_id,
-                (string) $transaction->type
+                (string) $transaction->type,
+                (int) ($transaction->financial_project_id ?? 0)
             );
             if (isset($fpResolved['errors'])) {
                 return back()
@@ -1058,7 +1060,8 @@ class TransactionController extends Controller
         array $ctx,
         array $pairs,
         int $coupleId,
-        ?string $txTypeOverride = null
+        ?string $txTypeOverride = null,
+        ?int $currentFpId = null
     ): array {
         $raw = $request->input('financial_project_id');
         $fpId = ($raw === null || $raw === '') ? null : (int) $raw;
@@ -1083,12 +1086,15 @@ class TransactionController extends Controller
         }
 
         if ($fpId !== null) {
-            $exists = FinancialProject::query()
+            $project = FinancialProject::query()
                 ->where('couple_id', $coupleId)
                 ->whereKey($fpId)
-                ->exists();
-            if (! $exists) {
+                ->first();
+            if (! $project) {
                 return ['errors' => ['financial_project_id' => ['Cofrinho inválido.']]];
+            }
+            if (! $project->is_active && ($currentFpId === null || $currentFpId !== (int) $project->id)) {
+                return ['errors' => ['financial_project_id' => ['Este cofrinho está desativado.']]];
             }
             if ($ctx['isCredit']) {
                 return ['errors' => ['financial_project_id' => ['Cofrinho só em conta corrente (não em cartão).']]];

@@ -51,6 +51,8 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
         ->name('cofrinhos.interest.destroy');
     Route::post('/cofrinhos/{cofrinho}/asset-aporte', [FinancialProjectController::class, 'storeAssetAporte'])
         ->name('cofrinhos.asset-aporte.store');
+    Route::patch('/cofrinhos/{cofrinho}/toggle-active', [FinancialProjectController::class, 'toggleActive'])
+        ->name('cofrinhos.toggle-active');
 
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');

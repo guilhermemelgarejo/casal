@@ -1,5 +1,6 @@
 *.log
 *.sql
+!database/sql/*.sql
 .DS_Store
 /bootstrap/cache/*
 !/bootstrap/cache/.gitignore

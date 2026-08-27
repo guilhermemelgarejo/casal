@@ -5211,6 +5211,17 @@ body.duozen-onboarding-active {
     transition: border-color 0.2s ease, box-shadow 0.22s ease, transform 0.2s ease;
 }
 
+.cofrinhos-page .cofrinhos-project-card--inactive {
+    opacity: 0.72;
+    filter: grayscale(0.25);
+    background: color-mix(in srgb, var(--bs-body-bg) 95%, var(--bs-tertiary-bg));
+}
+
+.cofrinhos-page .cofrinhos-project-card--inactive:hover {
+    opacity: 0.95;
+    filter: none;
+}
+
 .cofrinhos-page .cofrinhos-project-card:hover {
     border-color: color-mix(in srgb, var(--cofrinho-accent) 30%, var(--bs-border-color));
     box-shadow: 0 0.65rem 1.75rem rgba(15, 23, 42, 0.1);
@@ -5282,6 +5293,12 @@ body.duozen-onboarding-active {
     border-color: rgba(var(--bs-success-rgb), 0.24);
 }
 
+.cofrinhos-page .cofrinhos-project-card__badge--inactive {
+    color: var(--bs-secondary-color);
+    background: var(--bs-secondary-bg);
+    border-color: var(--bs-border-color);
+}
+
 .cofrinhos-page .cofrinhos-project-card__badge--crypto {
     color: #f59e0b;
     background: rgba(245, 158, 11, 0.14);
@@ -5310,6 +5327,23 @@ body.duozen-onboarding-active {
     color: var(--bs-secondary-color);
     background: var(--bs-tertiary-bg);
     border-color: var(--bs-border-color-translucent);
+}
+
+.cofrinhos-page .cofrinhos-collapse-toggle {
+    color: var(--bs-secondary-color);
+    transition: color 0.15s ease;
+}
+
+.cofrinhos-page .cofrinhos-collapse-toggle:hover {
+    color: var(--bs-body-color);
+}
+
+.cofrinhos-page .cofrinhos-collapse-toggle__arrow {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cofrinhos-page .cofrinhos-collapse-toggle:not(.collapsed) .cofrinhos-collapse-toggle__arrow {
+    transform: rotate(90deg);
 }
 
 .cofrinhos-page .cofrinhos-quote-pill {

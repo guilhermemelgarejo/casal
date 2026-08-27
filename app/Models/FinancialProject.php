@@ -24,6 +24,7 @@ class FinancialProject extends Model
         'asset_avg_price',
         'target_amount',
         'color',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -32,7 +33,13 @@ class FinancialProject extends Model
             'target_amount' => 'decimal:2',
             'asset_quantity' => 'decimal:8',
             'asset_avg_price' => 'decimal:4',
+            'is_active' => 'boolean',
         ];
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     public function couple(): BelongsTo

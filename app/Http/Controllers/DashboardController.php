@@ -187,6 +187,8 @@ class DashboardController extends Controller
 
                 if ($project === null) {
                     $txCofrinhoPrefillBlockedReason = 'Cofrinho não encontrado.';
+                } elseif (! $project->is_active) {
+                    $txCofrinhoPrefillBlockedReason = 'Este cofrinho está desativado.';
                 } elseif ($investCat === null || $withdrawCat === null) {
                     $txCofrinhoPrefillBlockedReason = 'Categorias de cofrinho não encontradas.';
                 } else {

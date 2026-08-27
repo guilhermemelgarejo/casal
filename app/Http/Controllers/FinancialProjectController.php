@@ -31,6 +31,7 @@ class FinancialProjectController extends Controller
         $couple = Auth::user()->couple;
         $projects = FinancialProject::query()
             ->where('couple_id', $couple->id)
+            ->orderByDesc('is_active')
             ->orderBy('name')
             ->get();
 
@@ -107,6 +108,7 @@ class FinancialProjectController extends Controller
             'asset_avg_price' => ['nullable', 'numeric', 'min:0'],
             'target_amount' => ['nullable', 'numeric', 'min:0'],
             'color' => ['nullable', 'string', 'max:32'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
         $assetType = $validated['asset_type'] ?? FinancialProject::ASSET_TYPE_FIAT;
@@ -131,6 +133,7 @@ class FinancialProjectController extends Controller
             'asset_avg_price' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $avgPrice : null,
             'target_amount' => $validated['target_amount'] ?? null,
             'color' => $validated['color'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
         ]);
 
         return redirect()->route('cofrinhos.index')->with('success', 'Cofrinho criado com sucesso.');
@@ -155,6 +158,7 @@ class FinancialProjectController extends Controller
             'asset_avg_price' => ['nullable', 'numeric', 'min:0'],
             'target_amount' => ['nullable', 'numeric', 'min:0'],
             'color' => ['nullable', 'string', 'max:32'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
         $assetType = $validated['asset_type'] ?? $cofrinho->asset_type ?? FinancialProject::ASSET_TYPE_FIAT;
@@ -178,6 +182,7 @@ class FinancialProjectController extends Controller
             'asset_avg_price' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $avgPrice : null,
             'target_amount' => $validated['target_amount'] ?? null,
             'color' => $validated['color'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
         ]);
 
         return redirect()->route('cofrinhos.index')->with('success', 'Cofrinho atualizado.');
@@ -399,12 +404,22 @@ class FinancialProjectController extends Controller
         ]);
     }
 
+    public function toggleActive(FinancialProject $cofrinho): RedirectResponse
+    {
+        $this->authorizeCofrinho($cofrinho);
+        $cofrinho->update(['is_active' => ! (bool) $cofrinho->is_active]);
+
+        $statusMsg = $cofrinho->is_active ? 'Cofrinho reativado com sucesso.' : 'Cofrinho desativado com sucesso.';
+
+        return redirect()->route('cofrinhos.index')->with('success', $statusMsg);
+    }
+
     public function destroy(FinancialProject $cofrinho): RedirectResponse
     {
         $this->authorizeCofrinho($cofrinho);
 
         if ($cofrinho->transactions()->exists() || $cofrinho->entries()->exists()) {
-            return redirect()->route('cofrinhos.index')->with('error', 'Não é possível excluir: há lançamentos ou rendimentos vinculados a este cofrinho.');
+            return redirect()->route('cofrinhos.index')->with('error', 'Não é possível excluir: há lançamentos ou rendimentos vinculados a este cofrinho. Você pode desativá-lo em vez de excluir.');
         }
         $cofrinho->delete();
 

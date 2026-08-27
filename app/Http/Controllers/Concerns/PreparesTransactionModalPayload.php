@@ -84,13 +84,9 @@ trait PreparesTransactionModalPayload
 
         $years = range($now->year - 5, $now->year + 5);
 
-        $financialProjects = FinancialProject::query()
-            ->where('couple_id', $couple->id)
-            ->orderBy('name')
-            ->get();
-
         $editTransactionModalMeta = null;
         $editTransactionIdSession = session('edit_transaction_id');
+        $editTx = null;
         if ($editTransactionIdSession !== null) {
             $editTx = Transaction::query()
                 ->where('couple_id', $couple->id)
@@ -119,6 +115,17 @@ trait PreparesTransactionModalPayload
                 ];
             }
         }
+
+        $financialProjects = FinancialProject::query()
+            ->where('couple_id', $couple->id)
+            ->where(function ($query) use ($editTx) {
+                $query->where('is_active', true);
+                if ($editTx?->financial_project_id) {
+                    $query->orWhere('id', $editTx->financial_project_id);
+                }
+            })
+            ->orderBy('name')
+            ->get();
 
         return [
             'categories' => $categories,

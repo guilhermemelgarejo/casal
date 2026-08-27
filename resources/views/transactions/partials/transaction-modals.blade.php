@@ -203,7 +203,7 @@
                                             value="{{ $fp->id }}"
                                             @selected((string) old('financial_project_id', ($editTransactionModalMeta ?? [])['financial_project_id'] ?? '') === (string) $fp->id)
                                         >
-                                            {{ $fp->name }}
+                                            {{ $fp->name }}{{ ! $fp->is_active ? ' (Inativo)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
