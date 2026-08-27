@@ -1,7 +1,7 @@
 @props(['status'])
 
 @if ($status)
-    <div {{ $attributes->merge(['class' => 'text-success small fw-medium']) }}>
+    <x-alert type="success" :auto-dismiss="10000" {{ $attributes->merge(['class' => 'small']) }}>
         {{ $status }}
-    </div>
+    </x-alert>
 @endif

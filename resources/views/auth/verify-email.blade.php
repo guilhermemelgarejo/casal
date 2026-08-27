@@ -4,9 +4,7 @@
     </p>
 
     @if (session('status') == 'verification-link-sent')
-        <div class="alert alert-success small mb-4">
-            Um novo link de verificação foi enviado para o e-mail informado no cadastro.
-        </div>
+        <x-alert type="success" class="small mb-4" message="Um novo link de verificação foi enviado para o e-mail informado no cadastro." />
     @endif
 
     <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3 mt-4">

@@ -6606,6 +6606,27 @@ body.duozen-onboarding-active {
     min-height: 32px;
 }
 
+/* Alertas dispensáveis e mensagens de notificação */
+.alert.alert-dismissible {
+    position: relative;
+    padding-right: 3.5rem;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.alert.alert-dismissible .btn-close {
+    position: absolute;
+    top: 0.875rem;
+    right: 0.875rem;
+    padding: 0.5rem;
+    opacity: 0.6;
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.alert.alert-dismissible .btn-close:hover,
+.alert.alert-dismissible .btn-close:focus {
+    opacity: 1;
+}
+
 /* Modo de privacidade (ocultação / desfoque de valores principais) */
 .duozen-privacy-blur {
     display: inline-block;

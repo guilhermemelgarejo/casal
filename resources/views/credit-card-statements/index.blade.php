@@ -26,21 +26,11 @@
     <div class="py-4 cc-statements-page">
         <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
             @if (session('success'))
-                <div class="alert alert-success border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
-                    <span class="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0 p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                    </span>
-                    <span class="pt-1">{{ session('success') }}</span>
-                </div>
+                <x-alert type="success" class="mb-0" :message="session('success')" />
             @endif
 
             @if ($errors->has('payment'))
-                <div class="alert alert-danger border-0 shadow-sm mb-0 d-flex align-items-start gap-3 rounded-4" role="alert">
-                    <span class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </span>
-                    <span class="pt-1">{{ $errors->first('payment') }}</span>
-                </div>
+                <x-alert type="danger" class="mb-0" :message="$errors->first('payment')" />
             @endif
 
             <section class="cc-statements-hero card border-0 shadow-sm">

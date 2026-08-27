@@ -12,6 +12,96 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /* Fechamento automático e temporizado de alertas (10s padrão) com pausa em hover */
+    const initDismissibleAlerts = () => {
+        const dismissibleAlerts = document.querySelectorAll('.alert.alert-dismissible');
+
+        dismissibleAlerts.forEach((alertEl) => {
+            if (alertEl.dataset.autoDismissInitialized) {
+                return;
+            }
+            alertEl.dataset.autoDismissInitialized = 'true';
+
+            const rawTimeout = alertEl.getAttribute('data-auto-dismiss');
+            if (rawTimeout === 'false' || rawTimeout === '0' || rawTimeout === 'none') {
+                return;
+            }
+
+            let timeoutMs = 10000;
+            if (rawTimeout && !isNaN(parseInt(rawTimeout, 10))) {
+                timeoutMs = parseInt(rawTimeout, 10);
+            }
+
+            let remainingTime = timeoutMs;
+            let startTime = Date.now();
+            let timerId = null;
+            let isPaused = false;
+
+            const closeAlert = () => {
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
+                }
+                if (!document.body.contains(alertEl)) {
+                    return;
+                }
+                if (bs?.Alert) {
+                    const alertInstance = bs.Alert.getOrCreateInstance(alertEl);
+                    alertInstance.close();
+                } else {
+                    alertEl.classList.remove('show');
+                    setTimeout(() => {
+                        alertEl.remove();
+                    }, 150);
+                }
+            };
+
+            const startTimer = () => {
+                if (remainingTime <= 0) {
+                    closeAlert();
+                    return;
+                }
+                startTime = Date.now();
+                timerId = setTimeout(() => {
+                    closeAlert();
+                }, remainingTime);
+            };
+
+            const pauseTimer = () => {
+                if (timerId && !isPaused) {
+                    clearTimeout(timerId);
+                    timerId = null;
+                    const elapsed = Date.now() - startTime;
+                    remainingTime = Math.max(0, remainingTime - elapsed);
+                    isPaused = true;
+                }
+            };
+
+            const resumeTimer = () => {
+                if (isPaused) {
+                    isPaused = false;
+                    startTimer();
+                }
+            };
+
+            alertEl.addEventListener('mouseenter', pauseTimer);
+            alertEl.addEventListener('mouseleave', resumeTimer);
+
+            alertEl.addEventListener('close.bs.alert', () => {
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
+                }
+                alertEl.removeEventListener('mouseenter', pauseTimer);
+                alertEl.removeEventListener('mouseleave', resumeTimer);
+            });
+
+            startTimer();
+        });
+    };
+    initDismissibleAlerts();
+    window.initDismissibleAlerts = initDismissibleAlerts;
+
     /* Controle de privacidade / desfoque de valores principais */
     const PRIVACY_STORAGE_KEY = 'duozen_privacy_mode';
     const initPrivacyMode = () => {
