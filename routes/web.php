@@ -39,6 +39,8 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/relatorios', [ReportController::class, 'index'])->name('reports.index');
 
+    Route::get('/cofrinhos/quote', [FinancialProjectController::class, 'getQuote'])
+        ->name('cofrinhos.quote');
     Route::resource('cofrinhos', FinancialProjectController::class)
         ->only(['index', 'store', 'update', 'destroy']);
     Route::get('/cofrinhos/{cofrinho}/movimentacoes', [FinancialProjectController::class, 'movements'])
@@ -47,6 +49,8 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
         ->name('cofrinhos.interest.store');
     Route::delete('/cofrinhos/juros/{entry}', [FinancialProjectController::class, 'destroyInterest'])
         ->name('cofrinhos.interest.destroy');
+    Route::post('/cofrinhos/{cofrinho}/asset-aporte', [FinancialProjectController::class, 'storeAssetAporte'])
+        ->name('cofrinhos.asset-aporte.store');
 
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
     Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');

@@ -127,6 +127,11 @@ class Account extends Model
         return $this->kind === self::KIND_CREDIT_CARD;
     }
 
+    public function isRegular(): bool
+    {
+        return $this->kind === self::KIND_REGULAR;
+    }
+
     /**
      * Formas de pagamento para lançamentos em conta (não-cartão): lista canónica.
      * Cartões de crédito não têm forma extra: o próprio cartão identifica o meio.

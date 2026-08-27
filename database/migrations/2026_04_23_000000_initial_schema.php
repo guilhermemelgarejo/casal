@@ -196,6 +196,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('couple_id')->constrained()->cascadeOnDelete();
             $table->string('name');
+            $table->string('asset_type', 32)->default('fiat');
+            $table->string('asset_code', 32)->nullable();
+            $table->decimal('asset_quantity', 18, 8)->nullable();
+            $table->decimal('asset_avg_price', 15, 4)->nullable();
             $table->decimal('target_amount', 12, 2)->nullable();
             $table->string('color', 32)->nullable();
             $table->timestamps();
@@ -293,6 +297,9 @@ return new class extends Migration
             $table->foreignId('financial_project_id')->constrained('financial_projects')->cascadeOnDelete();
             $table->string('type', 32);
             $table->decimal('amount', 12, 2);
+            $table->decimal('asset_quantity', 18, 8)->nullable();
+            $table->decimal('asset_unit_price', 15, 4)->nullable();
+            $table->decimal('asset_resulting_avg_price', 15, 4)->nullable();
             $table->date('date');
             $table->string('note', 255)->nullable();
             $table->timestamps();
