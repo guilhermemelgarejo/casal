@@ -100,6 +100,36 @@
                             </div>
                         </div>
 
+                        @php
+                            $isEditCreditCardNonInstallment = !empty($editTransactionModalMeta['is_credit']) && empty($editTransactionModalMeta['is_installment']);
+                        @endphp
+                        <div id="edit-tx-invoice-wrapper" class="mt-3 {{ $isEditCreditCardNonInstallment ? '' : 'd-none' }}">
+                            <x-input-label for="edit-tx-reference-cycle" value="Fatura" />
+                            <select
+                                id="edit-tx-reference-cycle"
+                                class="form-select mt-1"
+                            >
+                                <option value="">Selecione a fatura…</option>
+                                @if(!empty($editTransactionModalMeta['open_cycles']))
+                                    @foreach($editTransactionModalMeta['open_cycles'] as $cycle)
+                                        @php
+                                            $cycleVal = $cycle['month'].'-'.$cycle['year'];
+                                            $selected = ((int) old('reference_month', ($editTransactionModalMeta['reference_month'] ?? null)) === (int) $cycle['month'])
+                                                && ((int) old('reference_year', ($editTransactionModalMeta['reference_year'] ?? null)) === (int) $cycle['year']);
+                                        @endphp
+                                        <option value="{{ $cycleVal }}" @selected($selected)>
+                                            {{ $cycle['label'] }}
+                                        </option>
+                                    @endforeach
+                                @endif
+                            </select>
+                            <input type="hidden" name="reference_month" id="edit-tx-reference-month" value="{{ old('reference_month', ($editTransactionModalMeta['reference_month'] ?? '')) }}">
+                            <input type="hidden" name="reference_year" id="edit-tx-reference-year" value="{{ old('reference_year', ($editTransactionModalMeta['reference_year'] ?? '')) }}">
+                            <p class="form-text mb-0">Disponíveis apenas as faturas abertas deste cartão.</p>
+                            <x-input-error :messages="$errors->get('reference_month')" class="mt-2" />
+                            <x-input-error :messages="$errors->get('reference_year')" class="mt-2" />
+                        </div>
+
                         <div class="form-check mt-3 d-none" id="edit-tx-scope-all-wrap">
                             <input class="form-check-input" type="checkbox" value="1" id="edit-tx-scope-all">
                             <label class="form-check-label" for="edit-tx-scope-all">
@@ -227,7 +257,7 @@
             'installments', 'type', 'date', 'reference_month', 'reference_year', 'credit_limit_confirm_token',
             'category_allocations', 'recurring_template_id', 'refund_of_transaction_id',
         ]);
-        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('date') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations') || $errors->has('financial_project_id'));
+        $openEditTransactionAmountModal = $editTransactionModalMeta && session('edit_transaction_id') && ($errors->has('amount') || $errors->has('description') || $errors->has('date') || $errors->has('reference_month') || $errors->has('reference_year') || $errors->has('credit_limit_confirm_token') || $errors->has('category_allocations') || $errors->has('financial_project_id'));
         $txAllocVisibleRows = 1;
         for ($r = 0; $r < 5; $r++) {
             $ov = old('category_allocations.'.$r.'.category_id');
@@ -578,6 +608,7 @@
 
     @push('scripts')
         <script>
+            window.__txAccountsPayload = @json($txAccountsPayload ?? []);
             window.__txInstallmentGroups = @json($installmentGroupsModalPayload ?? []);
             window.__txOpenInstallmentModalRoot = @json(session('open_installment_modal_root'));
         </script>

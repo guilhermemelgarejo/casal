@@ -865,12 +865,86 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fpSel) {
                 fpSel.value = !isCreditTx && fpId ? String(fpId) : '';
             }
+
+            const peerCount = Number.parseInt(btn.getAttribute('data-tx-peer-count') || '1', 10);
+            const isInstallment = peerCount > 1;
+            const accId = Number.parseInt(btn.getAttribute('data-tx-account-id') || '0', 10);
+            const refMonth = btn.getAttribute('data-tx-ref-month') || '';
+            const refYear = btn.getAttribute('data-tx-ref-year') || '';
+
+            const invoiceWrap = document.getElementById('edit-tx-invoice-wrapper');
+            const invoiceCycleSel = document.getElementById('edit-tx-reference-cycle');
+            const editRefMonthInput = document.getElementById('edit-tx-reference-month');
+            const editRefYearInput = document.getElementById('edit-tx-reference-year');
+
+            if (invoiceWrap && invoiceCycleSel && editRefMonthInput && editRefYearInput) {
+                if (isCreditTx && !isInstallment) {
+                    invoiceWrap.classList.remove('d-none');
+                    editRefMonthInput.disabled = false;
+                    editRefYearInput.disabled = false;
+
+                    const cardsList = window.__txAccountsPayload?.cards || [];
+                    const cardData = cardsList.find((c) => Number(c.id) === accId);
+                    const openCycles = cardData?.open_cycles || [];
+
+                    invoiceCycleSel.innerHTML = '<option value="">Selecione a fatura…</option>';
+                    const currentCycleKey = `${refMonth}-${refYear}`;
+                    let hasSelected = false;
+
+                    openCycles.forEach((c) => {
+                        const opt = document.createElement('option');
+                        opt.value = `${c.month}-${c.year}`;
+                        opt.textContent = c.label;
+                        if (opt.value === currentCycleKey) {
+                            opt.selected = true;
+                            hasSelected = true;
+                        }
+                        invoiceCycleSel.appendChild(opt);
+                    });
+
+                    if (!hasSelected && refMonth && refYear) {
+                        const opt = document.createElement('option');
+                        opt.value = currentCycleKey;
+                        opt.textContent = `${String(refMonth).padStart(2, '0')}/${refYear}`;
+                        opt.selected = true;
+                        invoiceCycleSel.insertBefore(opt, invoiceCycleSel.children[1] || null);
+                    }
+
+                    editRefMonthInput.value = refMonth;
+                    editRefYearInput.value = refYear;
+                } else {
+                    invoiceWrap.classList.add('d-none');
+                    invoiceCycleSel.innerHTML = '<option value="">Selecione a fatura…</option>';
+                    editRefMonthInput.value = '';
+                    editRefYearInput.value = '';
+                    editRefMonthInput.disabled = true;
+                    editRefYearInput.disabled = true;
+                }
+            }
+
             const prevTok = txEditForm.querySelector('input[name="credit_limit_confirm_token"]');
             if (prevTok) {
                 prevTok.remove();
             }
             txEditForm.dataset.txCreditLimitSubmitting = '0';
         });
+
+        const invoiceCycleSel = document.getElementById('edit-tx-reference-cycle');
+        const editRefMonthInput = document.getElementById('edit-tx-reference-month');
+        const editRefYearInput = document.getElementById('edit-tx-reference-year');
+        if (invoiceCycleSel && editRefMonthInput && editRefYearInput) {
+            invoiceCycleSel.addEventListener('change', () => {
+                const val = invoiceCycleSel.value;
+                if (val) {
+                    const parts = val.split('-');
+                    editRefMonthInput.value = parts[0] || '';
+                    editRefYearInput.value = parts[1] || '';
+                } else {
+                    editRefMonthInput.value = '';
+                    editRefYearInput.value = '';
+                }
+            });
+        }
 
         txEditForm.querySelector('#edit-tx-scope-all')?.addEventListener('change', (e) => {
             const scopeInput = txEditForm.querySelector('#edit-tx-installment-scope');
@@ -1266,7 +1340,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const txDate = escapeHtmlTx(row.date_form || '');
                     const peerCount = Array.isArray(group.rows) ? group.rows.length : 0;
                     const txType = escapeHtmlTx(row.type || '');
-                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-date="${txDate}" data-tx-precheck="${precheck}" data-tx-peer-count="${peerCount}" data-tx-root-id="${escapeHtmlTx(String(group.rootId || rootId))}" data-tx-type="${txType}" data-tx-allocations="${allocEnc}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
+                    const accId = escapeHtmlTx(String(row.account_id || ''));
+                    const refMonth = escapeHtmlTx(String(row.reference_month || ''));
+                    const refYear = escapeHtmlTx(String(row.reference_year || ''));
+                    actions += `<button type="button" class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open" data-bs-toggle="modal" data-bs-target="#modalEditTransactionAmount" data-tx-from-installment-modal="1" data-tx-action="${updateUrl}" data-tx-amount="${amtForm}" data-tx-description="${descBase}" data-tx-date="${txDate}" data-tx-precheck="${precheck}" data-tx-peer-count="${peerCount}" data-tx-root-id="${escapeHtmlTx(String(group.rootId || rootId))}" data-tx-type="${txType}" data-tx-allocations="${allocEnc}" data-tx-is-credit="1" data-tx-account-id="${accId}" data-tx-ref-month="${refMonth}" data-tx-ref-year="${refYear}" title="Alterar lançamento" aria-label="Alterar lançamento">${svgTxPencil}</button>`;
                 }
 
                 if (skipAllowed && skipUrl) {

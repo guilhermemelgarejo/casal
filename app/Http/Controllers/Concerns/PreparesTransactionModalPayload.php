@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Account;
+use App\Models\CreditCardStatement;
 use App\Models\FinancialProject;
 use App\Models\Transaction;
 use App\Support\TransactionListingPresentation;
@@ -75,6 +76,7 @@ trait PreparesTransactionModalPayload
                 'limit_available_label' => $a->tracksCreditCardLimit()
                     ? number_format((float) $a->credit_card_limit_available, 2, ',', '.')
                     : null,
+                'open_cycles' => CreditCardStatement::openInvoiceCyclesForAccount($a),
             ])->values()->all(),
         ];
 
@@ -102,6 +104,12 @@ trait PreparesTransactionModalPayload
                         'amount' => number_format((float) $sp->amount, 2, '.', ''),
                     ];
                 }
+                $isCreditTx = (bool) $editTx->accountModel?->isCreditCard();
+                $isInstallment = $editTx->installment_parent_id !== null || $editTx->installmentChildren()->exists();
+                $openCycles = ($isCreditTx && $editTx->accountModel)
+                    ? CreditCardStatement::openInvoiceCyclesForAccount($editTx->accountModel, (int) $editTx->reference_month, (int) $editTx->reference_year)
+                    : [];
+
                 $editTransactionModalMeta = [
                     'id' => $editTx->id,
                     'action' => route('transactions.update', $editTx),
@@ -111,7 +119,12 @@ trait PreparesTransactionModalPayload
                     'edit' => TransactionListingPresentation::transactionAmountEditMeta($editTx),
                     'category_allocations' => $editAllocRows,
                     'financial_project_id' => old('financial_project_id', $editTx->financial_project_id),
-                    'is_credit' => (bool) $editTx->accountModel?->isCreditCard(),
+                    'is_credit' => $isCreditTx,
+                    'account_id' => (int) $editTx->account_id,
+                    'reference_month' => old('reference_month', $editTx->reference_month),
+                    'reference_year' => old('reference_year', $editTx->reference_year),
+                    'is_installment' => $isInstallment,
+                    'open_cycles' => $openCycles,
                 ];
             }
         }

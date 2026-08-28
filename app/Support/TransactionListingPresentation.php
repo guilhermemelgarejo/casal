@@ -203,6 +203,10 @@ class TransactionListingPresentation
                     'amount' => (float) $t->amount,
                     'amount_form' => number_format((float) $t->amount, 2, '.', ''),
                     'amount_str' => number_format((float) $t->amount, 2, ',', '.'),
+                    'account_id' => $cardAccountId,
+                    'reference_month' => $refMonth,
+                    'reference_year' => $refYear,
+                    'is_credit' => true,
                     'category_allocations' => $t->categorySplits()
                         ->orderBy('id')
                         ->get()

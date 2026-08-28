@@ -183,6 +183,10 @@
                             data-tx-allocations="{{ rawurlencode(json_encode($txAllocationsMeta, JSON_UNESCAPED_UNICODE)) }}"
                             data-tx-financial-project-id="{{ $transaction->financial_project_id ?? '' }}"
                             data-tx-is-credit="{{ $transaction->accountModel?->isCreditCard() ? '1' : '0' }}"
+                            data-tx-account-id="{{ (int) ($transaction->account_id ?? 0) }}"
+                            data-tx-ref-month="{{ (int) ($transaction->reference_month ?? 0) }}"
+                            data-tx-ref-year="{{ (int) ($transaction->reference_year ?? 0) }}"
+                            data-tx-peer-count="{{ (int) ($delMeta['peerCount'] ?? 1) }}"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                         </button>

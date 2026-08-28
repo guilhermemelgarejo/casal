@@ -120,6 +120,8 @@ class TransactionController extends Controller
                 'amount' => ['required', 'numeric'],
                 'description' => ['required', 'string', 'max:'.$descriptionMax],
                 'date' => ['required', 'date'],
+                'reference_month' => ['nullable', 'integer', 'min:1', 'max:12'],
+                'reference_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
                 'credit_limit_confirm_token' => ['nullable', 'string', 'size:64'],
                 'category_allocations' => 'nullable|array|max:5',
                 'category_allocations.*.category_id' => 'nullable|exists:categories,id',
@@ -269,7 +271,56 @@ class TransactionController extends Controller
             $financialProjectId = $fpResolved['financial_project_id'] ?? null;
         }
 
-        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged && ! $dateChanged) {
+        $transaction->loadMissing('accountModel');
+        $isCredit = (bool) $transaction->accountModel?->isCreditCard();
+        $installmentGroup = $this->installmentGroupTransactionsFor($transaction);
+        $isInstallment = $installmentGroup->count() > 1;
+
+        $oldRefMonth = (int) $transaction->reference_month;
+        $oldRefYear = (int) $transaction->reference_year;
+        $newRefMonth = $request->filled('reference_month') ? (int) $request->input('reference_month') : $oldRefMonth;
+        $newRefYear = $request->filled('reference_year') ? (int) $request->input('reference_year') : $oldRefYear;
+        $invoiceChanged = false;
+
+        if ($isCredit) {
+            $wantsInvoiceChange = ($request->filled('reference_month') && $newRefMonth !== $oldRefMonth)
+                || ($request->filled('reference_year') && $newRefYear !== $oldRefYear);
+
+            if ($wantsInvoiceChange) {
+                if ($isInstallment) {
+                    return back()
+                        ->withErrors(['reference_month' => 'Não é possível alterar a fatura de compras parceladas.'])
+                        ->withInput()
+                        ->with('edit_transaction_id', $transaction->id);
+                }
+
+                $targetStmt = CreditCardStatement::query()
+                    ->where('couple_id', Auth::user()->couple_id)
+                    ->where('account_id', (int) $transaction->account_id)
+                    ->where('reference_month', $newRefMonth)
+                    ->where('reference_year', $newRefYear)
+                    ->first();
+
+                if ($targetStmt !== null) {
+                    if ($targetStmt->is_avulsa) {
+                        return back()
+                            ->withErrors(['reference_month' => 'Não é possível mover para esta fatura: existe uma fatura avulsa neste ciclo.'])
+                            ->withInput()
+                            ->with('edit_transaction_id', $transaction->id);
+                    }
+                    if ($targetStmt->blocksEditingCardExpenses()) {
+                        return back()
+                            ->withErrors(['reference_month' => 'Não é possível mover para esta fatura: ela já possui pagamentos registrados ou está quitada.'])
+                            ->withInput()
+                            ->with('edit_transaction_id', $transaction->id);
+                    }
+                }
+
+                $invoiceChanged = true;
+            }
+        }
+
+        if (! $amountChanged && ! $descriptionChanged && ! $categoryChanged && ! $dateChanged && ! $invoiceChanged) {
             if ((int) ($transaction->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 // Continua para persistir o cofrinho.
             } else {
@@ -280,7 +331,7 @@ class TransactionController extends Controller
             }
         }
 
-        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId, $dateChanged, $newDateStr, $newDate) {
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId, $dateChanged, $newDateStr, $newDate, $invoiceChanged, $newRefMonth, $newRefYear) {
             if ($descriptionChanged) {
                 $transaction->description = $newDescriptionFull;
             }
@@ -290,6 +341,10 @@ class TransactionController extends Controller
             if ((int) ($transaction->financial_project_id ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 $transaction->financial_project_id = $financialProjectId;
             }
+            if ($invoiceChanged) {
+                $transaction->reference_month = $newRefMonth;
+                $transaction->reference_year = $newRefYear;
+            }
             if ($dateChanged) {
                 $transaction->date = $newDateStr;
                 $transaction->loadMissing('accountModel');
@@ -298,7 +353,7 @@ class TransactionController extends Controller
                     $transaction->reference_year = (int) $newDate->year;
                 }
             }
-            if ($amountChanged || $descriptionChanged || $dateChanged || (int) ($transaction->getOriginal('financial_project_id') ?? 0) !== (int) ($financialProjectId ?? 0)) {
+            if ($amountChanged || $descriptionChanged || $dateChanged || $invoiceChanged || (int) ($transaction->getOriginal('financial_project_id') ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 $transaction->save();
             }
 
@@ -368,7 +423,7 @@ class TransactionController extends Controller
         session()->forget('edit_transaction_id');
         $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
-        $msg = $this->transactionUpdateFlashMessage($amountChanged, $descriptionChanged, $categoryChanged, $dateChanged);
+        $msg = $this->transactionUpdateFlashMessage($amountChanged, $descriptionChanged, $categoryChanged, $dateChanged, $invoiceChanged);
 
         return back()->with('success', $msg);
     }
@@ -447,11 +502,15 @@ class TransactionController extends Controller
         bool $amountChanged,
         bool $descriptionChanged,
         bool $categoryChanged,
-        bool $dateChanged = false
+        bool $dateChanged = false,
+        bool $invoiceChanged = false
     ): string {
-        $changesCount = ($amountChanged ? 1 : 0) + ($descriptionChanged ? 1 : 0) + ($categoryChanged ? 1 : 0) + ($dateChanged ? 1 : 0);
+        $changesCount = ($amountChanged ? 1 : 0) + ($descriptionChanged ? 1 : 0) + ($categoryChanged ? 1 : 0) + ($dateChanged ? 1 : 0) + ($invoiceChanged ? 1 : 0);
         if ($changesCount > 1) {
             return 'Lançamento atualizado.';
+        }
+        if ($invoiceChanged) {
+            return 'Fatura do lançamento atualizada.';
         }
         if ($dateChanged) {
             return 'Data do lançamento atualizada.';

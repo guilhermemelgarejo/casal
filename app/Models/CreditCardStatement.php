@@ -203,4 +203,84 @@ class CreditCardStatement extends Model
         return $this->belongsToMany(Transaction::class, 'credit_card_statement_payments')
             ->withTimestamps();
     }
+
+    /**
+     * Retorna os ciclos de fatura abertos para o cartão de crédito (sem quitação, sem pagamentos e não avulsa).
+     *
+     * @return list<array{month: int, year: int, label: string}>
+     */
+    public static function openInvoiceCyclesForAccount(Account $account, ?int $includeMonth = null, ?int $includeYear = null): array
+    {
+        if (! $account->isCreditCard()) {
+            return [];
+        }
+
+        $coupleId = (int) $account->couple_id;
+        $now = Carbon::now();
+
+        $statements = self::query()
+            ->where('couple_id', $coupleId)
+            ->where('account_id', $account->id)
+            ->with('paymentTransactions')
+            ->get()
+            ->keyBy(fn (self $s) => $s->reference_year.'-'.$s->reference_month);
+
+        $existingTxCycles = Transaction::query()
+            ->where('couple_id', $coupleId)
+            ->where('account_id', $account->id)
+            ->where('type', 'expense')
+            ->groupBy('reference_month', 'reference_year')
+            ->selectRaw('reference_month, reference_year')
+            ->get();
+
+        $candidateKeys = [];
+
+        foreach ($existingTxCycles as $txc) {
+            $candidateKeys[(int) $txc->reference_year.'-'.(int) $txc->reference_month] = [
+                'month' => (int) $txc->reference_month,
+                'year' => (int) $txc->reference_year,
+            ];
+        }
+
+        $start = $now->copy()->startOfMonth();
+        $end = $now->copy()->addMonths(24)->startOfMonth();
+        $curr = $start->copy();
+        while ($curr->lte($end)) {
+            $m = (int) $curr->month;
+            $y = (int) $curr->year;
+            $candidateKeys[$y.'-'.$m] = ['month' => $m, 'year' => $y];
+            $curr->addMonth();
+        }
+
+        if ($includeMonth !== null && $includeYear !== null) {
+            $candidateKeys[$includeYear.'-'.$includeMonth] = ['month' => $includeMonth, 'year' => $includeYear];
+        }
+
+        $openCycles = [];
+        foreach ($candidateKeys as $key => $cand) {
+            $m = $cand['month'];
+            $y = $cand['year'];
+            $stmt = $statements->get($key);
+
+            if ($stmt !== null && ($stmt->is_avulsa || $stmt->blocksEditingCardExpenses())) {
+                continue;
+            }
+
+            $openCycles[] = [
+                'month' => $m,
+                'year' => $y,
+                'label' => sprintf('%02d/%d', $m, $y),
+                'ordinal' => $y * 12 + $m,
+            ];
+        }
+
+        usort($openCycles, fn (array $a, array $b): int => ($a['ordinal'] ?? 0) <=> ($b['ordinal'] ?? 0));
+
+        return array_values(array_map(fn (array $c) => [
+            'month' => (int) $c['month'],
+            'year' => (int) $c['year'],
+            'label' => (string) $c['label'],
+        ], $openCycles));
+    }
 }
+
