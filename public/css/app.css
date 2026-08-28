@@ -3931,6 +3931,131 @@ body .modal .modal-header.tx-modal-head--danger {
     transition: box-shadow 0.22s ease, transform 0.2s ease;
 }
 
+.accounts-page .accounts-modern-card {
+    --card-accent: var(--bs-primary);
+    position: relative;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color-translucent);
+    transition: box-shadow 0.22s ease, transform 0.2s ease;
+}
+
+.accounts-page .accounts-modern-card:hover {
+    box-shadow: 0 0.85rem 2.2rem rgba(0, 0, 0, 0.08) !important;
+    transform: translateY(-2px);
+}
+
+[data-bs-theme='dark'] .accounts-page .accounts-modern-card:hover {
+    box-shadow: 0 0.85rem 2.2rem rgba(0, 0, 0, 0.45) !important;
+}
+
+.accounts-page .accounts-modern-card__accent {
+    height: 4px;
+    width: 100%;
+    background: linear-gradient(
+        90deg,
+        var(--card-accent) 0%,
+        color-mix(in srgb, var(--card-accent) 35%, transparent) 100%
+    );
+}
+
+.accounts-page .accounts-modern-card__avatar {
+    width: 2.85rem;
+    height: 2.85rem;
+    border-radius: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.accounts-page .accounts-modern-card__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    color: var(--bs-emphasis-color);
+}
+
+.accounts-page .accounts-modern-card__badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.55rem;
+    border-radius: 100px;
+    white-space: nowrap;
+}
+
+.accounts-page .accounts-modern-card__badge--regular {
+    color: var(--bs-secondary-color);
+    background: color-mix(in srgb, var(--bs-tertiary-bg) 85%, var(--bs-body-bg));
+    border: 1px solid var(--bs-border-color-translucent);
+}
+
+.accounts-page .accounts-modern-card__badge--card {
+    color: var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), 0.1);
+    border: 1px solid rgba(var(--bs-primary-rgb), 0.22);
+}
+
+.accounts-page .accounts-modern-card__badge--yield {
+    color: #198754;
+    background: rgba(25, 135, 84, 0.12);
+    border: 1px solid rgba(25, 135, 84, 0.25);
+}
+
+.accounts-page .accounts-action-btn {
+    width: 2.1rem;
+    height: 2.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+    transition: all 0.15s ease;
+}
+
+.accounts-page .accounts-action-btn:hover {
+    background: color-mix(in srgb, var(--bs-tertiary-bg) 80%, var(--bs-body-color));
+    color: var(--bs-emphasis-color);
+}
+
+.accounts-page .accounts-action-btn.text-danger:hover {
+    background: rgba(var(--bs-danger-rgb), 0.12);
+    color: var(--bs-danger);
+}
+
+.accounts-page .accounts-mini-chip {
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.2rem 0.55rem;
+    border-radius: 100px;
+    background: color-mix(in srgb, var(--bs-tertiary-bg) 85%, var(--bs-body-bg));
+    border: 1px solid var(--bs-border-color-translucent);
+    color: var(--bs-secondary-color);
+}
+
+.accounts-page .accounts-mini-chip--invoice {
+    background: rgba(220, 53, 69, 0.07);
+    border: 1px solid rgba(220, 53, 69, 0.22);
+    color: var(--bs-danger-text-emphasis, #b02a37);
+}
+
+[data-bs-theme='dark'] .accounts-page .accounts-mini-chip--invoice {
+    background: rgba(220, 53, 69, 0.14);
+    border: 1px solid rgba(220, 53, 69, 0.28);
+    color: #ea868f;
+}
+
+.accounts-page .accounts-card-empty-hint {
+    background: color-mix(in srgb, var(--bs-tertiary-bg) 65%, transparent);
+    border: 1px dashed var(--bs-border-color);
+}
+
 .accounts-page .accounts-item-card:hover {
     box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.08) !important;
     transform: translateY(-2px);

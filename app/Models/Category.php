@@ -23,6 +23,8 @@ class Category extends Model
 
     public const SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL = 'piggy_bank_withdrawal_income';
 
+    public const SYSTEM_KEY_ACCOUNT_YIELD = 'account_yield_income';
+
     /**
      * Nome padrão ao criar o casal (texto mostrado na UI).
      */
@@ -36,11 +38,18 @@ class Category extends Model
 
     public const NAME_PIGGY_BANK_WITHDRAWAL = 'Retirada de cofrinho';
 
+    public const NAME_ACCOUNT_YIELD = 'Rendimentos';
+
     protected $fillable = ['couple_id', 'name', 'type', 'color', 'icon', 'system_key'];
 
     public function isCreditCardInvoicePayment(): bool
     {
         return $this->system_key === self::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT;
+    }
+
+    public function isAccountYield(): bool
+    {
+        return $this->system_key === self::SYSTEM_KEY_ACCOUNT_YIELD;
     }
 
     public function isInternalTransferExpense(): bool
@@ -164,8 +173,18 @@ class Category extends Model
             ->first();
     }
 
+    public static function accountYieldForCouple(int $coupleId): ?self
+    {
+        static::ensureSavingsCategoriesForCouple($coupleId);
+
+        return static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_ACCOUNT_YIELD)
+            ->first();
+    }
+
     /**
-     * Garante categorias de sistema para cofrinho (Investimentos + Retirada de cofrinho).
+     * Garante categorias de sistema para cofrinho (Investimentos + Retirada de cofrinho) e rendimentos em conta.
      */
     public static function ensureSavingsCategoriesForCouple(int $coupleId): void
     {
@@ -195,6 +214,29 @@ class Category extends Model
                 'color' => '#0d9488',
                 'system_key' => self::SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL,
             ]);
+        }
+
+        if (! static::query()
+            ->where('couple_id', $coupleId)
+            ->where('system_key', self::SYSTEM_KEY_ACCOUNT_YIELD)
+            ->exists()) {
+            $existing = static::query()
+                ->where('couple_id', $coupleId)
+                ->where('type', 'income')
+                ->whereRaw('LOWER(name) = ?', ['rendimentos'])
+                ->first();
+
+            if ($existing) {
+                $existing->update(['system_key' => self::SYSTEM_KEY_ACCOUNT_YIELD]);
+            } else {
+                static::query()->create([
+                    'couple_id' => $coupleId,
+                    'name' => self::NAME_ACCOUNT_YIELD,
+                    'type' => 'income',
+                    'color' => '#10b981',
+                    'system_key' => self::SYSTEM_KEY_ACCOUNT_YIELD,
+                ]);
+            }
         }
     }
 

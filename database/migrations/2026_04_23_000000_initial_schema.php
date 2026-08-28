@@ -154,6 +154,7 @@ return new class extends Migration
             $table->foreignId('couple_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('kind')->default('regular');
+            $table->boolean('yields_interest')->default(false);
             $table->string('color')->default('#4f46e5');
             $table->unsignedTinyInteger('credit_card_invoice_due_day')->nullable();
             $table->decimal('balance', 15, 2)->default(0);

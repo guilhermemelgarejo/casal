@@ -223,6 +223,16 @@
                             <x-input-error :messages="$errors->get('color')" class="mt-2" />
                         </div>
 
+                        <div id="account-yields-wrap" class="{{ $kindOld === Account::KIND_CREDIT_CARD ? 'd-none' : '' }}">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="yields_interest" name="yields_interest" value="1" {{ old('_form') === 'account-store' && old('yields_interest') ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold" for="yields_interest">
+                                    Conta com rendimentos (juros/cofrinho)
+                                </label>
+                            </div>
+                            <p class="form-text mb-0">Ative se esta conta rende juros/CDI periodicamente para poder lançar rendimentos nela a qualquer momento.</p>
+                        </div>
+
                         <div id="account-due-day-wrap" class="{{ $kindOld === Account::KIND_CREDIT_CARD ? '' : 'd-none' }}">
                             <x-input-label for="credit_card_invoice_due_day" value="Dia de vencimento da fatura" />
                             <x-text-input id="credit_card_invoice_due_day" name="credit_card_invoice_due_day" type="number" min="1" max="31" class="mt-1" placeholder="Ex.: 10 (padrão se vazio)" value="{{ old('_form') === 'account-store' ? old('credit_card_invoice_due_day') : '' }}" />
@@ -382,12 +392,14 @@
                 const typeSel = document.getElementById('type');
                 const wrap = document.getElementById('account-due-day-wrap');
                 const limitWrap = document.getElementById('account-limit-wrap');
+                const yieldsWrap = document.getElementById('account-yields-wrap');
                 if (!typeSel || !wrap) return;
                 const cardKind = @json(Account::KIND_CREDIT_CARD);
                 function syncDueDayField() {
                     const isCard = typeSel.value === cardKind;
                     wrap.classList.toggle('d-none', !isCard);
                     if (limitWrap) limitWrap.classList.toggle('d-none', !isCard);
+                    if (yieldsWrap) yieldsWrap.classList.toggle('d-none', isCard);
                 }
                 typeSel.addEventListener('change', syncDueDayField);
                 syncDueDayField();

@@ -17,11 +17,12 @@ class Account extends Model
 
     public const KIND_CREDIT_CARD = 'credit_card';
 
-    protected $fillable = ['couple_id', 'name', 'kind', 'color', 'credit_card_invoice_due_day'];
+    protected $fillable = ['couple_id', 'name', 'kind', 'yields_interest', 'color', 'credit_card_invoice_due_day'];
 
     protected function casts(): array
     {
         return [
+            'yields_interest' => 'boolean',
             'credit_card_invoice_due_day' => 'integer',
             'balance' => 'decimal:2',
             'credit_card_limit_total' => 'decimal:2',
@@ -130,6 +131,130 @@ class Account extends Model
     public function isRegular(): bool
     {
         return $this->kind === self::KIND_REGULAR;
+    }
+
+    public function yieldsInterest(): bool
+    {
+        return $this->isRegular() && (bool) $this->yields_interest;
+    }
+
+    public function currentInvoiceAmount(?int $month = null, ?int $year = null): float
+    {
+        if (! $this->isCreditCard()) {
+            return 0.0;
+        }
+
+        $summary = $this->currentOpenInvoiceSummary();
+
+        return (float) ($summary['amount'] ?? 0.0);
+    }
+
+    /**
+     * Resumo da fatura atual/aberta do cartão (primeiro ciclo em aberto a partir do mês atual, ou ciclo atual).
+     *
+     * @return array{
+     *     reference_month: int,
+     *     reference_year: int,
+     *     ref_label: string,
+     *     amount: float,
+     *     remaining: float,
+     *     is_paid: bool,
+     *     due_date: ?Carbon,
+     *     due_label: ?string
+     * }|null
+     */
+    public function currentOpenInvoiceSummary(?Carbon $now = null): ?array
+    {
+        if (! $this->isCreditCard()) {
+            return null;
+        }
+
+        $now = $now ?? Carbon::now();
+        $coupleId = (int) $this->couple_id;
+        $accountId = (int) $this->id;
+
+        $statements = CreditCardStatement::query()
+            ->where('couple_id', $coupleId)
+            ->where('account_id', $accountId)
+            ->with('paymentTransactions')
+            ->get()
+            ->keyBy(fn (CreditCardStatement $s) => $s->reference_year.'-'.$s->reference_month);
+
+        $txCycles = Transaction::query()
+            ->where('couple_id', $coupleId)
+            ->where('account_id', $accountId)
+            ->where('type', 'expense')
+            ->groupBy('reference_month', 'reference_year')
+            ->selectRaw('reference_month, reference_year, SUM(amount) as spent')
+            ->get()
+            ->keyBy(fn ($t) => $t->reference_year.'-'.$t->reference_month);
+
+        $candidateKeys = [];
+        foreach ($txCycles as $key => $c) {
+            $candidateKeys[$key] = ['month' => (int) $c->reference_month, 'year' => (int) $c->reference_year];
+        }
+        foreach ($statements as $key => $s) {
+            $candidateKeys[$key] = ['month' => (int) $s->reference_month, 'year' => (int) $s->reference_year];
+        }
+
+        $nowMonth = (int) $now->month;
+        $nowYear = (int) $now->year;
+        $candidateKeys[$nowYear.'-'.$nowMonth] = ['month' => $nowMonth, 'year' => $nowYear];
+
+        $nextMonth = $now->copy()->addMonth();
+        $candidateKeys[$nextMonth->year.'-'.$nextMonth->month] = ['month' => (int) $nextMonth->month, 'year' => (int) $nextMonth->year];
+
+        uasort($candidateKeys, fn ($a, $b) => ($a['year'] * 12 + $a['month']) <=> ($b['year'] * 12 + $b['month']));
+
+        $firstUnpaid = null;
+        $currentCycleData = null;
+
+        foreach ($candidateKeys as $cand) {
+            $m = $cand['month'];
+            $y = $cand['year'];
+            $key = $y.'-'.$m;
+
+            $meta = $statements->get($key);
+            $txSpent = isset($txCycles[$key]) ? (float) $txCycles[$key]->spent : 0.0;
+            $spentTotal = $meta !== null ? (float) $meta->spent_total : $txSpent;
+
+            $isPaid = $meta !== null && $meta->isPaid();
+            $remaining = $meta !== null ? $meta->remainingToPay() : $spentTotal;
+
+            $virtualDue = $this->defaultStatementDueDate($m, $y);
+            $due = $meta?->due_date ? Carbon::parse($meta->due_date) : $virtualDue;
+
+            $item = [
+                'reference_month' => $m,
+                'reference_year' => $y,
+                'ref_label' => sprintf('%02d/%d', $m, $y),
+                'amount' => $spentTotal,
+                'remaining' => $remaining,
+                'is_paid' => $isPaid,
+                'due_date' => $due,
+                'due_label' => $due ? $due->format('d/m/Y') : null,
+            ];
+
+            if ($m === $nowMonth && $y === $nowYear) {
+                $currentCycleData = $item;
+            }
+
+            if (! $isPaid && $spentTotal > 0.005) {
+                $firstUnpaid = $item;
+                break;
+            }
+        }
+
+        return $firstUnpaid ?? $currentCycleData ?? [
+            'reference_month' => $nowMonth,
+            'reference_year' => $nowYear,
+            'ref_label' => sprintf('%02d/%d', $nowMonth, $nowYear),
+            'amount' => 0.0,
+            'remaining' => 0.0,
+            'is_paid' => false,
+            'due_date' => $this->defaultStatementDueDate($nowMonth, $nowYear),
+            'due_label' => $this->defaultStatementDueDate($nowMonth, $nowYear)?->format('d/m/Y'),
+        ];
     }
 
     /**

@@ -74,6 +74,7 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
     Route::post('/accounts/transfer', [AccountTransferController::class, 'store'])->name('accounts.transfer');
     Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');
+    Route::post('/accounts/{account}/juros', [AccountController::class, 'storeInterest'])->name('accounts.interest.store');
     Route::put('/accounts/{account}', [AccountController::class, 'update'])->name('accounts.update');
     Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->name('accounts.destroy');
 
