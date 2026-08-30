@@ -127,12 +127,30 @@ body.dz-concept-body {
     padding: 0;
 }
 
-/* Privacy Blur Feature */
+/* ==========================================================================
+   Privacy Blur Feature (Aberto / Oculto)
+   ========================================================================== */
+.dz-privacy-blur,
+.duozen-privacy-blur {
+    transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+html.duozen-privacy-active .dz-privacy-blur,
+html.duozen-privacy-active .duozen-privacy-blur,
+html.dz-privacy-active .dz-privacy-blur,
+html.dz-privacy-active .duozen-privacy-blur,
+body.duozen-privacy-active .dz-privacy-blur,
+body.duozen-privacy-active .duozen-privacy-blur,
+body.dz-privacy-active .dz-privacy-blur,
+body.dz-privacy-active .duozen-privacy-blur,
 .duozen-privacy-active .dz-privacy-blur,
-body.dz-privacy-active .dz-privacy-blur {
-    filter: blur(7px) !important;
+.duozen-privacy-active .duozen-privacy-blur,
+.dz-privacy-active .dz-privacy-blur,
+.dz-privacy-active .duozen-privacy-blur {
+    filter: blur(7.5px) !important;
     user-select: none !important;
-    transition: filter 0.2s ease;
+    pointer-events: none !important;
+    cursor: default !important;
 }
 
 /* ==========================================================================

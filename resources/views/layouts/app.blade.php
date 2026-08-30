@@ -26,7 +26,7 @@
                 document.documentElement.setAttribute('data-theme', savedTheme);
 
                 if (localStorage.getItem('duozen_privacy_mode') === 'true') {
-                    document.documentElement.classList.add('duozen-privacy-active');
+                    document.documentElement.classList.add('duozen-privacy-active', 'dz-privacy-active');
                 }
             } catch (e) {}
         })();
@@ -48,7 +48,7 @@
             <div class="d-flex align-items-center gap-2 flex-nowrap ms-auto">
                 <!-- Alternador de Tema -->
                 <div class="dz-control-group" title="Alternar entre modo Claro e Escuro">
-                    <button type="button" class="dz-btn-pill active" data-dz-theme="light">
+                    <button type="button" class="dz-btn-pill" data-dz-theme="light">
                         ☀️ <span class="d-none d-md-inline">Claro</span>
                     </button>
                     <button type="button" class="dz-btn-pill" data-dz-theme="dark">
@@ -58,7 +58,7 @@
 
                 <!-- Modo Privacidade -->
                 <div class="dz-control-group" title="Ocultar ou exibir valores">
-                    <button type="button" class="dz-btn-pill active" data-dz-privacy="false">
+                    <button type="button" class="dz-btn-pill" data-dz-privacy="false">
                         👁️ <span class="d-none d-md-inline">Aberto</span>
                     </button>
                     <button type="button" class="dz-btn-pill" data-dz-privacy="true">

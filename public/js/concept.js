@@ -56,30 +56,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const privacyPills = document.querySelectorAll('[data-dz-privacy]');
 
     function togglePrivacy(active) {
-        if (active) {
-            document.body.classList.add('dz-privacy-active');
-            rootHtml.classList.add('duozen-privacy-active');
+        const isActive = active === true || active === 'true';
+        if (isActive) {
+            document.body.classList.add('dz-privacy-active', 'duozen-privacy-active');
+            rootHtml.classList.add('dz-privacy-active', 'duozen-privacy-active');
         } else {
-            document.body.classList.remove('dz-privacy-active');
-            rootHtml.classList.remove('duozen-privacy-active');
+            document.body.classList.remove('dz-privacy-active', 'duozen-privacy-active');
+            rootHtml.classList.remove('dz-privacy-active', 'duozen-privacy-active');
         }
-        privacyPills.forEach(p => p.classList.toggle('active', p.getAttribute('data-dz-privacy') === String(active)));
-        localStorage.setItem('duozen_privacy_mode', String(active));
+        privacyPills.forEach(p => {
+            const val = p.getAttribute('data-dz-privacy') === 'true';
+            p.classList.toggle('active', val === isActive);
+        });
+        localStorage.setItem('duozen_privacy_mode', isActive ? 'true' : 'false');
     }
 
     const initialPrivacy = localStorage.getItem('duozen_privacy_mode') === 'true';
     togglePrivacy(initialPrivacy);
 
     privacyPills.forEach(pill => {
-        pill.addEventListener('click', function () {
-            const val = this.getAttribute('data-dz-privacy') === 'true';
+        pill.addEventListener('click', function (e) {
+            e.preventDefault();
+            const val = pill.getAttribute('data-dz-privacy') === 'true';
             togglePrivacy(val);
         });
     });
 
     if (privacyBtn) {
-        privacyBtn.addEventListener('click', function () {
-            const isCurrentlyActive = document.body.classList.contains('dz-privacy-active');
+        privacyBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const isCurrentlyActive = document.body.classList.contains('dz-privacy-active') || rootHtml.classList.contains('duozen-privacy-active');
             togglePrivacy(!isCurrentlyActive);
         });
     }

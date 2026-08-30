@@ -107,13 +107,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const initPrivacyMode = () => {
         const isPrivacyActive = localStorage.getItem(PRIVACY_STORAGE_KEY) === 'true';
         const applyPrivacyState = (active) => {
-            if (active) {
-                document.documentElement.classList.add('duozen-privacy-active');
-                document.body?.classList.add('duozen-privacy-active');
+            const isActive = active === true || active === 'true';
+            if (isActive) {
+                document.documentElement.classList.add('duozen-privacy-active', 'dz-privacy-active');
+                document.body?.classList.add('duozen-privacy-active', 'dz-privacy-active');
             } else {
-                document.documentElement.classList.remove('duozen-privacy-active');
-                document.body?.classList.remove('duozen-privacy-active');
+                document.documentElement.classList.remove('duozen-privacy-active', 'dz-privacy-active');
+                document.body?.classList.remove('duozen-privacy-active', 'dz-privacy-active');
             }
+
+            document.querySelectorAll('[data-dz-privacy]').forEach((pill) => {
+                const val = pill.getAttribute('data-dz-privacy') === 'true';
+                pill.classList.toggle('active', val === isActive);
+            });
 
             document.querySelectorAll('.app-navbar-privacy-toggle').forEach((btn) => {
                 const iconVisible = btn.querySelector('.privacy-icon-visible');
