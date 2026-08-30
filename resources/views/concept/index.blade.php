@@ -416,7 +416,9 @@
                         <div class="dz-cc-card" style="background: {{ $acc['color'] }};">
                             <div class="dz-cc-card__top">
                                 <div>
-                                    <div class="dz-cc-card__chip"></div>
+                                    <div class="dz-cc-card__chip" style="background: rgba(255, 255, 255, 0.25); color: #ffffff;">
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                    </div>
                                     <div class="dz-cc-card__brand">{{ $acc['name'] }}</div>
                                     <div style="font-size: 0.7rem; opacity: 0.8;">Titular: {{ $acc['owner'] }}</div>
                                 </div>

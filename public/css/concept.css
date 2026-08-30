@@ -1133,11 +1133,15 @@ body.dz-privacy-active .duozen-privacy-blur,
 }
 
 .dz-cc-card__chip {
-    width: 32px;
+    width: 34px;
     height: 24px;
-    background: linear-gradient(135deg, #FCD34D 0%, #D97706 100%);
-    border-radius: 4px;
+    background: var(--card-accent, var(--dz-primary));
+    border-radius: var(--dz-radius-sm, 6px);
     margin-bottom: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
 }
 
 .dz-cc-card__brand {

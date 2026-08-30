@@ -247,9 +247,10 @@
                 <div class="dz-cc-card" style="border-top: 3.5px solid {{ $cardAccent }}; --card-accent-soft: {{ $cardAccent }}18;">
                     <div class="dz-cc-card__top">
                         <div>
-                            <div class="dz-cc-card__chip"></div>
+                            <div class="dz-cc-card__chip" style="background: linear-gradient(135deg, {{ $cardAccent }}, {{ $cardAccent }}dd); box-shadow: 0 2px 6px {{ $cardAccent }}40; display: inline-flex; align-items: center; justify-content: center; color: #ffffff;">
+                                <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                            </div>
                             <div class="d-flex align-items-center gap-2">
-                                <span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ $cardAccent }}; box-shadow: 0 0 6px {{ $cardAccent }};"></span>
                                 <span class="dz-cc-card__brand">{{ $acc->name }}</span>
                             </div>
                             <div style="font-size: 0.7rem; color: var(--dz-text-secondary); margin-top: 2px;">Cartão de Crédito</div>
