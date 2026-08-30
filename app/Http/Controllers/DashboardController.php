@@ -134,6 +134,8 @@ class DashboardController extends Controller
             $transactionAmountEditMeta[$txRow->id] = TransactionListingPresentation::transactionAmountEditMeta($txRow);
         }
 
+        $recentTransactions = $transactionsForPeriod->take(20)->values();
+
         $totalIncome = (float) $statsTransactions->where('type', 'income')->sum('amount');
         $totalExpense = (float) $statsTransactions->where('type', 'expense')->sum('amount');
         $netResult = round($totalIncome - $totalExpense, 2);
@@ -254,10 +256,95 @@ class DashboardController extends Controller
             }
         }
 
+        $coupleUsers = $couple->users()->orderBy('id')->get();
+        $financialProjects = $couple->financialProjects()->where('is_active', true)->with('entries')->orderBy('name')->get();
+        
+        $cofrinhosQuotes = [];
+        $quoteService = app(\App\Services\AssetQuoteService::class);
+        foreach ($financialProjects as $proj) {
+            if ($proj->isCustomAsset() && ! empty($proj->asset_code)) {
+                $cacheKey = "{$proj->asset_type}:{$proj->asset_code}";
+                if (! isset($cofrinhosQuotes[$cacheKey])) {
+                    $quoteData = $quoteService->getQuote($proj->asset_type, $proj->asset_code);
+                    if ($quoteData !== null) {
+                        $cofrinhosQuotes[$cacheKey] = $quoteData;
+                    }
+                }
+            }
+        }
+
+        $cofrinhoRows = $financialProjects->map(function ($project) use ($cofrinhosQuotes) {
+            $isAsset = $project->isCustomAsset();
+            $quoteKey = "{$project->asset_type}:{$project->asset_code}";
+            $quote = $isAsset ? ($cofrinhosQuotes[$quoteKey] ?? null) : null;
+            $quotePrice = $quote?->price;
+
+            $saved = $isAsset ? (float) $project->currentEstimatedValue($quotePrice) : (float) $project->savedProgress();
+            $invested = $isAsset ? (float) $project->totalInvestedBrl() : (float) $project->savedProgress();
+            $target = $project->target_amount !== null ? (float) $project->target_amount : null;
+            $pct = ($target !== null && $target > 0.00001) ? min(100.0, ($saved / $target) * 100.0) : null;
+
+            return [
+                'project' => $project,
+                'is_asset' => $isAsset,
+                'quote' => $quote,
+                'quote_price' => $quotePrice,
+                'saved' => $saved,
+                'invested' => $invested,
+                'target' => $target,
+                'pct' => $pct,
+            ];
+        })->sortByDesc('saved')->values();
+
+        // Contas e Cartões ordenados pelas maiores faturas e maiores saldos
+        $allCoupleAccounts = $couple->accounts()->get();
+        $creditCardAccounts = $allCoupleAccounts->filter(fn ($acc) => $acc->isCreditCard())
+            ->map(function ($acc) use ($transactionsForPeriod) {
+                $invoiceSummary = $acc->currentOpenInvoiceSummary();
+                $currentInvoice = $invoiceSummary ? (float) ($invoiceSummary['amount'] ?? 0) : (float) $acc->currentInvoiceAmount();
+                if ($currentInvoice <= 0.001) {
+                    $currentInvoice = (float) $transactionsForPeriod->where('account_id', $acc->id)->where('type', 'expense')->sum('amount');
+                }
+                $acc->computed_invoice = $currentInvoice;
+                return $acc;
+            })
+            ->sortByDesc('computed_invoice')
+            ->values();
+
+        $regularAccounts = $allCoupleAccounts->filter(fn ($acc) => ! $acc->isCreditCard())
+            ->sortByDesc(fn ($acc) => (float) $acc->balance)
+            ->values();
+
+        $dashboardAccounts = $creditCardAccounts->concat($regularAccounts);
+
+        $user1 = $coupleUsers->first();
+        $user2 = $coupleUsers->count() > 1 ? $coupleUsers->skip(1)->first() : null;
+
+        $user1Expense = 0.0;
+        $user2Expense = 0.0;
+        if ($user1) {
+            $user1Expense = (float) $transactionsForPeriod->where('type', 'expense')->where('user_id', $user1->id)->sum('amount');
+        }
+        if ($user2) {
+            $user2Expense = (float) $transactionsForPeriod->where('type', 'expense')->where('user_id', $user2->id)->sum('amount');
+        }
+
         return view('dashboard', array_merge(
             compact(
                 'couple',
+                'coupleUsers',
+                'financialProjects',
+                'cofrinhoRows',
+                'dashboardAccounts',
+                'creditCardAccounts',
+                'regularAccounts',
+                'user1',
+                'user2',
+                'user1Expense',
+                'user2Expense',
                 'transactions',
+                'transactionsForPeriod',
+                'recentTransactions',
                 'totalIncome',
                 'totalExpense',
                 'netResult',

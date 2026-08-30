@@ -17,82 +17,128 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div>
-                <p class="small text-secondary mb-1">Organização financeira</p>
-                <h2 class="h5 mb-0 cat-page-title">Categorias</h2>
-                <p class="small text-secondary mb-0 mt-1">Classifique lançamentos e acompanhe metas mensais por despesa.</p>
+        <div>
+            <h1 class="dz-page-title">Categorias & Orçamento</h1>
+            <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
+                Organização por tipos, cores e metas mensais de despesa
             </div>
-            <button
-                type="button"
-                class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0"
-                id="btn-new-category"
-                title="Criar uma nova categoria de receita ou despesa"
-                data-bs-toggle="modal"
-                data-bs-target="#modalCategoryForm"
-            >
-                Nova categoria
-            </button>
         </div>
     </x-slot>
 
-    <div class="py-4 categories-page">
-        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
-            @if (session('success'))
-                <x-alert type="success" class="mb-0" :message="session('success')" />
-            @endif
-            @if ($errors->any() && ! $categoryModalOpen && old('_form') !== 'budget-store')
-                <x-alert type="danger" class="mb-0" title="Não foi possível salvar">
-                    <ul class="mb-0 ps-3 small">
-                        @foreach ($errors->all() as $err)
-                            <li>{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </x-alert>
-            @endif
+    <x-slot name="actions">
+        <button
+            type="button"
+            class="dz-btn dz-btn-primary"
+            id="btn-new-category"
+            title="Criar uma nova categoria de receita ou despesa"
+            data-bs-toggle="modal"
+            data-bs-target="#modalCategoryForm"
+        >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Nova Categoria
+        </button>
+    </x-slot>
 
-            <section class="cat-hero card border-0 shadow-sm">
-                <div class="card-body p-4 p-lg-5">
-                    <div class="row g-4 align-items-center">
-                        <div class="col-lg-5">
-                            <span class="cat-hero__badge">Visão geral</span>
-                            <h3 class="cat-hero__title h4 mt-3 mb-2">Categorias e orçamento no mesmo lugar.</h3>
-                            <p class="text-secondary mb-0">Receitas organizam entradas; despesas também recebem metas mensais para acompanhar o planejado contra o gasto real.</p>
-                        </div>
-                        <div class="col-lg-7">
-                            <div class="cat-summary-grid">
-                                <div class="cat-summary-card cat-summary-card--success">
-                                    <span class="cat-summary-card__label">Receitas</span>
-                                    <strong class="cat-summary-card__value">{{ $categoriesIncome->count() }}</strong>
-                                    <span class="cat-summary-card__hint">categorias de entrada</span>
-                                </div>
-                                <div class="cat-summary-card cat-summary-card--danger">
-                                    <span class="cat-summary-card__label">Despesas</span>
-                                    <strong class="cat-summary-card__value">{{ $categoriesExpense->count() }}</strong>
-                                    <span class="cat-summary-card__hint">{{ $reservedExpenseCount }} reservada(s)</span>
-                                </div>
-                                <div class="cat-summary-card cat-summary-card--primary">
-                                    <span class="cat-summary-card__label">Metas</span>
-                                    <strong class="cat-summary-card__money duozen-privacy-blur">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</strong>
-                                    <span class="cat-summary-card__hint">{{ $budgetableExpenseCount }} despesa(s) planejáveis</span>
-                                </div>
-                                <div class="cat-summary-card cat-summary-card--warning">
-                                    <span class="cat-summary-card__label">Gasto real</span>
-                                    <strong class="cat-summary-card__money duozen-privacy-blur">R$ {{ number_format($totalSpent, 2, ',', '.') }}</strong>
-                                    <span class="cat-summary-card__hint">{{ number_format($budgetUsagePct, 1, ',', '.') }}% das metas</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="cat-hero__strip mt-4">
-                        <span>Renda: <span class="duozen-privacy-blur">R$ {{ number_format($coupleIncome, 2, ',', '.') }}</span></span>
-                        <span>Planejado: <span class="duozen-privacy-blur">R$ {{ number_format($totalBudgeted, 2, ',', '.') }}</span></span>
-                        <span>Disponível no plano: <span class="duozen-privacy-blur">R$ {{ number_format(max(0, $coupleIncome - $totalBudgeted), 2, ',', '.') }}</span></span>
+    <div class="container-xxl py-4 px-3 px-lg-4 categories-page cat-page budgets-page">
+        @if (session('success'))
+            <x-alert type="success" class="mb-4" :message="session('success')" />
+        @endif
+        @if ($errors->any() && ! $categoryModalOpen && old('_form') !== 'budget-store')
+            <x-alert type="danger" class="mb-4" title="Não foi possível salvar">
+                <ul class="mb-0 ps-3 small">
+                    @foreach ($errors->all() as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </x-alert>
+        @endif
+
+        <!-- TOP KPIS DUOZEN 2.0 -->
+        <section class="dz-kpi-grid mb-4">
+            <!-- Metas Planejadas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Metas de Orçamento</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary">
+                        🎯
                     </div>
                 </div>
-            </section>
+                <div>
+                    <div class="dz-kpi-card__value text-primary dz-privacy-blur">
+                        R$ {{ number_format($totalBudgeted, 2, ',', '.') }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $budgetableExpenseCount }} categorias planejáveis</span>
+                    </div>
+                </div>
+            </div>
 
-            <div id="orcamento" class="budgets-page">
+            <!-- Gasto Real do Mês -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Gasto Real no Mês</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--warning">
+                        📊
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value text-warning dz-privacy-blur">
+                        R$ {{ number_format($totalSpent, 2, ',', '.') }}
+                    </div>
+                    @if($totalBudgeted > 0)
+                        <div class="dz-progress-bar">
+                            <div class="dz-progress-bar__fill" style="width: {{ $budgetUsagePct }}%; background: #F59E0B;"></div>
+                        </div>
+                        <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
+                            <span>{{ number_format($budgetUsagePct, 1, ',', '.') }}% do planejado</span>
+                        </div>
+                    @else
+                        <div class="dz-kpi-card__footer">
+                            <span>Defina metas nas categorias abaixo</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Categorias de Despesa -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Despesas</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--danger">
+                        🔴
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $categoriesExpense->count() }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $reservedExpenseCount }} reservada(s) do sistema</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categorias de Receita -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Receitas</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                        🟢
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $categoriesIncome->count() }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Categorias de entrada</span>
+                        <button type="button" class="btn btn-link p-0 fw-bold" style="color: var(--dz-primary); text-decoration: none; font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#modalCategoryForm">+ Nova</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+            <div id="orcamento" class="budgets-page mb-4">
                 @include('budgets.partials.embedded')
             </div>
 

@@ -384,7 +384,7 @@
                                         </div>
                                     @endif
 
-                                    <p class="form-text mb-0 mt-2 pt-1 border-top border-light-subtle">
+                                    <p class="form-text mb-0 mt-2 pt-1 border-top border-secondary-subtle" style="border-color: var(--dz-border, #1E293B) !important;">
                                         <a href="{{ route('accounts.index') }}">Gerenciar contas e cartões</a>
                                     </p>
                                 </section>
@@ -417,7 +417,7 @@
 
                                 <div id="tx-section-credit" class="tx-form-section {{ $txShowCreditBlock ? '' : 'd-none' }}" aria-labelledby="tx-section-credit-heading">
                                     <h3 class="tx-form-section-title" id="tx-section-credit-heading">Parcelas e fatura</h3>
-                                    <div id="installments-wrapper" class="mb-3 pb-1 border-bottom border-light-subtle">
+                                    <div id="installments-wrapper" class="mb-3 pb-1 border-bottom border-secondary-subtle" style="border-color: var(--dz-border, #1E293B) !important;">
                                         <x-input-label for="installments" value="Parcelas (crédito)" />
                                         <select
                                             id="installments"

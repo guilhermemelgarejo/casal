@@ -88,67 +88,117 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div>
-                <p class="small text-secondary mb-1">Metas e investimentos</p>
-                <h2 class="h5 mb-0 cofrinhos-page-title">Cofrinhos</h2>
-                <p class="small text-secondary mb-0 mt-1">Acompanhe objetivos, reservas e investimentos em Bitcoin, ações e renda fixa.</p>
+        <div>
+            <h1 class="dz-page-title">Cofrinhos & Metas</h1>
+            <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
+                Metas, reservas e investimentos com cotações ao vivo
             </div>
-            <button type="button" class="btn btn-primary rounded-pill px-4 py-2" data-bs-toggle="modal" data-bs-target="#modalCofrinhoCreate">
-                Novo cofrinho
-            </button>
         </div>
     </x-slot>
 
-    <div class="py-4 cofrinhos-page">
-        <div class="container-xxl px-3 px-lg-4">
-            @if (session('success'))
-                <x-alert type="success" class="mb-4" :message="session('success')" />
-            @endif
-            @if (session('error'))
-                <x-alert type="danger" class="mb-4" :message="session('error')" />
-            @endif
+    <x-slot name="actions">
+        <button type="button" class="dz-btn dz-btn-primary" data-bs-toggle="modal" data-bs-target="#modalCofrinhoCreate">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Novo Cofrinho
+        </button>
+    </x-slot>
 
-            <section class="cofrinhos-hero card border-0 shadow-sm mb-4">
-                <div class="card-body p-4 p-lg-5">
-                    <div class="row g-4 align-items-center">
-                        <div class="col-lg-5">
-                            <span class="cofrinhos-hero__badge">Visão geral</span>
-                            <h3 class="cofrinhos-hero__title h4 mt-3 mb-2">Transformem planos em patrimônio visível.</h3>
-                            <p class="text-secondary mb-0">Cada cofrinho gerencia reservas em reais ou aplicações em ativos como Bitcoin, calculando preço médio e cotação em tempo real.</p>
-                        </div>
-                        <div class="col-lg-7">
-                            <div class="cofrinhos-summary-grid">
-                                <div class="cofrinhos-summary-card cofrinhos-summary-card--primary">
-                                    <span class="cofrinhos-summary-card__label">Total patrimônio</span>
-                                    <strong class="cofrinhos-summary-card__value duozen-privacy-blur">R$ {{ number_format($totalSaved, 2, ',', '.') }}</strong>
-                                    @if($totalPct !== null)
-                                        <span class="cofrinhos-summary-card__hint">{{ number_format($totalPct, 1, ',', '.') }}% das metas definidas</span>
-                                    @else
-                                        <span class="cofrinhos-summary-card__hint">Crie metas para acompanhar o avanço geral</span>
-                                    @endif
-                                </div>
-                                <div class="cofrinhos-summary-card">
-                                    <span class="cofrinhos-summary-card__label">Cofrinhos</span>
-                                    <strong class="cofrinhos-summary-card__value">{{ $activeCount }}</strong>
-                                    <span class="cofrinhos-summary-card__hint">
-                                        @if($inactiveCount > 0)
-                                            {{ $projectsWithTarget }} com meta · {{ $inactiveCount }} {{ $inactiveCount === 1 ? 'inativo' : 'inativos' }}
-                                        @else
-                                            {{ $projectsWithTarget }} com meta
-                                        @endif
-                                    </span>
-                                </div>
-                                <div class="cofrinhos-summary-card">
-                                    <span class="cofrinhos-summary-card__label">Metas concluídas</span>
-                                    <strong class="cofrinhos-summary-card__value">{{ $completedProjects }}</strong>
-                                    <span class="cofrinhos-summary-card__hint">objetivos no alvo</span>
-                                </div>
-                            </div>
-                        </div>
+    <div class="container-xxl py-4 px-3 px-lg-4">
+        @if (session('success'))
+            <x-alert type="success" class="mb-4" :message="session('success')" />
+        @endif
+        @if (session('error'))
+            <x-alert type="danger" class="mb-4" :message="session('error')" />
+        @endif
+
+        <!-- TOP KPIS DUOZEN 2.0 -->
+        <section class="dz-kpi-grid mb-4">
+            <!-- Patrimônio Total -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Patrimônio Total</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary">
+                        🐷
                     </div>
                 </div>
-            </section>
+                <div>
+                    <div class="dz-kpi-card__value text-primary dz-privacy-blur">
+                        R$ {{ number_format($totalSaved, 2, ',', '.') }}
+                    </div>
+                    @if($totalPct !== null)
+                        <div class="dz-progress-bar">
+                            <div class="dz-progress-bar__fill dz-progress-bar__fill--primary" style="width: {{ $totalPct }}%;"></div>
+                        </div>
+                        <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
+                            <span>{{ number_format($totalPct, 1, ',', '.') }}% do total das metas</span>
+                            <span class="dz-privacy-blur">Meta: R$ {{ number_format($totalTarget, 2, ',', '.') }}</span>
+                        </div>
+                    @else
+                        <div class="dz-kpi-card__footer">
+                            <span>Soma de todos os cofrinhos</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Cofrinhos Ativos -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Cofrinhos Ativos</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                        🎯
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $activeCount }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $projectsWithTarget }} com meta definida</span>
+                        @if($inactiveCount > 0)
+                            <span class="text-secondary">({{ $inactiveCount }} inativo)</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metas Concluídas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Metas Concluídas</span>
+                    <div class="dz-kpi-card__icon-box" style="background: rgba(16, 185, 129, 0.15); color: #059669;">
+                        🏆
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value text-success">
+                        {{ $completedProjects }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Objetivos atingidos com 100%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tipos de Investimento -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Aplicações & Cripto</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--warning">
+                        ₿
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $cofrinhoRows->where('is_asset', true)->count() }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Cotações em tempo real</span>
+                        <button type="button" class="btn btn-link p-0 fw-bold" style="color: var(--dz-primary); text-decoration: none; font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#modalCofrinhoCreate">+ Novo</button>
+                    </div>
+                </div>
+            </div>
+        </section>
 
             {{-- Modal Novo Cofrinho --}}
             <div
@@ -571,7 +621,11 @@
 
                 // Atualizacao de Cotacao via AJAX
                 document.querySelectorAll('.js-btn-refresh-quote').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
+                    btn.addEventListener('click', function (e) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
                         const type = this.getAttribute('data-asset-type') || 'crypto';
                         const code = this.getAttribute('data-asset-code') || 'BTC';
                         const targetPriceId = this.getAttribute('data-target-price-id');
@@ -605,7 +659,7 @@
                                         profitEl.textContent = `${prefix}R$ ${Math.abs(profit).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${prefix}${profitPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%)`;
                                         profitEl.className = `small fw-bold ${profit >= 0 ? 'text-success' : 'text-danger'}`;
                                         if (profitContainer) {
-                                            profitContainer.className = `d-flex align-items-center justify-content-between rounded-3 border p-2 px-3 mb-3 ${profit >= 0 ? 'border-success-subtle bg-success-subtle' : 'border-danger-subtle bg-danger-subtle'}`;
+                                            profitContainer.className = `d-flex align-items-center justify-content-between rounded-3 border p-2 px-3 ${profit >= 0 ? 'border-success-subtle bg-success-subtle' : 'border-danger-subtle bg-danger-subtle'}`;
                                         }
                                     }
 
@@ -613,7 +667,6 @@
                                     const modalPriceInput = document.getElementById('asset_price_' + cofrinhoId);
                                     if (modalPriceInput) {
                                         modalPriceInput.value = newPrice.toFixed(2);
-                                        modalPriceInput.dispatchEvent(new Event('input', { bubbles: true }));
                                     }
                                 }
                             })

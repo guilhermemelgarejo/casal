@@ -1,10 +1,10 @@
 /**
- * Tour curto pós-criação de casal (conta → categoria → lançamento).
- * Config: window.__DUOZEN_ONBOARDING__ (definido em layouts.app).
+ * Tour guiado de boas-vindas do DuoZen 2.0.
+ * Configuração injetada via window.__DUOZEN_ONBOARDING__ em layouts.app.
  */
 (function () {
     const cfg = window.__DUOZEN_ONBOARDING__;
-    if (!cfg || !Array.isArray(cfg.steps)) {
+    if (!cfg || !Array.isArray(cfg.steps) || !cfg.steps.length) {
         return;
     }
 
@@ -14,8 +14,9 @@
         const onRoute = cfg.steps.filter(function (s) {
             return s.route === routeName;
         });
-        let i;
-        for (i = 0; i < onRoute.length; i++) {
+
+        // 1. Prioriza passos com whenQuery matching
+        for (let i = 0; i < onRoute.length; i++) {
             const s = onRoute[i];
             const wq = s.whenQuery;
             if (wq && typeof wq === 'object' && Object.keys(wq).length) {
@@ -27,13 +28,16 @@
                 }
             }
         }
-        for (i = 0; i < onRoute.length; i++) {
+
+        // 2. Passos sem whenQuery
+        for (let i = 0; i < onRoute.length; i++) {
             const s = onRoute[i];
             const wq = s.whenQuery;
             if (!wq || typeof wq !== 'object' || !Object.keys(wq).length) {
                 return s;
             }
         }
+
         return null;
     }
 
@@ -46,6 +50,7 @@
     let ring;
     let panel;
     let resizeObs;
+    let keyHandler;
 
     function destroyDom() {
         if (resizeObs) {
@@ -56,8 +61,13 @@
             }
             resizeObs = null;
         }
+        if (keyHandler) {
+            window.removeEventListener('keydown', keyHandler);
+            keyHandler = null;
+        }
         window.removeEventListener('resize', layout);
         window.removeEventListener('scroll', layout, true);
+
         [backdrop, ring, panel].forEach(function (el) {
             if (el && el.parentNode) {
                 el.parentNode.removeChild(el);
@@ -91,41 +101,63 @@
     }
 
     function layout() {
-        const el = document.querySelector(step.selector);
-        if (!el || !ring || !panel) {
+        if (!panel) {
             return;
         }
 
-        const r = el.getBoundingClientRect();
+        const el = step.selector ? document.querySelector(step.selector) : null;
         const pad = 8;
+        const gap = 14;
 
-        ring.style.top = r.top - pad + 'px';
-        ring.style.left = r.left - pad + 'px';
-        ring.style.width = r.width + pad * 2 + 'px';
-        ring.style.height = r.height + pad * 2 + 'px';
+        if (el && ring) {
+            ring.style.display = 'block';
+            const r = el.getBoundingClientRect();
 
-        panel.style.maxWidth = 'min(22rem, calc(100vw - 2rem))';
+            ring.style.top = (r.top - pad) + 'px';
+            ring.style.left = (r.left - pad) + 'px';
+            ring.style.width = (r.width + pad * 2) + 'px';
+            ring.style.height = (r.height + pad * 2) + 'px';
 
-        const panelHeight = panel.offsetHeight || 200;
-        const gap = 12;
-        let top = r.bottom + gap;
-        if (top + panelHeight > window.innerHeight - 16) {
-            top = r.top - panelHeight - gap;
-        }
-        if (top < 16) {
-            top = 16;
-        }
+            const panelWidth = Math.min(360, window.innerWidth - 32);
+            panel.style.width = panelWidth + 'px';
+            const panelHeight = panel.offsetHeight || 220;
 
-        let left = r.left + r.width / 2 - panel.offsetWidth / 2;
-        const maxLeft = window.innerWidth - panel.offsetWidth - 16;
-        if (left > maxLeft) {
-            left = maxLeft;
+            let top = r.bottom + gap;
+            // Se não couber embaixo, tenta colocar em cima
+            if (top + panelHeight > window.innerHeight - 16) {
+                top = r.top - panelHeight - gap;
+            }
+            // Garante que não saia da tela
+            if (top < 16) {
+                top = 16;
+            }
+            if (top + panelHeight > window.innerHeight - 16) {
+                top = Math.max(16, window.innerHeight - panelHeight - 16);
+            }
+
+            let left = r.left + (r.width / 2) - (panelWidth / 2);
+            const maxLeft = window.innerWidth - panelWidth - 16;
+            if (left > maxLeft) {
+                left = maxLeft;
+            }
+            if (left < 16) {
+                left = 16;
+            }
+
+            panel.style.top = top + 'px';
+            panel.style.left = left + 'px';
+        } else {
+            // Se o elemento não existir, centraliza o card
+            if (ring) {
+                ring.style.display = 'none';
+            }
+            const panelWidth = Math.min(380, window.innerWidth - 32);
+            panel.style.width = panelWidth + 'px';
+            const panelHeight = panel.offsetHeight || 220;
+
+            panel.style.top = Math.max(16, (window.innerHeight - panelHeight) / 2) + 'px';
+            panel.style.left = Math.max(16, (window.innerWidth - panelWidth) / 2) + 'px';
         }
-        if (left < 16) {
-            left = 16;
-        }
-        panel.style.top = top + 'px';
-        panel.style.left = left + 'px';
     }
 
     function build() {
@@ -140,37 +172,53 @@
         ring.setAttribute('aria-hidden', 'true');
 
         panel = document.createElement('div');
-        panel.className = 'duozen-onboarding-panel card border-0 shadow-lg';
+        panel.className = 'duozen-onboarding-panel card shadow-lg';
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'true');
         panel.setAttribute('aria-labelledby', 'duozen-onboarding-title');
 
         const isLast = !step.nextUrl;
+        const stepNum = step.step;
+        const totalSteps = step.total;
+
+        let badgeHtml = '';
+        if (stepNum && totalSteps) {
+            badgeHtml = '<span class="badge rounded-pill bg-primary-subtle text-primary fw-bold px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.03em;">Passo ' +
+                escapeHtml(stepNum) + ' de ' + escapeHtml(totalSteps) + '</span>';
+        }
 
         panel.innerHTML =
             '<div class="card-body p-4">' +
-            '<h2 id="duozen-onboarding-title" class="h6 fw-semibold mb-2">' +
+            '<div class="d-flex align-items-center justify-content-between mb-2">' +
+            badgeHtml +
+            '<button type="button" class="btn-close ms-auto duozen-onboarding-close" aria-label="Fechar tour" title="Fechar tour"></button>' +
+            '</div>' +
+            '<h2 id="duozen-onboarding-title" class="h6 fw-bold mb-2" style="color: var(--dz-text-title, inherit);">' +
             escapeHtml(step.title) +
             '</h2>' +
-            '<p class="small text-secondary mb-4 mb-md-3">' +
+            '<p class="small mb-4" style="color: var(--dz-text-secondary, #64748B); line-height: 1.55;">' +
             escapeHtml(step.body) +
             '</p>' +
             '<div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">' +
-            '<button type="button" class="btn btn-link btn-sm text-secondary text-decoration-none p-0 duozen-onboarding-skip">Saltar tour</button>' +
+            '<button type="button" class="btn btn-link btn-sm text-secondary text-decoration-none p-0 duozen-onboarding-skip" style="font-size: 0.8rem;">Pular tour</button>' +
             '<div class="d-flex flex-wrap gap-2 ms-auto">' +
             (step.prevUrl
-                ? '<button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 duozen-onboarding-prev">Anterior</button>'
+                ? '<button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 duozen-onboarding-prev" style="font-size: 0.8rem; font-weight: 600;">Anterior</button>'
                 : '') +
             (isLast
-                ? '<button type="button" class="btn btn-primary btn-sm rounded-pill px-3 duozen-onboarding-done">Concluir</button>'
-                : '<button type="button" class="btn btn-primary btn-sm rounded-pill px-3 duozen-onboarding-next">Seguinte</button>') +
+                ? '<button type="button" class="btn btn-primary btn-sm rounded-pill px-3 duozen-onboarding-done" style="font-size: 0.8rem; font-weight: 600; background: var(--dz-primary, #6366F1); border-color: var(--dz-primary, #6366F1);">Concluir 🎉</button>'
+                : '<button type="button" class="btn btn-primary btn-sm rounded-pill px-3 duozen-onboarding-next" style="font-size: 0.8rem; font-weight: 600; background: var(--dz-primary, #6366F1); border-color: var(--dz-primary, #6366F1);">Próximo →</button>') +
             '</div></div></div>';
 
         document.body.appendChild(backdrop);
         document.body.appendChild(ring);
         document.body.appendChild(panel);
 
-        panel.querySelector('.duozen-onboarding-skip').addEventListener('click', dismiss);
+        // Eventos
+        backdrop.addEventListener('click', dismiss);
+        panel.querySelector('.duozen-onboarding-close')?.addEventListener('click', dismiss);
+        panel.querySelector('.duozen-onboarding-skip')?.addEventListener('click', dismiss);
+
         const prevBtn = panel.querySelector('.duozen-onboarding-prev');
         if (prevBtn && step.prevUrl) {
             prevBtn.addEventListener('click', function () {
@@ -188,25 +236,35 @@
             doneBtn.addEventListener('click', dismiss);
         }
 
-        const target = document.querySelector(step.selector);
+        keyHandler = function (e) {
+            if (e.key === 'Escape') {
+                dismiss();
+            }
+        };
+        window.addEventListener('keydown', keyHandler);
+
+        // Scroll e Layout inicial
+        const target = step.selector ? document.querySelector(step.selector) : null;
         if (target) {
             try {
-                target.scrollIntoView({ block: 'center', behavior: 'auto' });
+                target.scrollIntoView({ block: 'center', behavior: 'smooth' });
             } catch (e) {
                 target.scrollIntoView(true);
             }
         }
 
         layout();
+        requestAnimationFrame(layout);
+        setTimeout(layout, 120);
+
         window.addEventListener('resize', layout);
         window.addEventListener('scroll', layout, true);
 
-        const el = document.querySelector(step.selector);
-        if (el && typeof ResizeObserver !== 'undefined') {
+        if (target && typeof ResizeObserver !== 'undefined') {
             resizeObs = new ResizeObserver(function () {
                 layout();
             });
-            resizeObs.observe(el);
+            resizeObs.observe(target);
         }
 
         const focusable = panel.querySelector(
@@ -218,11 +276,11 @@
     }
 
     function escapeHtml(s) {
-        if (!s) {
+        if (s === null || s === undefined) {
             return '';
         }
         const d = document.createElement('div');
-        d.textContent = s;
+        d.textContent = String(s);
         return d.innerHTML;
     }
 

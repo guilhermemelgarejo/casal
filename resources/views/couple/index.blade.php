@@ -5,35 +5,141 @@
 
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div>
-                <p class="small text-secondary mb-1">Espaço compartilhado</p>
-                <h2 class="h5 mb-0 couple-page-title">Casal</h2>
-                <p class="small text-secondary mb-0 mt-1">Convite, membros, renda planejada e responsabilidade da assinatura.</p>
+        <div>
+            <h1 class="dz-page-title">Espaço do Casal</h1>
+            <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
+                Sincronização financeira a dois, convites e metas compartilhadas
             </div>
-            @if ($couple)
-                <a href="{{ route('dashboard') }}" class="btn btn-primary rounded-pill px-4 align-self-start align-self-md-center">
-                    Ir para o painel
-                </a>
-            @endif
         </div>
     </x-slot>
 
-    <div class="py-4 couple-page">
-        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
-            @if (session('success'))
-                <x-alert type="success" class="mb-0" :message="session('success')" />
+    <x-slot name="actions">
+        @if ($couple)
+            @if (!empty($canReplayOnboardingTour))
+                <form action="{{ route('onboarding.restart') }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="dz-btn dz-btn-outline" title="Reiniciar o tour de introdução no painel">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Ver tour do app
+                    </button>
+                </form>
             @endif
+            <button type="button" class="dz-btn dz-btn-primary" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
+                ⚙️ Configurações
+            </button>
+        @endif
+    </x-slot>
+    <div class="container-xxl py-4 px-3 px-lg-4 couple-page">
+        @if (session('success'))
+            <x-alert type="success" class="mb-4" :message="session('success')" />
+        @endif
 
-            @if (session('error'))
-                <x-alert type="warning" class="mb-0" :message="session('error')" />
-            @endif
+        @if (session('error'))
+            <x-alert type="warning" class="mb-4" :message="session('error')" />
+        @endif
 
-            @if ($couple)
-                <x-cofrinho-promo variant="compact" />
-            @endif
+        @if ($couple)
+            <!-- TOP KPIS DUOZEN 2.0 -->
+            <section class="dz-kpi-grid mb-4">
+                <!-- Membros Conectados -->
+                <div class="dz-card dz-kpi-card">
+                    <div class="dz-kpi-card__head">
+                        <span class="dz-kpi-card__label">Membros do Casal</span>
+                        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary">
+                            👫
+                        </div>
+                    </div>
+                    <div>
+                        <div class="dz-kpi-card__value text-primary">
+                            {{ $memberCount }}/2
+                        </div>
+                        <div class="dz-kpi-card__footer">
+                            <span>{{ $availableSlots > 0 ? $availableSlots . ' vaga disponível' : 'Sincronizado e Completo' }}</span>
+                        </div>
+                    </div>
+                </div>
 
-            @if (!$couple)
+                <!-- Renda Planejada -->
+                <div class="dz-card dz-kpi-card">
+                    <div class="dz-kpi-card__head">
+                        <span class="dz-kpi-card__label">Renda Mensal do Casal</span>
+                        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                            💰
+                        </div>
+                    </div>
+                    <div>
+                        <div class="dz-kpi-card__value text-success dz-privacy-blur">
+                            R$ {{ number_format((float) $couple->monthly_income, 2, ',', '.') }}
+                        </div>
+                        <div class="dz-kpi-card__footer">
+                            <span>Base de cálculo para metas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Limite de Alerta -->
+                <div class="dz-card dz-kpi-card">
+                    <div class="dz-kpi-card__head">
+                        <span class="dz-kpi-card__label">Alerta de Gastos</span>
+                        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--warning">
+                            ⚡
+                        </div>
+                    </div>
+                    <div>
+                        <div class="dz-kpi-card__value text-warning">
+                            {{ number_format($couple->spending_alert_threshold, 0) }}%
+                        </div>
+                        <div class="dz-kpi-card__footer">
+                            <span>Gatilho de notificação</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Código de Convite -->
+                <div class="dz-card dz-kpi-card">
+                    <div class="dz-kpi-card__head">
+                        <span class="dz-kpi-card__label">Código de Convite</span>
+                        <div class="dz-kpi-card__icon-box" style="background: rgba(14, 165, 233, 0.15); color: #0284C7;">
+                            🔑
+                        </div>
+                    </div>
+                    <div>
+                        <div class="dz-kpi-card__value" style="font-size: 1.2rem; letter-spacing: 0.08em; color: var(--dz-text-title);">
+                            {{ $couple->invite_code }}
+                        </div>
+                        <div class="dz-kpi-card__footer">
+                            <span>Compartilhe com seu parceiro(a)</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Ações e Configurações Rápidas do Casal -->
+            <div class="dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                    <div>
+                        <h3 class="h6 mb-1 fw-bold" style="color: var(--dz-text-title);">Espaço: {{ $couple->name }}</h3>
+                        <p class="small text-secondary mb-0">Membros, regras compartilhadas e gerenciamento de conta do casal.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        @if (!empty($canReplayOnboardingTour))
+                            <form action="{{ route('onboarding.restart') }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="dz-btn dz-btn-outline" style="font-size: 0.82rem; padding: 0.4rem 0.85rem;" title="Reiniciar o tour de introdução no painel">
+                                    🧭 Ver tour do app
+                                </button>
+                            </form>
+                        @endif
+                        <form action="{{ route('couple.leave') }}" method="POST" data-confirm-title="Sair do casal" data-confirm="Tem certeza de que deseja sair do casal?" data-confirm-accept="Sim, sair" data-confirm-cancel="Cancelar" data-confirm-icon="question">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                Sair do casal
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @else
                 <section class="couple-hero card border-0 shadow-sm">
                     <div class="card-body p-4 p-lg-5">
                         <div class="row g-4 align-items-center">
@@ -111,63 +217,10 @@
                         </div>
                     </div>
                 </div>
-            @else
-                <div class="vstack gap-4">
-                    <section class="couple-hero card border-0 shadow-sm">
-                        <div class="card-body p-4 p-lg-5">
-                            <div class="row g-4 align-items-center">
-                                <div class="col-lg-5">
-                                    <span class="couple-hero__badge">O casal de vocês</span>
-                                    <h3 class="couple-hero__title h4 mt-3 mb-2 text-truncate" title="{{ $couple->name }}">{{ $couple->name }}</h3>
-                                    <p class="text-secondary mb-0">Configure o espaço compartilhado, convide o parceiro e mantenha a assinatura com responsável claro.</p>
-                                </div>
-                                <div class="col-lg-7">
-                                    <div class="couple-summary-grid">
-                                        <div class="couple-summary-stat couple-summary-stat--primary">
-                                            <span class="couple-summary-stat__label">Código</span>
-                                            <strong class="couple-summary-stat__code">{{ $couple->invite_code }}</strong>
-                                            <span class="couple-summary-stat__hint">para convite</span>
-                                        </div>
-                                        <div class="couple-summary-stat couple-summary-stat--success">
-                                            <span class="couple-summary-stat__label">Membros</span>
-                                            <strong class="couple-summary-stat__value">{{ $memberCount }}/2</strong>
-                                            <span class="couple-summary-stat__hint">{{ $availableSlots > 0 ? $availableSlots . ' vaga disponível' : 'casal completo' }}</span>
-                                        </div>
-                                        <div class="couple-summary-stat">
-                                            <span class="couple-summary-stat__label">Renda mensal</span>
-                                            <strong class="couple-summary-stat__money duozen-privacy-blur">R$ {{ number_format((float) $couple->monthly_income, 2, ',', '.') }}</strong>
-                                            <span class="couple-summary-stat__hint">base para alertas</span>
-                                        </div>
-                                        <div class="couple-summary-stat couple-summary-stat--warning">
-                                            <span class="couple-summary-stat__label">Alerta</span>
-                                            <strong class="couple-summary-stat__value">{{ number_format($couple->spending_alert_threshold, 0) }}%</strong>
-                                            <span class="couple-summary-stat__hint">do limite de gastos</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="couple-hero__actions mt-4">
-                                @if (!empty($canReplayOnboardingTour))
-                                    <form action="{{ route('onboarding.restart') }}" method="POST" class="d-inline">
-                                        @csrf
-                                        <button type="submit" class="btn btn-outline-primary rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Reiniciar o tour de introdução no painel">
-                                            Ver tour novamente
-                                        </button>
-                                    </form>
-                                @endif
-                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" title="Editar nome do casal, renda e alerta de gastos" data-bs-toggle="modal" data-bs-target="#modal-edit-couple">
-                                    Configurações
-                                </button>
-                                <form action="{{ route('couple.leave') }}" method="POST" data-confirm-title="Sair do casal" data-confirm="Tem certeza de que deseja sair do casal?" data-confirm-accept="Sim, sair" data-confirm-cancel="Cancelar" data-confirm-icon="question">
-                                    @csrf
-                                    <button type="submit" class="btn btn-outline-danger rounded-pill px-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Sair deste casal (confirmação será pedida)">
-                                        Sair do casal
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </section>
+            @endif
 
+            @if ($couple)
+                <div class="vstack gap-4">
                     <x-modal name="edit-couple" maxWidth="lg">
                         <form method="post" action="{{ route('couple.update') }}">
                             @csrf

@@ -90,87 +90,113 @@
 @endphp
 
 <x-app-layout>
+    @php
+        $repDate = \Carbon\Carbon::createFromFormat('Y-m', $period);
+        $repPrev = $repDate->copy()->subMonth()->format('Y-m');
+        $repNext = $repDate->copy()->addMonth()->format('Y-m');
+    @endphp
+
     <x-slot name="header">
-        <div class="reports-head-wrap">
-            <div class="reports-title-block">
-                <p class="reports-title-kicker">Visão financeira</p>
-                <h2 class="h4 mb-0 reports-title">Relatórios</h2>
-                <p class="small text-secondary mb-0 mt-1">{{ ucfirst($periodLabel) }}</p>
+        <div>
+            <h1 class="dz-page-title">Relatórios Financeiros</h1>
+            <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
+                Análise executiva e tendências de gastos
             </div>
+        </div>
+
+        <!-- Navegador de Período Inline -->
+        <div class="dz-period-nav">
+            <a href="{{ route('reports.index', ['period' => $repPrev]) }}" class="dz-period-nav__btn" title="Mês anterior">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <span class="dz-period-nav__label">{{ ucfirst($periodLabel) }}</span>
+            <a href="{{ route('reports.index', ['period' => $repNext]) }}" class="dz-period-nav__btn" title="Próximo mês">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </a>
         </div>
     </x-slot>
 
-    <div class="py-4 reports-page">
-        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
-            <section class="reports-hero card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="row g-4 align-items-center reports-hero-intro">
-                        <div class="col-lg-5">
-                            <span class="reports-hero__badge">Resumo executivo</span>
-                            <h3 class="reports-hero-title h4 mt-3 mb-2">Leitura consolidada do período.</h3>
-                            <p class="text-secondary mb-0">Indicadores, tendências e tabelas usam os mesmos critérios das demais telas para manter a leitura consistente.</p>
-                        </div>
-                        <div class="col-lg-7">
-                            <div class="reports-hero-panel">
-                                <form action="{{ route('reports.index') }}" method="GET" class="reports-filter-shell">
-                                    <div class="reports-filter-grid">
-                                        <div class="reports-filter-field">
-                                            <label class="reports-filter-label" for="reports-period">Período</label>
-                                            <input
-                                                id="reports-period"
-                                                type="text"
-                                                name="period"
-                                                value="{{ $period }}"
-                                                class="form-control form-control-sm rounded-pill"
-                                                data-duozen-flatpickr="month"
-                                                autocomplete="off"
-                                                aria-label="Mês de referência"
-                                            >
-                                        </div>
-                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3">Aplicar</button>
-                                        @if(request()->has('period'))
-                                            <a href="{{ route('reports.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Limpar</a>
-                                        @endif
-                                    </div>
-                                </form>
-                                <div class="reports-hero__strip">
-                                    <span>Renda base: <span class="duozen-privacy-blur">{{ $money($executiveKpis['planned_income']) }}</span></span>
-                                    <span>Orçamento: {{ $pct($budgetCommitmentPct) }}</span>
-                                    <span>Cartões: {{ $pct($overallCardUtilizationPct) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="reports-kpi-grid">
-                        <article class="reports-kpi-card reports-kpi-card--income">
-                            <p class="reports-kpi-label">Receitas</p>
-                            <p class="reports-kpi-value text-success duozen-privacy-blur">{{ $money($executiveKpis['total_income']) }}</p>
-                        </article>
-                        <article class="reports-kpi-card reports-kpi-card--expense">
-                            <p class="reports-kpi-label">Despesas</p>
-                            <p class="reports-kpi-value text-danger duozen-privacy-blur">{{ $money($executiveKpis['total_expense']) }}</p>
-                        </article>
-                        <article class="reports-kpi-card reports-kpi-card--result">
-                            <p class="reports-kpi-label">Resultado</p>
-                            <p class="reports-kpi-value {{ $executiveKpis['net_result'] >= 0 ? 'text-success' : 'text-danger' }} duozen-privacy-blur">{{ $money($executiveKpis['net_result']) }}</p>
-                        </article>
-                        <article class="reports-kpi-card">
-                            <div class="d-flex justify-content-between align-items-center gap-2">
-                                <p class="reports-kpi-label mb-0">Pressão de gasto</p>
-                                <span class="reports-kpi-badge {{ $pressurePct >= 80 ? 'is-danger' : ($pressurePct >= 60 ? 'is-warning' : 'is-ok') }}">
-                                    {{ $pct($pressurePct) }}
-                                </span>
-                            </div>
-                            <p class="small text-secondary mb-2">Renda base: <span class="duozen-privacy-blur">{{ $money($executiveKpis['planned_income']) }}</span></p>
-                            <div class="progress reports-mini-progress" role="progressbar" aria-label="Pressão de gasto">
-                                <div class="progress-bar {{ $pressurePct >= 80 ? 'bg-danger' : ($pressurePct >= 60 ? 'bg-warning' : 'bg-success') }}" style="width: {{ $pressureBar }}%"></div>
-                            </div>
-                        </article>
+    <div class="container-xxl py-4 px-3 px-lg-4 reports-page">
+
+        <!-- TOP KPIS DUOZEN 2.0 -->
+        <section class="dz-kpi-grid mb-4">
+            <!-- Receitas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Total de Receitas</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                        🟢
                     </div>
                 </div>
-            </section>
+                <div>
+                    <div class="dz-kpi-card__value text-success dz-privacy-blur">
+                        {{ $money($executiveKpis['total_income']) }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Entradas no período</span>
+                    </div>
+                </div>
+            </div>
 
-            <section class="reports-section card border-0 shadow-sm">
+            <!-- Despesas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Total de Despesas</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--danger">
+                        🔴
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value text-danger dz-privacy-blur">
+                        {{ $money($executiveKpis['total_expense']) }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Saídas e compras no cartão</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resultado -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Resultado Líquido</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary">
+                        ⚖️
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value {{ $executiveKpis['net_result'] >= 0 ? 'text-success' : 'text-danger' }} dz-privacy-blur">
+                        {{ $money($executiveKpis['net_result']) }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Economia do período</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pressão de Gasto -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Pressão de Gasto</span>
+                    <div class="dz-kpi-card__icon-box" style="background: {{ $pressurePct >= 80 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)' }}; color: {{ $pressurePct >= 80 ? 'var(--dz-danger)' : '#D97706' }};">
+                        ⚡
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value {{ $pressurePct >= 80 ? 'text-danger' : ($pressurePct >= 60 ? 'text-warning' : 'text-success') }}">
+                        {{ $pct($pressurePct) }}
+                    </div>
+                    <div class="dz-progress-bar">
+                        <div class="dz-progress-bar__fill {{ $pressurePct >= 80 ? 'dz-progress-bar__fill--danger' : 'dz-progress-bar__fill--warning' }}" style="width: {{ $pressureBar }}%;"></div>
+                    </div>
+                    <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
+                        <span>Renda base: <strong class="dz-privacy-blur">{{ $money($executiveKpis['planned_income']) }}</strong></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+            <section class="reports-section card border-0 shadow-sm mb-4">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
                         <div class="reports-section-title-wrap">
@@ -374,7 +400,7 @@
                 </div>
             </section>
 
-            <section class="reports-section card border-0 shadow-sm">
+            <section class="reports-section card border-0 shadow-sm mb-4">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
                         <div class="reports-section-title-wrap">
@@ -415,22 +441,22 @@
                             <thead>
                                 <tr>
                                     <th>Categoria</th>
-                                    <th class="text-end">Planejado</th>
-                                    <th class="text-end">Realizado</th>
-                                    <th class="text-end">Variação</th>
-                                    <th class="text-end">Execução</th>
+                                    <th>Planejado</th>
+                                    <th>Realizado</th>
+                                    <th>Variação</th>
+                                    <th>Execução</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($budgetRows as $row)
                                     <tr>
                                         <td>{{ $row['name'] }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($row['budget']) }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($row['spent']) }}</td>
-                                        <td class="text-end">
+                                        <td><span class="duozen-privacy-blur">{{ $money($row['budget']) }}</span></td>
+                                        <td><span class="duozen-privacy-blur">{{ $money($row['spent']) }}</span></td>
+                                        <td>
                                             <span class="fw-semibold {{ $row['variance'] >= 0 ? 'text-success' : 'text-danger' }} duozen-privacy-blur">{{ $money($row['variance']) }}</span>
                                         </td>
-                                        <td class="text-end">
+                                        <td>
                                             @if($row['execution_pct'] !== null)
                                                 <span class="reports-kpi-badge {{ $row['execution_pct'] > 100 ? 'is-danger' : ($row['execution_pct'] >= 80 ? 'is-warning' : 'is-ok') }}">{{ $pct($row['execution_pct']) }}</span>
                                             @else
@@ -467,7 +493,7 @@
                 </div>
             </section>
 
-            <section class="reports-section card border-0 shadow-sm">
+            <section class="reports-section card border-0 shadow-sm mb-4">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
                         <div class="reports-section-title-wrap">
@@ -491,18 +517,18 @@
                             <thead>
                                 <tr>
                                     <th>Cartão</th>
-                                    <th class="text-end">Limite</th>
-                                    <th class="text-end">Em aberto</th>
-                                    <th class="text-end">Utilização</th>
+                                    <th>Limite</th>
+                                    <th>Em aberto</th>
+                                    <th>Utilização</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($cardRows as $row)
                                     <tr>
                                         <td>{{ $row['name'] }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $row['limit_total'] !== null ? $money($row['limit_total']) : 'Sem limite' }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($row['outstanding']) }}</td>
-                                        <td class="text-end">
+                                        <td><span class="duozen-privacy-blur">{{ $row['limit_total'] !== null ? $money($row['limit_total']) : 'Sem limite' }}</span></td>
+                                        <td><span class="duozen-privacy-blur">{{ $money($row['outstanding']) }}</span></td>
+                                        <td>
                                             @if($row['utilization_pct'] !== null)
                                                 <span class="reports-kpi-badge {{ $row['utilization_pct'] >= 80 ? 'is-danger' : ($row['utilization_pct'] >= 60 ? 'is-warning' : 'is-ok') }}">{{ $pct($row['utilization_pct']) }}</span>
                                             @else
@@ -531,18 +557,18 @@
                             <thead>
                                 <tr>
                                     <th>Fatura</th>
-                                    <th class="text-end">Em aberto</th>
-                                    <th class="text-end">Vencimento</th>
-                                    <th class="text-end">Dias p/ vencer</th>
+                                    <th>Em aberto</th>
+                                    <th>Vencimento</th>
+                                    <th>Dias p/ vencer</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($openStatements as $statement)
                                     <tr>
                                         <td>{{ $statement['account_name'] }} - {{ $statement['reference_label'] }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($statement['remaining']) }}</td>
-                                        <td class="text-end">{{ $statement['due_label'] ?? '-' }}</td>
-                                        <td class="text-end">
+                                        <td><span class="duozen-privacy-blur">{{ $money($statement['remaining']) }}</span></td>
+                                        <td>{{ $statement['due_label'] ?? '-' }}</td>
+                                        <td>
                                             @if($statement['days_to_due'] === null)
                                                 -
                                             @elseif($statement['days_to_due'] < 0)
@@ -573,7 +599,7 @@
                 </div>
             </section>
 
-            <section class="reports-section card border-0 shadow-sm">
+            <section class="reports-section card border-0 shadow-sm mb-4">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
                         <div class="reports-section-title-wrap">
@@ -602,26 +628,26 @@
                             <thead>
                                 <tr>
                                     <th>Cofrinho</th>
-                                    <th class="text-end">Acumulado</th>
-                                    <th class="text-end">Meta</th>
-                                    <th class="text-end">Progresso</th>
-                                    <th class="text-end">Aporte líquido mês</th>
+                                    <th>Acumulado</th>
+                                    <th>Meta</th>
+                                    <th>Progresso</th>
+                                    <th>Aporte líquido mês</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($projectRows as $row)
                                     <tr>
                                         <td>{{ $row['name'] }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($row['saved']) }}</td>
-                                        <td class="text-end duozen-privacy-blur">{{ $row['target'] !== null ? $money($row['target']) : 'Sem meta' }}</td>
-                                        <td class="text-end">
+                                        <td><span class="duozen-privacy-blur">{{ $money($row['saved']) }}</span></td>
+                                        <td><span class="duozen-privacy-blur">{{ $row['target'] !== null ? $money($row['target']) : 'Sem meta' }}</span></td>
+                                        <td>
                                             @if($row['progress_pct'] !== null)
                                                 <span class="reports-kpi-badge {{ $row['progress_pct'] >= 100 ? 'is-ok' : ($row['progress_pct'] >= 60 ? 'is-warning' : '') }}">{{ $pct($row['progress_pct']) }}</span>
                                             @else
                                                 -
                                             @endif
                                         </td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($row['monthly_net']) }}</td>
+                                        <td><span class="duozen-privacy-blur">{{ $money($row['monthly_net']) }}</span></td>
                                     </tr>
                                 @empty
                                     <tr class="reports-empty-row">
@@ -642,7 +668,7 @@
                 </div>
             </section>
 
-            <section class="reports-section card border-0 shadow-sm">
+            <section class="reports-section card border-0 shadow-sm mb-4">
                 <div class="card-body reports-section-body">
                     <div class="reports-section-head">
                         <div class="reports-section-title-wrap">
@@ -666,9 +692,9 @@
                             <thead>
                                 <tr>
                                     <th>Recorrência pendente</th>
-                                    <th class="text-end">Valor</th>
-                                    <th class="text-end">Dia sugerido</th>
-                                    <th class="text-end">Conta</th>
+                                    <th>Valor</th>
+                                    <th>Dia sugerido</th>
+                                    <th>Conta</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -680,9 +706,9 @@
                                                 <span class="badge rounded-pill text-bg-info text-dark-emphasis ms-1" style="font-size: 0.68rem;">Múltiplo</span>
                                             @endif
                                         </td>
-                                        <td class="text-end duozen-privacy-blur">{{ $money($row['amount']) }}</td>
-                                        <td class="text-end">{{ !empty($row['is_multiple']) ? 'Dia atual' : ($row['day_of_month'] ?? '—') }}</td>
-                                        <td class="text-end">{{ $row['account_name'] }}</td>
+                                        <td><span class="duozen-privacy-blur">{{ $money($row['amount']) }}</span></td>
+                                        <td>{{ !empty($row['is_multiple']) ? 'Dia atual' : ($row['day_of_month'] ?? '—') }}</td>
+                                        <td>{{ $row['account_name'] }}</td>
                                     </tr>
                                 @empty
                                     <tr class="reports-empty-row">

@@ -5,22 +5,26 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-md-between gap-3">
-            <div class="min-w-0">
-                <h2 class="h5 mb-0 tx-page-title">Lançamentos recorrentes</h2>
-                    <p class="small text-secondary mb-0 mt-1">Modelos para despesas e receitas fixas. Você pode criar o lançamento do mês no <strong class="fw-medium text-body">Painel</strong> — nada é gravado sozinho.</p>
+        <div>
+            <h1 class="dz-page-title">Lançamentos Recorrentes</h1>
+            <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
+                Modelos de despesas fixas e atalhos rápidos de lançamento
             </div>
-            <button
-                type="button"
-                class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0 js-rt-open-new"
-                title="Criar modelo de lançamento recorrente"
-                data-bs-toggle="modal"
-                data-bs-target="#modalRecurringForm"
-                id="btnRtNew"
-            >
-                Novo modelo
-            </button>
         </div>
+    </x-slot>
+
+    <x-slot name="actions">
+        <button
+            type="button"
+            class="dz-btn dz-btn-primary js-rt-open-new"
+            title="Criar modelo de lançamento recorrente"
+            data-bs-toggle="modal"
+            data-bs-target="#modalRecurringForm"
+            id="btnRtNew"
+        >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Novo Modelo
+        </button>
     </x-slot>
 
     @php
@@ -32,57 +36,88 @@
         $rtCardCount = $items->where('funding', \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD)->count();
     @endphp
 
-    <div class="py-4 recurring-page">
-        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
-            @if (session('success'))
-                <x-alert type="success" class="mb-0" :message="session('success')" />
-            @endif
-            @if (session('error'))
-                <x-alert type="danger" class="mb-0" :message="session('error')" />
-            @endif
+    <div class="container-xxl py-4 px-3 px-lg-4 rt-page">
+        @if (session('success'))
+            <x-alert type="success" class="mb-4" :message="session('success')" />
+        @endif
+        @if (session('error'))
+            <x-alert type="danger" class="mb-4" :message="session('error')" />
+        @endif
 
-            <section class="rt-hero card border-0 shadow-sm">
-                <div class="card-body p-4 p-lg-5">
-                    <div class="row g-4 align-items-center">
-                        <div class="col-lg-5">
-                            <span class="rt-hero__badge">Modelos mensais</span>
-                            <h3 class="rt-hero__title h4 mt-3 mb-2">Organize contas fixas sem gerar nada sozinho.</h3>
-                            <p class="text-secondary mb-0">Os modelos aparecem como lembrete no mês. Você decide quando criar o lançamento no Painel.</p>
-                        </div>
-                        <div class="col-lg-7">
-                            <div class="rt-summary-grid">
-                                <div class="rt-summary-card rt-summary-card--primary">
-                                    <span class="rt-summary-card__label">Modelos</span>
-                                    <strong class="rt-summary-card__value">{{ $rtTotal }}</strong>
-                                    <span class="rt-summary-card__hint">{{ $rtActive }} ativo(s)</span>
-                                </div>
-                                <div class="rt-summary-card rt-summary-card--success">
-                                    <span class="rt-summary-card__label">Receitas ativas</span>
-                                    <strong class="rt-summary-card__money">R$ {{ number_format($rtIncomeTotal, 2, ',', '.') }}</strong>
-                                    <span class="rt-summary-card__hint">previsão mensal</span>
-                                </div>
-                                <div class="rt-summary-card rt-summary-card--danger">
-                                    <span class="rt-summary-card__label">Despesas ativas</span>
-                                    <strong class="rt-summary-card__money">R$ {{ number_format($rtExpenseTotal, 2, ',', '.') }}</strong>
-                                    <span class="rt-summary-card__hint">previsão mensal</span>
-                                </div>
-                                <div class="rt-summary-card rt-summary-card--warning">
-                                    <span class="rt-summary-card__label">Pendentes</span>
-                                    <strong class="rt-summary-card__value">{{ $rtPendingCount }}</strong>
-                                    <span class="rt-summary-card__hint">lembretes do mês</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="rt-hero__strip mt-4">
-                        <span>{{ $rtCardCount }} modelo(s) no cartão</span>
-                        <span>{{ $regularAccounts->count() }} conta(s) corrente(s)</span>
-                        <span>{{ $cardAccounts->count() }} cartão(ões)</span>
+        <!-- TOP KPIS DUOZEN 2.0 -->
+        <section class="dz-kpi-grid mb-4">
+            <!-- Despesas Recorrentes -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Despesas Previstas</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--danger">
+                        🔴
                     </div>
                 </div>
-            </section>
+                <div>
+                    <div class="dz-kpi-card__value text-danger dz-privacy-blur">
+                        R$ {{ number_format($rtExpenseTotal, 2, ',', '.') }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Previsão de saída mensal</span>
+                    </div>
+                </div>
+            </div>
 
-            <x-cofrinho-promo variant="compact" />
+            <!-- Receitas Recorrentes -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Receitas Previstas</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                        🟢
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value text-success dz-privacy-blur">
+                        R$ {{ number_format($rtIncomeTotal, 2, ',', '.') }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>Previsão de entrada mensal</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modelos Ativos -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Modelos Recorrentes</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary">
+                        🔁
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $rtTotal }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $rtActive }} ativo(s) • {{ $rtCardCount }} no cartão</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pendentes no Mês -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Lembretes Pendentes</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--warning">
+                        🔔
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value {{ $rtPendingCount > 0 ? 'text-warning' : 'text-success' }}">
+                        {{ $rtPendingCount }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $rtPendingCount > 0 ? 'Aguardando lançamento no painel' : 'Todos lançados!' }}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
             <section class="card border-0 shadow-sm overflow-hidden tx-index-card rt-list-shell">
                 <div class="tx-index-head px-4 py-3">

@@ -1,7 +1,7 @@
 @php
     use App\Models\Account;
 
-    $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->values();
+    $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->sortByDesc(fn ($account) => (float) $account->balance)->values();
     $creditCardAccounts = $accounts->where('kind', Account::KIND_CREDIT_CARD)->values();
     $storeModalOpen = $errors->any() && old('_form') === 'account-store';
     $transferModalOpen = $errors->any() && old('_form') === 'account-transfer';
@@ -13,169 +13,212 @@
 @endphp
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div>
-                <p class="small text-secondary mb-1">Contas e crédito</p>
-                <h2 class="h5 mb-0 accounts-hero-title">Contas</h2>
-                <p class="small text-secondary mb-0 mt-1">Cadastre contas correntes e cartões para lançamentos, faturas e transferências.</p>
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2 justify-content-md-end">
-                @if ($canCreateAccountTransfer)
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary rounded-pill px-4 py-2 flex-shrink-0"
-                        id="btn-account-transfer"
-                        title="Registrar transferência entre contas correntes"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalAccountTransfer"
-                    >
-                        Transferir entre contas
-                    </button>
-                @endif
-                <button type="button" class="btn btn-primary rounded-pill px-4 py-2 flex-shrink-0" id="btn-new-account" title="Cadastrar conta corrente ou cartão de crédito" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
-                    Nova conta ou cartão
-                </button>
+        <div>
+            <h1 class="dz-page-title">Contas & Cartões</h1>
+            <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
+                Gerenciamento de contas correntes, cartões e limites
             </div>
         </div>
     </x-slot>
 
-    <div class="py-4 accounts-page">
-        <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
-            @if (session('success'))
-                <x-alert type="success" class="mb-0" :message="session('success')" />
-            @endif
+    <x-slot name="actions">
+        @if ($canCreateAccountTransfer)
+            <button
+                type="button"
+                class="dz-btn dz-btn-outline"
+                id="btn-account-transfer"
+                title="Registrar transferência entre contas correntes"
+                data-bs-toggle="modal"
+                data-bs-target="#modalAccountTransfer"
+            >
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                Transferir
+            </button>
+        @endif
+        <button type="button" class="dz-btn dz-btn-primary" id="btn-new-account" title="Cadastrar conta corrente ou cartão de crédito" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Nova Conta / Cartão
+        </button>
+    </x-slot>
 
-            @if ($errors->any() && old('_form') === 'account-transfer')
-                <x-alert type="danger" class="mb-0" title="Não foi possível concluir a transferência">
-                    <ul class="mb-0 ps-3 small">
-                        @foreach ($errors->all() as $err)
-                            <li>{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </x-alert>
-            @endif
+    <div class="container-xxl py-4 px-3 px-lg-4 accounts-page">
+        @if (session('success'))
+            <x-alert type="success" class="mb-4" :message="session('success')" />
+        @endif
 
-            <section class="accounts-hero card border-0 shadow-sm">
-                <div class="card-body p-4 p-lg-5">
-                    <div class="row g-4 align-items-center">
-                        <div class="col-lg-5">
-                            <span class="accounts-hero__badge">Visão geral</span>
-                            <h3 class="accounts-hero__title h4 mt-3 mb-2">A base dos lançamentos e faturas.</h3>
-                            <p class="text-secondary mb-0">Contas correntes guardam saldo persistido; cartões concentram faturas, parcelas e controle opcional de limite.</p>
-                        </div>
-                        <div class="col-lg-7">
-                            <div class="accounts-summary-grid">
-                                <div class="accounts-summary-card accounts-summary-card--primary">
-                                    <span class="accounts-summary-card__label">Contas</span>
-                                    <strong class="accounts-summary-card__value">{{ $regularAccounts->count() }}</strong>
-                                    <span class="accounts-summary-card__hint">correntes cadastradas</span>
-                                </div>
-                                <div class="accounts-summary-card accounts-summary-card--success">
-                                    <span class="accounts-summary-card__label">Saldo em contas</span>
-                                    <strong class="accounts-summary-card__money {{ $regularBalanceTotal < 0 ? 'text-danger' : '' }} duozen-privacy-blur">R$ {{ number_format($regularBalanceTotal, 2, ',', '.') }}</strong>
-                                    <span class="accounts-summary-card__hint">somatório dos saldos</span>
-                                </div>
-                                <div class="accounts-summary-card">
-                                    <span class="accounts-summary-card__label">Cartões</span>
-                                    <strong class="accounts-summary-card__value">{{ $creditCardAccounts->count() }}</strong>
-                                    <span class="accounts-summary-card__hint">{{ $trackedCards->count() }} com limite</span>
-                                </div>
-                                <div class="accounts-summary-card accounts-summary-card--warning">
-                                    <span class="accounts-summary-card__label">Limite disponível</span>
-                                    <strong class="accounts-summary-card__money {{ $creditLimitAvailable < 0 ? 'text-danger' : '' }} duozen-privacy-blur">R$ {{ number_format($creditLimitAvailable, 2, ',', '.') }}</strong>
-                                    <span class="accounts-summary-card__hint">de <span class="duozen-privacy-blur">R$ {{ number_format($creditLimitTotal, 2, ',', '.') }}</span></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accounts-hero__strip mt-4">
-                        <span>{{ $accounts->count() }} item(ns) no total</span>
-                        <span>{{ $canCreateAccountTransfer ? 'Transferência disponível' : 'Cadastre 2 contas para transferir' }}</span>
-                        <span>{{ $trackedCards->count() }} cartão(ões) com limite monitorado</span>
+        @if ($errors->any() && old('_form') === 'account-transfer')
+            <x-alert type="danger" class="mb-4" title="Não foi possível concluir a transferência">
+                <ul class="mb-0 ps-3 small">
+                    @foreach ($errors->all() as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </x-alert>
+        @endif
+
+        <!-- TOP KPIS DUOZEN 2.0 -->
+        <section class="dz-kpi-grid mb-4">
+            <!-- Saldo em Contas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Saldo em Contas Correntes</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary">
+                        🏦
                     </div>
                 </div>
-            </section>
-
-            <x-cofrinho-promo variant="compact" />
-
-            <div class="row g-4 align-items-start">
-                <div class="col-12">
-                    <div class="row g-4 g-lg-3 gx-lg-4 align-items-start accounts-lists-row">
-                        <div class="col-12 col-lg-6">
-                            <section class="h-100" aria-labelledby="accounts-regular-heading">
-                                <div class="accounts-list-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <div class="accounts-list-header__title-wrap min-w-0">
-                                        <span class="accounts-list-header__icon accounts-list-header__icon--regular" aria-hidden="true">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v2a2 2 0 002 2z" /></svg>
-                                        </span>
-                                        <div class="min-w-0">
-                                            <span class="accounts-section-kicker">Caixa</span>
-                                            <h3 class="h5 mb-0" id="accounts-regular-heading">Suas contas</h3>
-                                            <p class="small text-secondary mb-0">Dinheiro, débito, Pix ou boleto.</p>
-                                        </div>
-                                    </div>
-                                    @if ($regularAccounts->isNotEmpty())
-                                        <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle px-3 py-2 flex-shrink-0">
-                                            {{ $regularAccounts->count() }} {{ $regularAccounts->count() === 1 ? 'conta' : 'contas' }}
-                                        </span>
-                                    @endif
-                                </div>
-
-                                <div class="vstack gap-3">
-                                    @forelse ($regularAccounts as $account)
-                                        @include('accounts.partials.account-card', ['account' => $account])
-                                    @empty
-                                        <div class="accounts-empty text-center py-4 px-3">
-                                            <div class="rounded-3 bg-white bg-opacity-50 d-inline-flex align-items-center justify-content-center p-3 mb-3 shadow-sm">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="rgb(var(--bs-primary-rgb))" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                            </div>
-                                            <p class="fw-semibold text-body mb-1">Nenhuma conta corrente ainda</p>
-                                            <p class="small text-secondary mb-0 mx-auto" style="max-width: 18rem;">Use <strong>Nova conta ou cartão</strong> e escolha tipo Conta.</p>
-                                        </div>
-                                    @endforelse
-                                </div>
-                            </section>
-                        </div>
-
-                        <div class="col-12 col-lg-6">
-                            <section class="h-100" aria-labelledby="accounts-cards-heading">
-                                <div class="accounts-list-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <div class="accounts-list-header__title-wrap min-w-0">
-                                        <span class="accounts-list-header__icon accounts-list-header__icon--card" aria-hidden="true">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                                        </span>
-                                        <div class="min-w-0">
-                                            <span class="accounts-section-kicker">Crédito</span>
-                                            <h3 class="h5 mb-0" id="accounts-cards-heading">Seus cartões</h3>
-                                            <p class="small text-secondary mb-0">Faturas, parcelas e limite.</p>
-                                        </div>
-                                    </div>
-                                    @if ($creditCardAccounts->isNotEmpty())
-                                        <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle px-3 py-2 flex-shrink-0">
-                                            {{ $creditCardAccounts->count() }} {{ $creditCardAccounts->count() === 1 ? 'cartão' : 'cartões' }}
-                                        </span>
-                                    @endif
-                                </div>
-
-                                <div class="vstack gap-3">
-                                    @forelse ($creditCardAccounts as $account)
-                                        @include('accounts.partials.account-card', ['account' => $account])
-                                    @empty
-                                        <div class="accounts-empty text-center py-4 px-3">
-                                            <div class="rounded-3 bg-white bg-opacity-50 d-inline-flex align-items-center justify-content-center p-3 mb-3 shadow-sm">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="rgb(var(--bs-primary-rgb))" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                                            </div>
-                                            <p class="fw-semibold text-body mb-1">Nenhum cartão ainda</p>
-                                            <p class="small text-secondary mb-0 mx-auto" style="max-width: 18rem;">Use <strong>Nova conta ou cartão</strong> e escolha <strong>Cartão de crédito</strong>.</p>
-                                        </div>
-                                    @endforelse
-                                </div>
-                            </section>
-                        </div>
+                <div>
+                    <div class="dz-kpi-card__value {{ $regularBalanceTotal < 0 ? 'text-danger' : 'text-primary' }} dz-privacy-blur">
+                        R$ {{ number_format($regularBalanceTotal, 2, ',', '.') }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $regularAccounts->count() }} conta(s) cadastrada(s)</span>
+                        @if($canCreateAccountTransfer)
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" style="color: var(--dz-primary); font-weight: 700; text-decoration: none;">Transferir ⇄</a>
+                        @endif
                     </div>
                 </div>
             </div>
-        </div>
+
+            <!-- Limite Disponível de Cartões -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Limite Disponível (Cartões)</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--warning">
+                        💳
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value text-success dz-privacy-blur">
+                        R$ {{ number_format($creditLimitAvailable, 2, ',', '.') }}
+                    </div>
+                    @php
+                        $usedTotalLimit = max(0, $creditLimitTotal - $creditLimitAvailable);
+                        $usedLimitPct = $creditLimitTotal > 0 ? min(100, round(($usedTotalLimit / $creditLimitTotal) * 100)) : 0;
+                    @endphp
+                    <div class="dz-progress-bar">
+                        <div class="dz-progress-bar__fill" style="width: {{ $usedLimitPct }}%; background: #F59E0B;"></div>
+                    </div>
+                    <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
+                        <span>Limite Total: <strong class="dz-privacy-blur">R$ {{ number_format($creditLimitTotal, 2, ',', '.') }}</strong></span>
+                        <a href="{{ route('credit-card-statements.index') }}" style="color: var(--dz-primary); font-weight: 700; text-decoration: none;">Faturas ↗</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total de Cartões -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Cartões de Crédito</span>
+                    <div class="dz-kpi-card__icon-box" style="background: rgba(14, 165, 233, 0.15); color: #0284C7;">
+                        💎
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $creditCardAccounts->count() }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $trackedCards->count() }} com limite monitorado</span>
+                        <a href="{{ route('credit-card-statements.index') }}" style="color: var(--dz-primary); font-weight: 700; text-decoration: none;">Ver faturas ↗</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total de Contas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Contas Bancárias</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                        💼
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $regularAccounts->count() }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $accounts->count() }} itens financeiros</span>
+                        <button type="button" class="btn btn-link p-0 fw-bold" style="color: var(--dz-primary); text-decoration: none; font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#modalNewAccount">+ Nova conta</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 1: CARTÕES DE CRÉDITO -->
+        <section class="dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 1.1rem;">💳</span>
+                    <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Cartões de Crédito</h3>
+                    <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700;">
+                        {{ $creditCardAccounts->count() }}
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size: 0.75rem; font-weight: 700;">
+                        Ver todas as Faturas ↗
+                    </a>
+                </div>
+            </div>
+
+            @if($creditCardAccounts->isEmpty())
+                <div class="text-center py-4 px-3" style="background: var(--dz-bg-card-subtle); border-radius: var(--dz-radius-md); border: 1px dashed var(--dz-border);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">💳</div>
+                    <p class="fw-bold mb-1" style="color: var(--dz-text-title);">Nenhum cartão cadastrado ainda</p>
+                    <p class="small text-secondary mb-3">Cadastre seus cartões de crédito para acompanhar faturas e limites.</p>
+                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
+                        + Adicionar Cartão
+                    </button>
+                </div>
+            @else
+                <div class="row g-3">
+                    @foreach ($creditCardAccounts as $account)
+                        <div class="col-12 col-md-6 col-xl-4">
+                            @include('accounts.partials.account-card', ['account' => $account])
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </section>
+
+        <!-- SEÇÃO 2: CONTAS BANCÁRIAS & SALDOS -->
+        <section class="dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 1.1rem;">🏦</span>
+                    <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Contas Bancárias & Saldos</h3>
+                    <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700;">
+                        {{ $regularAccounts->count() }}
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    @if ($canCreateAccountTransfer)
+                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" style="font-size: 0.75rem; font-weight: 700;">
+                            Transferir entre contas ⇄
+                        </button>
+                    @endif
+                </div>
+            </div>
+
+            @if($regularAccounts->isEmpty())
+                <div class="text-center py-4 px-3" style="background: var(--dz-bg-card-subtle); border-radius: var(--dz-radius-md); border: 1px dashed var(--dz-border);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏦</div>
+                    <p class="fw-bold mb-1" style="color: var(--dz-text-title);">Nenhuma conta corrente cadastrada</p>
+                    <p class="small text-secondary mb-3">Cadastre suas contas bancárias para registrar receitas, despesas e transferências.</p>
+                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
+                        + Adicionar Conta
+                    </button>
+                </div>
+            @else
+                <div class="row g-3">
+                    @foreach ($regularAccounts as $account)
+                        <div class="col-12 col-md-6 col-xl-4">
+                            @include('accounts.partials.account-card', ['account' => $account])
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </section>
     </div>
 
     <div

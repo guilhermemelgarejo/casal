@@ -5125,12 +5125,12 @@ body .modal .modal-header.tx-modal-head--danger {
     letter-spacing: 0.06em;
 }
 
-/* Tour de onboarding (pós criar casal) */
+/* Tour de onboarding DuoZen 2.0 */
 .duozen-onboarding-backdrop {
     position: fixed;
     inset: 0;
     z-index: 1070;
-    background: rgba(15, 23, 42, 0.52);
+    background: transparent;
     pointer-events: auto;
 }
 
@@ -5138,19 +5138,35 @@ body .modal .modal-header.tx-modal-head--danger {
     position: fixed;
     z-index: 1071;
     border-radius: 0.75rem;
-    border: 2px solid rgba(255, 255, 255, 0.95);
+    border: 2px solid #6366F1;
     box-shadow:
-        0 0 0 1px rgba(124, 58, 237, 0.35),
-        0 0.35rem 1.25rem rgba(15, 23, 42, 0.25);
+        0 0 0 9999px rgba(15, 23, 42, 0.65),
+        0 0 20px rgba(99, 102, 241, 0.35);
     pointer-events: none;
-    transition: top 0.12s ease, left 0.12s ease, width 0.12s ease, height 0.12s ease;
+    transition: top 0.15s ease, left 0.15s ease, width 0.15s ease, height 0.15s ease;
 }
 
 .duozen-onboarding-panel {
     position: fixed;
     z-index: 1072;
     pointer-events: auto;
-    border-radius: var(--bs-border-radius-xl);
+    background: var(--dz-bg-card, #FFFFFF) !important;
+    border: 1px solid var(--dz-border, rgba(0, 0, 0, 0.08)) !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 0, 0, 0.1) !important;
+    color: var(--dz-text-body, #1E293B) !important;
+    animation: dzTourFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dzTourFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 body.duozen-onboarding-active {

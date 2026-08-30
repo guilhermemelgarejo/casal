@@ -13,9 +13,10 @@
     @if ($active) aria-current="page" @endif
     aria-label="Ver faturas do cartão {{ $account->name }}{{ $pickerSummary ? ', fatura '.$pickerSummary['ref_label'].' R$ '.$pickerSummary['spent_total_str'] : '' }}{{ $hasPastOpenStatements ? '. Há faturas de meses anteriores em aberto.' : '' }}"
 >
-    <div class="d-flex justify-content-between align-items-start gap-1 flex-shrink-0">
+    <div class="d-flex justify-content-between align-items-center gap-2 flex-shrink-0 mb-2">
         <span class="cc-pick-card-chip" aria-hidden="true"></span>
-        <div class="d-flex align-items-center gap-1 flex-shrink-0">
+        <div class="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">
+            <span class="cc-pick-card-pan small font-monospace opacity-75 text-nowrap" aria-hidden="true" style="letter-spacing: 0.04em; font-size: {{ $compact ? '0.7rem' : '0.78rem' }};">{{ $compact ? '•••• '.$panTail : '•••• •••• •••• '.$panTail }}</span>
             @if ($hasPastOpenStatements)
                 <span
                     class="cc-pick-card-past-open rounded-circle bg-warning d-inline-flex align-items-center justify-content-center shadow-sm"
@@ -32,22 +33,18 @@
             @endif
         </div>
     </div>
-    <div class="cc-pick-card-stack d-flex flex-column flex-grow-1 justify-content-end w-100 min-w-0">
-        <div class="cc-pick-card-main w-100">
-            @unless ($compact)
-                <div class="cc-pick-card-pan small font-monospace opacity-60 mb-2" aria-hidden="true">•••• •••• •••• {{ $panTail }}</div>
-            @endunless
+    <div class="cc-pick-card-stack d-flex flex-column flex-grow-1 justify-content-between w-100 min-w-0 pt-1">
+        <div class="cc-pick-card-main w-100 d-flex flex-column justify-content-center flex-grow-1">
             @if ($pickerSummary)
-                <div class="cc-pick-card-ref small opacity-75">{{ $pickerSummary['ref_label'] }}</div>
-                <div class="cc-pick-card-amount lh-sm {{ $compact ? 'fs-6' : 'fs-5' }} fw-bold mt-1 duozen-privacy-blur">R$ {{ $pickerSummary['spent_total_str'] }}</div>
+                <div class="cc-pick-card-amount lh-1 {{ $compact ? 'fs-6' : 'fs-5' }} fw-bold duozen-privacy-blur">R$ {{ $pickerSummary['spent_total_str'] }}</div>
                 @if (! empty($pickerSummary['partial']) && $pickerSummary['remaining'] > 0.005 && $pickerSummary['remaining'] + 0.01 < $pickerSummary['spent_total'])
-                    <div class="cc-pick-card-pending small opacity-90 mt-1">Pendente <span class="duozen-privacy-blur">R$ {{ $pickerSummary['remaining_str'] }}</span></div>
+                    <div class="cc-pick-card-pending small opacity-90 mt-1" style="font-size: 0.7rem;">Pendente <span class="duozen-privacy-blur">R$ {{ $pickerSummary['remaining_str'] }}</span></div>
                 @endif
             @else
-                <div class="cc-pick-card-none small opacity-75 {{ $compact ? 'mt-1' : 'mt-2' }}">Sem fatura em aberto</div>
+                <div class="cc-pick-card-none small opacity-75">Sem fatura em aberto</div>
             @endif
         </div>
-        <div class="cc-pick-card-footer d-flex justify-content-between align-items-end gap-2 w-100 flex-shrink-0 pt-2">
+        <div class="cc-pick-card-footer d-flex justify-content-between align-items-end gap-2 w-100 flex-shrink-0 pt-1">
             <div class="cc-pick-card-footer-start min-w-0">
                 <div class="cc-pick-card-brand fw-semibold">{{ $account->name }}</div>
                 @unless ($compact)

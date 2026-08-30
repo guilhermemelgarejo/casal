@@ -61,103 +61,118 @@
         @if(empty($embedded ?? false))
             <div class="container-xxl px-3 px-lg-4">
         @endif
-            <div class="rt-reminder-card border-0 shadow-sm @if($reminderPanelHasOverdue) rt-reminder-card--overdue @endif" role="status">
-                <div class="rt-reminder-card__inner">
-                    <div class="rt-reminder-card__icon" aria-hidden="true">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            <div class="rt-reminder-card border-0 shadow-sm @if($reminderPanelHasOverdue) rt-reminder-card--overdue @endif {{ $bothReminderKinds ? 'rt-reminder-columns--split' : '' }}" role="status" style="border-radius: var(--dz-radius-lg); background: var(--dz-bg-card); border: 1px solid var(--dz-border); padding: 0.85rem 1.15rem;">
+                
+                <!-- Cabeçalho Compacto em Linha Única -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="font-size: 1.1rem; line-height: 1;">🔔</span>
+                        <h3 class="rt-reminder-card__title mb-0" style="font-size: 0.92rem; font-weight: 800; color: var(--dz-text-title);">{{ $title }}</h3>
+                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: {{ $reminderPanelHasOverdue ? 'rgba(244, 63, 94, 0.15)' : 'var(--dz-primary-subtle)' }}; color: {{ $reminderPanelHasOverdue ? 'var(--dz-danger)' : 'var(--dz-primary)' }};">
+                            {{ count($monthlyReminders) + count($multipleReminders) + count($invoiceReminders) }} pendência(s)
+                        </span>
                     </div>
-                    <div class="rt-reminder-card__body min-w-0">
-                        <div class="rt-reminder-card__head">
-                            <h3 class="rt-reminder-card__title mb-0">{{ $title }}</h3>
-                            <div class="rt-reminder-card__head-actions">
-                                @if($hasRecurring && $manageUrl)
-                                    <a href="{{ $manageUrl }}" class="btn btn-sm rounded-pill rt-reminder-btn rt-reminder-btn--header @if($reminderPanelHasOverdue) btn-outline-danger @else btn-outline-primary @endif" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir a página de modelos recorrentes">{{ $manageLabel }}</a>
-                                @endif
-                                @if($hasInvoices && $invoiceManageUrl)
-                                    <a href="{{ $invoiceManageUrl }}" class="btn btn-sm rounded-pill rt-reminder-btn rt-reminder-btn--header @if($reminderPanelHasOverdue) btn-outline-danger @else btn-outline-primary @endif" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir faturas de cartão">{{ $invoiceManageLabel }}</a>
+                    <div class="d-flex align-items-center gap-2">
+                        @if($hasRecurring && $manageUrl)
+                            <a href="{{ $manageUrl }}" class="rt-reminder-btn--header" style="font-size: 0.75rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
+                                {{ $manageLabel }} ↗
+                            </a>
+                        @endif
+                        @if($hasRecurring && $hasInvoices)
+                            <span style="color: var(--dz-border); font-size: 0.75rem;">•</span>
+                        @endif
+                        @if($hasInvoices && $invoiceManageUrl)
+                            <a href="{{ $invoiceManageUrl }}" class="rt-reminder-btn--header" style="font-size: 0.75rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
+                                {{ $invoiceManageLabel }} ↗
+                            </a>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Trilha Horizontal Elegante de Lembretes (Estilo Fintech Carousel) -->
+                <div class="dz-reminder-track pt-2">
+                    <!-- Faturas de Cartão -->
+                    @foreach($invoiceReminders as $inv)
+                        @php
+                            $isOverdue = !empty($inv['is_overdue']);
+                        @endphp
+                        <div class="dz-reminder-chip dz-reminder-chip--card {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(124, 58, 237, 0.15); font-size: 0.85rem;">💳</span>
+                                    <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(124, 58, 237, 0.15); color: #7C3AED;"><span class="d-none">Faturas de cartão</span>Fatura</span>
+                                </div>
+                                @if($isOverdue)
+                                    <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: var(--dz-danger);">🔴 Vencida</span>
+                                @else
+                                    <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
+                                        {{ $inv['due_label'] ? explode(':', $inv['due_label'])[0] : $inv['ref_label'] }}
+                                    </span>
                                 @endif
                             </div>
+                            <div class="dz-reminder-chip__body">
+                                <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $inv['account_name'] }}">{{ $inv['account_name'] }}</div>
+                                <div class="fw-bolder dz-privacy-blur {{ $isOverdue ? 'text-danger' : '' }}" style="font-size: 1.05rem; color: var(--dz-text-title); margin-top: 0.15rem;">
+                                    R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}
+                                </div>
+                            </div>
+                            <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-outline-primary rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center;" title="Ver fatura do cartão">
+                                Ver Fatura ↗
+                            </a>
                         </div>
-                        <p class="rt-reminder-card__lead small text-secondary mb-0">{!! $description !!}</p>
+                    @endforeach
 
-                        <div class="rt-reminder-columns @if($activeColumnsCount === 2) rt-reminder-columns--split rt-reminder-columns--cols-2 @elseif($activeColumnsCount >= 3) rt-reminder-columns--split rt-reminder-columns--cols-3 @endif">
-                            @if($hasMonthly)
-                                <div class="rt-reminder-col rt-reminder-col--recurring min-w-0">
-                                    <p class="rt-reminder-subhead small fw-semibold text-secondary mb-1 text-uppercase">
-                                        {{ $hasMultiple ? 'Recorrentes mensais' : 'Recorrentes' }}
-                                    </p>
-                                    <ul class="list-unstyled rt-reminder-list mb-0">
-                                        @foreach($monthlyReminders as $rec)
-                                            @php
-                                                $predDay = $rec->effectiveDayInMonth($reminderCivilYear, $reminderCivilMonth);
-                                                $predDateLabel = sprintf('%02d/%02d/%04d', $predDay, $reminderCivilMonth, $reminderCivilYear);
-                                            @endphp
-                                            <li class="rt-reminder-list__item">
-                                                <div class="rt-reminder-list__row rt-reminder-list__row--invoice">
-                                                    <span class="rt-reminder-list__name min-w-0">
-                                                        <span class="d-block text-truncate">{{ $rec->description }}</span>
-                                                        <span class="d-block small text-secondary text-truncate">Dia previsto: {{ $predDateLabel }}</span>
-                                                    </span>
-                                                    <span class="rt-reminder-list__amount duozen-privacy-blur">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
-                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                    <!-- Recorrentes Mensais -->
+                    @foreach($monthlyReminders as $rec)
+                        @php
+                            $predDay = $rec->effectiveDayInMonth($reminderCivilYear, $reminderCivilMonth);
+                        @endphp
+                        <div class="dz-reminder-chip dz-reminder-chip--recurring">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.85rem;">🔁</span>
+                                    <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;"><span class="d-none">Recorrentes</span>Mensal</span>
                                 </div>
-                            @endif
-
-                            @if($hasMultiple)
-                                <div class="rt-reminder-col rt-reminder-col--multiples min-w-0">
-                                    <p class="rt-reminder-subhead small fw-semibold text-secondary mb-1 text-uppercase">Recorrentes múltiplos</p>
-                                    <ul class="list-unstyled rt-reminder-list mb-0">
-                                        @foreach($multipleReminders as $rec)
-                                            <li class="rt-reminder-list__item">
-                                                <div class="rt-reminder-list__row rt-reminder-list__row--invoice">
-                                                    <span class="rt-reminder-list__name min-w-0">
-                                                        <span class="d-flex align-items-center gap-2">
-                                                            <span class="d-block text-truncate">{{ $rec->description }}</span>
-                                                            <span class="badge rounded-pill text-bg-info text-dark-emphasis flex-shrink-0" style="font-size: 0.68rem;">Múltiplo</span>
-                                                        </span>
-                                                        <span class="d-block small text-secondary text-truncate">Atalho</span>
-                                                    </span>
-                                                    <span class="rt-reminder-list__amount duozen-privacy-blur">R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}</span>
-                                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir ao painel com este modelo pré-preenchido">Criar lançamento</a>
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
+                                    <span class="d-none">Dia previsto: {{ sprintf('%02d/%02d/%04d', $predDay, $reminderCivilMonth, $reminderCivilYear) }}</span>
+                                    Dia {{ sprintf('%02d', $predDay) }}
+                                </span>
+                            </div>
+                            <div class="dz-reminder-chip__body">
+                                <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
+                                <div class="fw-bolder dz-privacy-blur text-success" style="font-size: 1.05rem; margin-top: 0.15rem;">
+                                    R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
                                 </div>
-                            @endif
-
-                            @if($hasInvoices)
-                                <div class="rt-reminder-col rt-reminder-col--invoices min-w-0">
-                                    <p class="rt-reminder-subhead small fw-semibold text-secondary mb-1 text-uppercase">Faturas de cartão</p>
-                                    <ul class="list-unstyled rt-reminder-list mb-0">
-                                        @foreach($invoiceReminders as $inv)
-                                            <li class="rt-reminder-list__item">
-                                                <div class="rt-reminder-list__row rt-reminder-list__row--invoice">
-                                                    <span class="rt-reminder-list__name min-w-0">
-                                                        <span class="d-flex flex-wrap align-items-center gap-2">
-                                                            <span class="text-truncate">{{ $inv['account_name'] }} · {{ $inv['ref_label'] }}</span>
-                                                            @if(!empty($inv['is_overdue']))
-                                                                <span class="badge rounded-pill text-bg-warning text-dark-emphasis flex-shrink-0">Vencida</span>
-                                                            @endif
-                                                        </span>
-                                                        @if(!empty($inv['due_label']))
-                                                            <span class="d-block small text-secondary text-truncate">{{ $inv['due_label'] }}</span>
-                                                        @endif
-                                                    </span>
-                                                    <span class="rt-reminder-list__amount duozen-privacy-blur">R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}</span>
-                                                    <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-primary rounded-pill rt-reminder-btn rt-reminder-list__cta" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir o cartão e o período desta fatura">Ver fatura</a>
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
+                            </div>
+                            <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-success rounded-pill w-100 py-1 text-white fw-bold" style="font-size: 0.72rem; text-align: center;" title="Lançar este modelo no painel">
+                                + Lançar Mensal
+                            </a>
                         </div>
-                    </div>
+                    @endforeach
+
+                    <!-- Recorrentes Múltiplos / Atalhos -->
+                    @foreach($multipleReminders as $rec)
+                        <div class="dz-reminder-chip dz-reminder-chip--shortcut">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(245, 158, 11, 0.15); font-size: 0.85rem;">⚡</span>
+                                    <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">Atalho</span>
+                                </div>
+                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: rgba(245, 158, 11, 0.12); color: #D97706;">
+                                    Rápido
+                                </span>
+                            </div>
+                            <div class="dz-reminder-chip__body">
+                                <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
+                                <div class="fw-bolder dz-privacy-blur" style="font-size: 1.05rem; color: #D97706; margin-top: 0.15rem;">
+                                    R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
+                                </div>
+                            </div>
+                            <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Lançar este atalho no painel">
+                                + Lançar Rápido
+                            </a>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         @if(empty($embedded ?? false))

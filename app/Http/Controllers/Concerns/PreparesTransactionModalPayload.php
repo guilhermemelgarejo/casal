@@ -36,7 +36,7 @@ trait PreparesTransactionModalPayload
             ];
         })->values();
 
-        $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->values();
+        $regularAccounts = $accounts->where('kind', Account::KIND_REGULAR)->sortByDesc(fn (Account $a) => (float) $a->balance)->values();
         $cardAccounts = $accounts->where('kind', Account::KIND_CREDIT_CARD)->values();
 
         $fundingOld = old('funding');

@@ -15,195 +15,69 @@
     $cardAccent = $p->color ?: ($p->isBitcoin() ? '#f59e0b' : '#0d9488');
 @endphp
 <div class="col-md-6 col-xl-4">
-    <div class="card border-0 cofrinhos-project-card {{ ! $p->is_active ? 'cofrinhos-project-card--inactive' : '' }} h-100" style="--cofrinho-accent: {{ e($cardAccent) }}">
+    <div class="card border-0 cofrinhos-project-card {{ ! $p->is_active ? 'cofrinhos-project-card--inactive' : '' }} d-flex flex-column h-100 shadow-sm" style="--cofrinho-accent: {{ e($cardAccent) }}; padding: 1.25rem;">
         <div class="cofrinhos-project-card__accent" aria-hidden="true"></div>
-        <div class="cofrinhos-project-card__top">
-            <div class="cofrinhos-project-card__avatar" aria-hidden="true">
-                @if($p->isBitcoin())
-                    <span class="fs-4 fw-bold">₿</span>
-                @elseif($p->asset_type === 'crypto')
-                    <span class="fs-5 fw-bold">⟠</span>
-                @elseif($p->asset_type === 'stock')
-                    <span class="fs-5">📈</span>
-                @elseif($p->asset_type === 'fii')
-                    <span class="fs-5">🏢</span>
-                @elseif($p->asset_type === 'fixed_income')
-                    <span class="fs-5">🏛️</span>
-                @else
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 48 48">
-                        <ellipse cx="24" cy="29" rx="16" ry="11" fill="currentColor" opacity="0.18" />
-                        <path d="M12 27c0-7.2 6.2-13 14-13 6.8 0 12.6 4.4 13.8 10.2l3 1.1a2 2 0 011.2 1.8v3.1a2 2 0 01-2 2h-2.4a13.8 13.8 0 01-3.6 4.1v3.2a2 2 0 01-2 2h-3.1a2 2 0 01-1.9-1.4l-.5-1.4a20.3 20.3 0 01-6.9 0l-.5 1.4a2 2 0 01-1.9 1.4H16a2 2 0 01-2-2v-3.3A12.8 12.8 0 0112 27z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
-                        <path d="M20 14c1.4-3.4 5.9-5 9.8-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
-                        <circle cx="31" cy="24" r="1.8" fill="currentColor" />
-                        <path d="M21 23h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
-                    </svg>
-                @endif
-            </div>
-            <div class="min-w-0 flex-grow-1">
-                <div class="d-flex align-items-start justify-content-between gap-2">
-                    <h3 class="cofrinhos-project-card__title mb-1 text-truncate">{{ $p->name }}</h3>
-                    @if(! $p->is_active)
-                        <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--inactive">Inativo</span>
-                    @elseif($p->isBitcoin())
-                        <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--crypto">₿ Bitcoin</span>
-                    @elseif($isAsset)
-                        <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--{{ str_replace('_', '-', $p->asset_type) }}">{{ $p->asset_code ?: $p->assetTypeLabel() }}</span>
-                    @elseif($isComplete)
-                        <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--done">Concluído</span>
-                    @elseif($target !== null)
-                        <span class="cofrinhos-project-card__badge">Com meta</span>
+        
+        <!-- TOPO DO CARD: AVATAR, TÍTULO, BADGES E BOTÕES DE AÇÃO RÁPIDA -->
+        <div class="cofrinhos-project-card__top d-flex align-items-start justify-content-between gap-2 mb-2.5">
+            <div class="d-flex align-items-start min-w-0 flex-grow-1" style="gap: 0.95rem;">
+                <div class="cofrinhos-project-card__avatar flex-shrink-0" aria-hidden="true">
+                    @if($p->isBitcoin())
+                        <span class="fs-4 fw-bold">₿</span>
+                    @elseif($p->asset_type === 'crypto')
+                        <span class="fs-5 fw-bold">⟠</span>
+                    @elseif($p->asset_type === 'stock')
+                        <span class="fs-5">📈</span>
+                    @elseif($p->asset_type === 'fii')
+                        <span class="fs-5">🏢</span>
+                    @elseif($p->asset_type === 'fixed_income')
+                        <span class="fs-5">🏛️</span>
                     @else
-                        <span class="cofrinhos-project-card__badge cofrinhos-project-card__badge--muted">Livre</span>
+                        <span class="fs-5">🐷</span>
                     @endif
                 </div>
-                @if($isAsset)
-                    <p class="small text-secondary mb-0">Preço Médio: <strong class="text-body duozen-privacy-blur">R$ {{ number_format((float) $p->asset_avg_price, 2, ',', '.') }}</strong></p>
-                @elseif($target !== null)
-                    <p class="small text-secondary mb-0">Meta de <span class="duozen-privacy-blur">R$ {{ number_format($target, 2, ',', '.') }}</span></p>
-                @else
-                    <p class="small text-secondary mb-0">Sem valor-alvo definido</p>
-                @endif
-            </div>
-        </div>
-        <div class="card-body p-4 cofrinhos-project-card__body">
-            @if($isAsset)
-                {{-- Seção de Ativo / Cripto --}}
-                <div class="d-flex align-items-baseline justify-content-between gap-2 mb-1">
-                    <p class="dz-stat-label mb-0">Quantidade acumulada</p>
-                    @if($quote && $p->is_active)
-                        <div class="cofrinhos-quote-pill" id="quote-pill-{{ $p->id }}">
-                            <span>Cotação: <strong id="quote-price-{{ $p->id }}">{{ $quote->formattedPrice() }}</strong></span>
-                            <button
-                                type="button"
-                                class="js-btn-refresh-quote"
-                                data-asset-type="{{ $p->asset_type }}"
-                                data-asset-code="{{ $p->asset_code }}"
-                                data-asset-quantity="{{ (float) $p->asset_quantity }}"
-                                data-asset-avg-price="{{ (float) $p->asset_avg_price }}"
-                                data-target-price-id="quote-price-{{ $p->id }}"
-                                data-cofrinho-id="{{ $p->id }}"
-                                title="Atualizar cotação agora"
-                            >⟳</button>
-                        </div>
+                <div class="min-w-0 flex-grow-1">
+                    <div class="d-flex align-items-center gap-1.5 flex-wrap mb-0.5">
+                        <h3 class="cofrinhos-project-card__title mb-0 text-truncate" style="font-size: 1rem; font-weight: 700; color: var(--dz-text-title);" title="{{ $p->name }}">{{ $p->name }}</h3>
+                        @if(! $p->is_active)
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary" style="font-size: 0.65rem;">Inativo</span>
+                        @elseif($p->isBitcoin())
+                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #D97706;">₿ Bitcoin</span>
+                        @elseif($isAsset)
+                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: var(--dz-primary-subtle); color: var(--dz-primary);">{{ $p->asset_code ?: $p->assetTypeLabel() }}</span>
+                        @elseif($isComplete)
+                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #059669;">Concluído</span>
+                        @elseif($target !== null)
+                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: var(--dz-primary-subtle); color: var(--dz-primary);">Com meta</span>
+                        @else
+                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: var(--dz-bg-card-subtle); color: var(--dz-text-secondary); border: 1px solid var(--dz-border);">Livre</span>
+                        @endif
+                    </div>
+                    @if($isAsset)
+                        <p class="small text-secondary mb-0" style="font-size: 0.75rem;">Preço Médio: <strong class="text-body duozen-privacy-blur">R$ {{ number_format((float) $p->asset_avg_price, 2, ',', '.') }}</strong></p>
+                    @elseif($target !== null)
+                        <p class="small text-secondary mb-0" style="font-size: 0.75rem;">Meta de <span class="duozen-privacy-blur">R$ {{ number_format($target, 2, ',', '.') }}</span></p>
+                    @else
+                        <p class="small text-secondary mb-0" style="font-size: 0.75rem;">Sem valor-alvo definido</p>
                     @endif
                 </div>
-                <p class="cofrinhos-project-card__amount mb-3 duozen-privacy-blur">
-                    {{ rtrim(rtrim(number_format((float) $p->asset_quantity, 8, ',', '.'), '0'), ',') ?: '0' }} <span class="fs-6 fw-semibold text-secondary">{{ $p->assetUnitLabel() }}</span>
-                </p>
-
-                <div class="cofrinhos-asset-stats-grid mb-3">
-                    <div class="cofrinhos-mini-stat">
-                        <span>Patrimônio atual</span>
-                        <strong class="duozen-privacy-blur text-body" id="estimated-val-{{ $p->id }}">R$ {{ number_format($saved, 2, ',', '.') }}</strong>
-                    </div>
-                    <div class="cofrinhos-mini-stat">
-                        <span>Total investido</span>
-                        <strong class="duozen-privacy-blur">R$ {{ number_format($invested, 2, ',', '.') }}</strong>
-                    </div>
-                </div>
-
-                @if($invested > 0)
-                    <div id="profit-container-{{ $p->id }}" class="d-flex align-items-center justify-content-between rounded-3 border p-2 px-3 mb-3 {{ $profit >= 0 ? 'border-success-subtle bg-success-subtle' : 'border-danger-subtle bg-danger-subtle' }}">
-                        <span class="small fw-semibold text-secondary">Rentabilidade</span>
-                        <span id="profit-badge-{{ $p->id }}" class="small fw-bold {{ $profit >= 0 ? 'text-success' : 'text-danger' }}">
-                            {{ $profit >= 0 ? '+' : '' }}R$ {{ number_format($profit, 2, ',', '.') }}
-                            @if($profitPct !== null)
-                                ({{ ($profitPct >= 0 ? '+' : '') . number_format($profitPct, 2, ',', '.') }}%)
-                            @endif
-                        </span>
-                    </div>
-                @endif
-            @else
-                {{-- Seção Tradicional em R$ --}}
-                <p class="dz-stat-label mb-1">Guardado agora</p>
-                <p class="cofrinhos-project-card__amount mb-3 duozen-privacy-blur">R$ {{ number_format($saved, 2, ',', '.') }}</p>
-                @if($target !== null)
-                    @if($pct !== null)
-                        <div class="cofrinhos-progress mb-3" aria-label="Progresso de {{ number_format((float) $pct, 1, ',', '.') }}%">
-                            <div class="cofrinhos-progress__bar {{ $isComplete ? 'cofrinhos-progress__bar--done' : '' }}" style="width: {{ number_format((float) $pct, 2, '.', '') }}%"></div>
-                        </div>
-                    @endif
-                    <div class="cofrinhos-project-card__metrics mb-3">
-                        <div class="cofrinhos-mini-stat">
-                            <span>Falta</span>
-                            <strong class="duozen-privacy-blur">R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong>
-                        </div>
-                        <div class="cofrinhos-mini-stat">
-                            <span>Avanço</span>
-                            <strong>{{ number_format((float) $pct, 1, ',', '.') }}%</strong>
-                        </div>
-                    </div>
-                @else
-                    <div class="cofrinhos-no-target mb-3">
-                        Use como reserva livre ou edite o cofrinho para definir uma meta.
-                    </div>
-                @endif
-            @endif
-
-            {{-- Ações Primárias --}}
-            <div class="cofrinhos-project-card__primary-actions">
-                @if(! $p->is_active)
-                    <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-pill bg-body-secondary border border-secondary-subtle small text-secondary w-100">
-                        <span>Cofrinho desativado</span>
-                        <form action="{{ route('cofrinhos.toggle-active', $p) }}" method="post" class="d-inline">
-                            @csrf
-                            @method('PATCH')
-                            <button type="submit" class="btn btn-sm btn-link p-0 text-primary fw-semibold text-decoration-none">Reativar</button>
-                        </form>
-                    </div>
-                @elseif($isAsset)
-                    <button
-                        type="button"
-                        class="btn btn-success btn-sm rounded-pill px-3"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalCofrinhoAssetAporte{{ $p->id }}"
-                    >+ Aporte {{ $p->isBitcoin() ? 'BTC' : $p->assetUnitLabel() }}</button>
-                    <a
-                        href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
-                        class="btn btn-outline-danger btn-sm rounded-pill px-3"
-                        data-bs-toggle="tooltip"
-                        data-bs-placement="top"
-                        title="Ir ao painel com receita em Retirada de cofrinho e este cofrinho"
-                    >− Retirada</a>
-                @else
-                    <a
-                        href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'aporte']) }}"
-                        class="btn btn-success btn-sm rounded-pill px-3"
-                        data-bs-toggle="tooltip"
-                        data-bs-placement="top"
-                        title="Ir ao painel com despesa em Investimentos e este cofrinho"
-                    >+ Aporte</a>
-                    <a
-                        href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
-                        class="btn btn-outline-danger btn-sm rounded-pill px-3"
-                        data-bs-toggle="tooltip"
-                        data-bs-placement="top"
-                        title="Ir ao painel com receita em Retirada de cofrinho e este cofrinho"
-                    >− Retirada</a>
-                @endif
             </div>
 
-            {{-- Barra secundária --}}
-            <div class="cofrinhos-project-card__toolbar pt-3 mt-3">
-                @if($p->is_active && ! $isAsset)
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary btn-sm rounded-pill"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalCofrinhoJuros{{ $p->id }}"
-                    >
-                        + Juros
-                    </button>
-                @endif
+            <!-- Botões de Ação no Topo do Card (Histórico, Editar, Mais Opções) -->
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
                 <a
                     href="{{ route('cofrinhos.movements', $p) }}"
-                    class="btn btn-outline-dark btn-sm rounded-pill"
+                    class="btn btn-sm btn-icon rounded-circle accounts-action-btn"
+                    title="Ver Histórico de Movimentações"
+                    style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;"
                 >
-                    Movimentações
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                 </a>
                 <button
                     type="button"
-                    class="btn btn-outline-secondary btn-sm rounded-pill js-cofrinho-edit-open"
+                    class="btn btn-sm btn-icon rounded-circle accounts-action-btn js-cofrinho-edit-open"
+                    title="Editar cofrinho"
+                    style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;"
                     data-bs-toggle="modal"
                     data-bs-target="#modalCofrinhoEdit"
                     data-cofrinho-id="{{ $p->id }}"
@@ -216,26 +90,176 @@
                     data-cofrinho-color="{{ e($cardAccent) }}"
                     data-cofrinho-is-active="{{ $p->is_active ? '1' : '0' }}"
                     data-cofrinho-saved="{{ number_format((float) $p->savedProgress(), 2, ',', '.') }}"
-                >Editar</button>
-                @if($p->is_active)
-                    <form action="{{ route('cofrinhos.toggle-active', $p) }}" method="post" class="d-inline" data-confirm-title="Desativar cofrinho" data-confirm="Desativar este cofrinho? Ele não aparecerá para novos lançamentos e aportes." data-confirm-accept="Sim, desativar" data-confirm-cancel="Cancelar">
-                        @csrf
-                        @method('PATCH')
-                        <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill">Desativar</button>
-                    </form>
+                >
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-icon rounded-circle accounts-action-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Mais opções" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: var(--dz-radius-md); border: 1px solid var(--dz-border); font-size: 0.82rem;">
+                        @if($p->is_active)
+                            <li>
+                                <form action="{{ route('cofrinhos.toggle-active', $p) }}" method="post" class="d-inline" data-confirm-title="Desativar cofrinho" data-confirm="Desativar este cofrinho? Ele não aparecerá para novos lançamentos e aportes." data-confirm-accept="Sim, desativar" data-confirm-cancel="Cancelar">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="dropdown-item py-1.5 text-secondary">
+                                        ⏸️ Desativar cofrinho
+                                    </button>
+                                </form>
+                            </li>
+                        @else
+                            <li>
+                                <form action="{{ route('cofrinhos.toggle-active', $p) }}" method="post" class="d-inline">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="dropdown-item py-1.5 text-success">
+                                        ▶️ Reativar cofrinho
+                                    </button>
+                                </form>
+                            </li>
+                        @endif
+                        <li><hr class="dropdown-divider my-1"></li>
+                        <li>
+                            <form action="{{ route('cofrinhos.destroy', $p) }}" method="post" class="d-inline" data-confirm-title="Excluir cofrinho" data-confirm="Excluir este cofrinho? Movimentações vinculadas podem afetar o histórico." data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="dropdown-item py-1.5 text-danger">
+                                    🗑️ Excluir cofrinho
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- CORPO PRINCIPAL DO CARD -->
+        <div class="d-flex flex-column flex-grow-1 justify-content-center py-2">
+            @if($isAsset)
+                {{-- Seção de Ativo / Cripto --}}
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                    <span class="small text-secondary fw-semibold" style="font-size: 0.75rem;">Quantidade acumulada</span>
+                    @if($quote && $p->is_active)
+                        <div class="d-inline-flex align-items-center gap-1.5 px-2 py-0.5 rounded-pill" style="background: var(--dz-bg-card-subtle); border: 1px solid var(--dz-border); font-size: 0.7rem;">
+                            <span>Cotação: <strong id="quote-price-{{ $p->id }}">{{ $quote->formattedPrice() }}</strong></span>
+                            <button
+                                type="button"
+                                class="js-btn-refresh-quote btn btn-link p-0 text-decoration-none"
+                                data-asset-type="{{ $p->asset_type }}"
+                                data-asset-code="{{ $p->asset_code }}"
+                                data-asset-quantity="{{ (float) $p->asset_quantity }}"
+                                data-asset-avg-price="{{ (float) $p->asset_avg_price }}"
+                                data-target-price-id="quote-price-{{ $p->id }}"
+                                data-cofrinho-id="{{ $p->id }}"
+                                title="Atualizar cotação agora"
+                                style="font-size: 0.85rem; color: var(--dz-primary); line-height: 1;"
+                            >⟳</button>
+                        </div>
+                    @endif
+                </div>
+                <div class="fs-4 fw-bold mb-2 duozen-privacy-blur" style="color: var(--dz-text-title); font-size: 1.35rem; line-height: 1.15;">
+                    {{ rtrim(rtrim(number_format((float) $p->asset_quantity, 8, ',', '.'), '0'), ',') ?: '0' }} <span class="fs-6 fw-semibold text-secondary">{{ $p->assetUnitLabel() }}</span>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <div class="p-2 rounded-3" style="background: var(--dz-bg-card-subtle); border: 1px solid var(--dz-border-subtle);">
+                            <span class="text-secondary small d-block" style="font-size: 0.68rem;">Patrimônio atual</span>
+                            <strong class="duozen-privacy-blur text-body" style="font-size: 0.82rem;" id="estimated-val-{{ $p->id }}">R$ {{ number_format($saved, 2, ',', '.') }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded-3" style="background: var(--dz-bg-card-subtle); border: 1px solid var(--dz-border-subtle);">
+                            <span class="text-secondary small d-block" style="font-size: 0.68rem;">Total investido</span>
+                            <strong class="duozen-privacy-blur text-body" style="font-size: 0.82rem;">R$ {{ number_format($invested, 2, ',', '.') }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                @if($invested > 0)
+                    <div id="profit-container-{{ $p->id }}" class="d-flex align-items-center justify-content-between rounded-3 border mb-2 {{ $profit >= 0 ? 'border-success-subtle bg-success-subtle' : 'border-danger-subtle bg-danger-subtle' }}" style="padding: 0.55rem 0.95rem;">
+                        <span class="small fw-semibold text-secondary" style="font-size: 0.72rem;">Rentabilidade</span>
+                        <span id="profit-badge-{{ $p->id }}" class="small fw-bold {{ $profit >= 0 ? 'text-success' : 'text-danger' }}" style="font-size: 0.78rem;">
+                            {{ $profit >= 0 ? '+' : '' }}R$ {{ number_format($profit, 2, ',', '.') }}
+                            @if($profitPct !== null)
+                                ({{ ($profitPct >= 0 ? '+' : '') . number_format($profitPct, 2, ',', '.') }}%)
+                            @endif
+                        </span>
+                    </div>
+                @endif
+            @else
+                {{-- Seção Tradicional em R$ --}}
+                <span class="small text-secondary fw-semibold d-block mb-0.5" style="font-size: 0.75rem;">Guardado agora</span>
+                <div class="fs-4 fw-bold mb-2 duozen-privacy-blur" style="color: var(--dz-text-title); font-size: 1.35rem; line-height: 1.15;">R$ {{ number_format($saved, 2, ',', '.') }}</div>
+                @if($target !== null)
+                    @if($pct !== null)
+                        <div class="progress mb-2" style="height: 6px; background: var(--dz-border); border-radius: 9999px;">
+                            <div class="progress-bar {{ $isComplete ? 'bg-success' : 'bg-primary' }}" style="width: {{ number_format((float) $pct, 2, '.', '') }}%; border-radius: 9999px;"></div>
+                        </div>
+                    @endif
+                    <div class="d-flex align-items-center justify-content-between text-secondary small mb-1" style="font-size: 0.75rem;">
+                        <span>Falta: <strong class="text-body duozen-privacy-blur">R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong></span>
+                        <span>Avanço: <strong class="text-body">{{ number_format((float) $pct, 1, ',', '.') }}%</strong></span>
+                    </div>
                 @else
+                    <p class="small text-secondary mb-1" style="font-size: 0.78rem; line-height: 1.35;">
+                        Use como reserva livre ou edite o cofrinho para definir uma meta financeira.
+                    </p>
+                @endif
+            @endif
+        </div>
+
+        <!-- RODAPÉ DO CARD: BOTÕES DE APORTE, RETIRADA E JUROS ALINHADOS NA MESMA LINHA -->
+        <div class="d-flex align-items-center gap-2 pt-2.5 border-top mt-auto" style="border-color: var(--dz-border-subtle) !important;">
+            @if(! $p->is_active)
+                <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-pill bg-body-secondary border border-secondary-subtle small text-secondary w-100">
+                    <span>Cofrinho desativado</span>
                     <form action="{{ route('cofrinhos.toggle-active', $p) }}" method="post" class="d-inline">
                         @csrf
                         @method('PATCH')
-                        <button type="submit" class="btn btn-outline-success btn-sm rounded-pill">Reativar</button>
+                        <button type="submit" class="btn btn-sm btn-link p-0 text-primary fw-semibold text-decoration-none">Reativar</button>
                     </form>
-                @endif
-                <form action="{{ route('cofrinhos.destroy', $p) }}" method="post" class="d-inline" data-confirm-title="Excluir cofrinho" data-confirm="Excluir este cofrinho? Movimentações vinculadas podem afetar o histórico." data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill">Excluir</button>
-                </form>
-            </div>
+                </div>
+            @elseif($isAsset)
+                <button
+                    type="button"
+                    class="btn btn-success btn-sm rounded-pill px-3 flex-grow-1 fw-bold text-white shadow-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalCofrinhoAssetAporte{{ $p->id }}"
+                >+ Aporte {{ $p->isBitcoin() ? 'BTC' : $p->assetUnitLabel() }}</button>
+                <a
+                    href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
+                    class="btn btn-outline-danger btn-sm rounded-pill px-3 flex-grow-1 fw-semibold"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Registrar retirada deste cofrinho"
+                >− Retirada</a>
+            @else
+                <a
+                    href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'aporte']) }}"
+                    class="btn btn-success btn-sm rounded-pill px-3 flex-grow-1 fw-bold text-white shadow-sm"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Registrar aporte neste cofrinho"
+                >+ Aporte</a>
+                <a
+                    href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
+                    class="btn btn-outline-danger btn-sm rounded-pill px-3 flex-grow-1 fw-semibold"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Registrar retirada deste cofrinho"
+                >− Retirada</a>
+                <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm rounded-pill px-2.5 fw-semibold"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalCofrinhoJuros{{ $p->id }}"
+                    title="Lançar juros/rendimentos neste cofrinho"
+                >
+                    + Juros
+                </button>
+            @endif
         </div>
     </div>
 </div>

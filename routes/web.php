@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SubscriptionAdminController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ConceptController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CoupleController;
 use App\Http\Controllers\CreditCardStatementController;
@@ -26,6 +27,8 @@ Route::match(['get', 'post'], '/system/deploy-hook/{token?}', DeployController::
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/conceito', [ConceptController::class, 'index'])->name('concept.index');
 
 Route::get('/contato', [ContactController::class, 'show'])->name('contact.show');
 Route::post('/contato', [ContactController::class, 'send'])
@@ -59,6 +62,7 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::put('/categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
 
+    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::post('/transactions/credit-limit-precheck', [TransactionController::class, 'creditLimitPrecheck'])->name('transactions.credit-limit-precheck');
     Route::post('/transactions/{transaction}/credit-limit-precheck-update', [TransactionController::class, 'creditLimitPrecheckUpdate'])->name('transactions.credit-limit-precheck-update');
     Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');

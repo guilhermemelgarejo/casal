@@ -86,14 +86,14 @@
                 <div class="mb-3">
                     @if($hasLimit)
                         <div class="d-flex align-items-baseline justify-content-between gap-2 mb-1">
-                            <div>
-                                <span class="text-secondary fw-semibold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.65rem;">Disponível</span>
-                                <div class="fs-4 fw-bold {{ $limitAvail < 0 ? 'text-danger' : 'text-success' }} duozen-privacy-blur">
+                            <div class="min-w-0">
+                                <span class="text-secondary fw-semibold text-uppercase d-block" style="letter-spacing: 0.05em; font-size: 0.65rem;">Disponível</span>
+                                <div class="fs-4 fw-bold {{ $limitAvail < 0 ? 'text-danger' : 'text-success' }} duozen-privacy-blur text-truncate">
                                     R$ {{ number_format($limitAvail, 2, ',', '.') }}
                                 </div>
                             </div>
-                            <div class="text-end">
-                                <span class="text-secondary small" style="font-size: 0.72rem;">Limite total</span>
+                            <div class="text-end flex-shrink-0">
+                                <span class="text-secondary small d-block" style="font-size: 0.72rem;">Limite total</span>
                                 <div class="fw-semibold text-body duozen-privacy-blur">
                                     R$ {{ number_format($limitTot, 2, ',', '.') }}
                                 </div>

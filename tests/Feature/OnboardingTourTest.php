@@ -17,7 +17,19 @@ class OnboardingTourTest extends TestCase
 
         $this->actingAs($user)->post(route('couple.create'), [
             'name' => 'Casal Teste Tour',
-        ])->assertRedirect(route('couple.index'));
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertTrue(session()->get('duozen_onboarding_tour'));
+    }
+
+    public function test_entrar_em_casal_define_sessao_de_onboarding(): void
+    {
+        $couple = Couple::factory()->create(['invite_code' => 'ABC123XYZ']);
+        $user = User::factory()->create(['couple_id' => null]);
+
+        $this->actingAs($user)->post(route('couple.join'), [
+            'invite_code' => 'ABC123XYZ',
+        ])->assertRedirect(route('dashboard'));
 
         $this->assertTrue(session()->get('duozen_onboarding_tour'));
     }

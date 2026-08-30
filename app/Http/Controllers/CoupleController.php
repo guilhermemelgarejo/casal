@@ -73,7 +73,7 @@ class CoupleController extends Controller
 
         $request->session()->put('duozen_onboarding_tour', true);
 
-        return redirect()->route('couple.index')->with('success', 'Casal criado com sucesso!');
+        return redirect()->route('dashboard')->with('success', 'Casal criado com sucesso! Bem-vindos ao DuoZen.');
     }
 
     public function join(Request $request)
@@ -96,7 +96,9 @@ class CoupleController extends Controller
         $user->couple_id = $couple->id;
         $user->save();
 
-        return redirect()->route('couple.index')->with('success', 'Você entrou no casal!');
+        $request->session()->put('duozen_onboarding_tour', true);
+
+        return redirect()->route('dashboard')->with('success', 'Você entrou no casal! Bem-vindo(a) ao DuoZen.');
     }
 
     public function sendInvite(Request $request)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\CreditCardStatement;
@@ -9,6 +10,7 @@ use App\Models\FinancialProject;
 use App\Models\Transaction;
 use App\Support\PaymentMethods;
 use App\Support\TransactionCategorySplitDistribution;
+use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,9 +22,155 @@ use Illuminate\Validation\ValidationException;
 
 class TransactionController extends Controller
 {
+    use PreparesTransactionModalPayload;
+
     private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING = 'credit_limit_overflow_pending';
 
     private const SESSION_CREDIT_LIMIT_OVERFLOW_PENDING_UPDATE = 'credit_limit_overflow_pending_tx_update';
+
+    public function index(Request $request)
+    {
+        $couple = Auth::user()->couple;
+        if (! $couple) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'period' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
+            'account_id' => ['nullable', 'integer'],
+            'category_id' => ['nullable', 'integer'],
+            'user_id' => ['nullable', 'integer'],
+            'type' => ['nullable', 'string', 'in:income,expense,all'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'focus_transaction' => ['nullable', 'integer'],
+        ]);
+
+        if (! empty($validated['period'])) {
+            [$year, $month] = array_map('intval', explode('-', $validated['period']));
+        } else {
+            $year = (int) now()->year;
+            $month = (int) now()->month;
+        }
+
+        $period = sprintf('%04d-%02d', $year, $month);
+        $periodDate = Carbon::createFromDate($year, $month, 1);
+        $periodLabel = $periodDate->translatedFormat('F \d\e Y');
+        $periodPrev = $periodDate->copy()->subMonth()->format('Y-m');
+        $periodNext = $periodDate->copy()->addMonth()->format('Y-m');
+
+        $filterAccountId = ! empty($validated['account_id']) ? (int) $validated['account_id'] : null;
+        $filterCategoryId = ! empty($validated['category_id']) ? (int) $validated['category_id'] : null;
+        $filterUserId = ! empty($validated['user_id']) ? (int) $validated['user_id'] : null;
+        $filterType = ! empty($validated['type']) && $validated['type'] !== 'all' ? $validated['type'] : null;
+        $searchQuery = ! empty($validated['search']) ? trim($validated['search']) : null;
+
+        $query = $couple->transactions()
+            ->with(['user', 'accountModel', 'categorySplits.category', 'creditCardStatementsPaidFor'])
+            ->whereMatchesTransactionsListingPeriod($month, $year)
+            ->whereCreditCardInstallmentVisibleInList();
+
+        if ($filterAccountId !== null) {
+            $query->where('account_id', $filterAccountId);
+        }
+
+        if ($filterUserId !== null) {
+            $query->where('user_id', $filterUserId);
+        }
+
+        if ($filterType !== null) {
+            $query->where('type', $filterType);
+        }
+
+        if ($filterCategoryId !== null) {
+            $query->where(function ($q) use ($filterCategoryId) {
+                $q->where('category_id', $filterCategoryId)
+                  ->orWhereHas('categorySplits', fn ($sub) => $sub->where('category_id', $filterCategoryId));
+            });
+        }
+
+        if ($searchQuery !== null) {
+            $query->where(function ($q) use ($searchQuery) {
+                $q->where('description', 'like', "%{$searchQuery}%")
+                  ->orWhere('amount', 'like', "%{$searchQuery}%");
+            });
+        }
+
+        $transactionsForPeriod = $query->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get();
+
+        $focusTransactionId = isset($validated['focus_transaction']) ? (int) $validated['focus_transaction'] : null;
+        $transactions = $transactionsForPeriod;
+        if ($focusTransactionId !== null) {
+            $focused = $transactionsForPeriod->firstWhere('id', $focusTransactionId);
+            if ($focused instanceof Transaction) {
+                $transactions = collect([$focused]);
+            }
+        }
+
+        $installmentGroups = TransactionListingPresentation::installmentGroupsForPage($couple->id, $transactions);
+        $installmentGroupsModalPayload = TransactionListingPresentation::installmentGroupsModalPayload($installmentGroups);
+        $creditCardPurchaseRowMeta = TransactionListingPresentation::creditCardPurchaseRowMetaForPage($transactions, $installmentGroups);
+        $transactionDeleteMeta = [];
+        $transactionAmountEditMeta = [];
+        foreach ($transactions as $txRow) {
+            $transactionDeleteMeta[$txRow->id] = TransactionListingPresentation::transactionDeleteMeta($txRow, $installmentGroups);
+            $transactionAmountEditMeta[$txRow->id] = TransactionListingPresentation::transactionAmountEditMeta($txRow);
+        }
+
+        $statsTransactions = $couple->transactions()
+            ->whereMatchesDashboardPeriod($month, $year)
+            ->select('type', 'amount')
+            ->get();
+        $totalIncome = (float) $statsTransactions->where('type', 'income')->sum('amount');
+        $totalExpense = (float) $statsTransactions->where('type', 'expense')->sum('amount');
+        $netResult = round($totalIncome - $totalExpense, 2);
+
+        $modalPayload = $this->transactionModalPayload();
+        $regularAccounts = $modalPayload['regularAccounts'] ?? collect();
+        $canCreateAccountTransfer = $regularAccounts->count() >= 2;
+        $transferPaymentMethods = PaymentMethods::forRegularAccounts();
+        $txFormMode = $modalPayload['txFormMode'] ?? 'regular_only';
+
+        $accounts = $couple->accounts()->orderBy('name')->get();
+        $categories = $couple->categories()->orderBy('name')->get();
+        $coupleUsers = $couple->users()->orderBy('name')->get();
+
+        return view('transactions.index', array_merge(
+            compact(
+                'couple',
+                'transactions',
+                'transactionsForPeriod',
+                'installmentGroups',
+                'installmentGroupsModalPayload',
+                'creditCardPurchaseRowMeta',
+                'transactionDeleteMeta',
+                'transactionAmountEditMeta',
+                'month',
+                'year',
+                'period',
+                'periodLabel',
+                'periodPrev',
+                'periodNext',
+                'filterAccountId',
+                'filterCategoryId',
+                'filterUserId',
+                'filterType',
+                'searchQuery',
+                'totalIncome',
+                'totalExpense',
+                'netResult',
+                'canCreateAccountTransfer',
+                'transferPaymentMethods',
+                'txFormMode',
+                'regularAccounts',
+                'accounts',
+                'categories',
+                'coupleUsers'
+            ),
+            $modalPayload
+        ));
+    }
 
     public function creditLimitPrecheckUpdate(Request $request, Transaction $transaction)
     {
