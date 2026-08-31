@@ -238,28 +238,37 @@
                     data-bs-toggle="modal"
                     data-bs-target="#modalCofrinhoAssetAporte{{ $p->id }}"
                 >+ Aporte {{ $p->isBitcoin() ? 'BTC' : $p->assetUnitLabel() }}</button>
-                <a
-                    href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
+                <button
+                    type="button"
                     class="btn btn-outline-danger btn-sm rounded-pill px-3 flex-grow-1 fw-semibold"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalNewTransaction"
+                    data-cofrinho-id="{{ $p->id }}"
+                    data-cofrinho-name="{{ $p->name }}"
+                    data-cofrinho-kind="retirada"
                     title="Registrar retirada deste cofrinho"
-                >− Retirada</a>
+                >− Retirada</button>
             @else
-                <a
-                    href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'aporte']) }}"
+                <button
+                    type="button"
                     class="btn btn-success btn-sm rounded-pill px-3 flex-grow-1 fw-bold text-white shadow-sm"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalNewTransaction"
+                    data-cofrinho-id="{{ $p->id }}"
+                    data-cofrinho-name="{{ $p->name }}"
+                    data-cofrinho-kind="aporte"
                     title="Registrar aporte neste cofrinho"
-                >+ Aporte</a>
-                <a
-                    href="{{ route('dashboard', ['period' => now()->format('Y-m'), 'prefill_cofrinho' => $p->id, 'prefill_cofrinho_kind' => 'retirada']) }}"
+                >+ Aporte</button>
+                <button
+                    type="button"
                     class="btn btn-outline-danger btn-sm rounded-pill px-3 flex-grow-1 fw-semibold"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalNewTransaction"
+                    data-cofrinho-id="{{ $p->id }}"
+                    data-cofrinho-name="{{ $p->name }}"
+                    data-cofrinho-kind="retirada"
                     title="Registrar retirada deste cofrinho"
-                >− Retirada</a>
+                >− Retirada</button>
                 <button
                     type="button"
                     class="btn btn-outline-primary btn-sm rounded-pill px-2.5 fw-semibold"

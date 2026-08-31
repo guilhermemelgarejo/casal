@@ -142,4 +142,58 @@ class TransactionStoreRedirectTest extends TestCase
         $response->assertSessionHas('success', 'Lançamento realizado!');
         $response->assertRedirect(route('transactions.index'));
     }
+
+    public function test_redireciona_de_volta_para_tela_de_cofrinhos(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->setupTestEnv();
+        Category::ensureSavingsCategoriesForCouple((int) $couple->id);
+        $investCat = Category::investmentsForCouple((int) $couple->id);
+
+        $fromUrl = route('cofrinhos.index');
+
+        $response = $this->actingAs($user)->from($fromUrl)->post(route('transactions.store'), [
+            'funding' => 'account',
+            'payment_method' => 'Pix',
+            'account_id' => $account->id,
+            'category_allocations' => [
+                ['category_id' => $investCat->id, 'amount' => '250.00'],
+            ],
+            'description' => 'Aporte no cofrinho',
+            'amount' => '250.00',
+            'type' => 'expense',
+            'date' => '2026-04-20',
+        ]);
+
+        $response->assertSessionHas('success', 'Lançamento realizado!');
+        $response->assertRedirect($fromUrl);
+    }
+
+    public function test_cards_de_cofrinho_abrem_modal_diretamente_sem_link_para_dashboard(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupTestEnv();
+
+        $project = \App\Models\FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Reserva Carro',
+            'target_amount' => '15000.00',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cofrinhos.index'));
+
+        $response->assertOk();
+        $html = $response->getContent();
+
+        // Não deve ter links levando para o dashboard com prefill_cofrinho
+        $this->assertStringNotContainsString('route(\'dashboard\')', $html);
+        $this->assertStringNotContainsString('href="http://localhost/dashboard?period=', $html);
+        $this->assertStringNotContainsString('prefill_cofrinho=', $html);
+
+        // Deve conter os botões com data-bs-target="#modalNewTransaction" e data-cofrinho-kind
+        $this->assertStringContainsString('data-bs-target="#modalNewTransaction"', $html);
+        $this->assertStringContainsString('data-cofrinho-id="'.$project->id.'"', $html);
+        $this->assertStringContainsString('data-cofrinho-kind="aporte"', $html);
+        $this->assertStringContainsString('data-cofrinho-kind="retirada"', $html);
+    }
 }
+

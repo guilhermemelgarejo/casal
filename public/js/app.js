@@ -1746,150 +1746,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        const modalNewTx = document.getElementById('modalNewTransaction');
-        if (modalNewTx) {
-            modalNewTx.addEventListener('show.bs.modal', (ev) => {
-                const rel = ev.relatedTarget;
-                const preset = rel?.getAttribute?.('data-tx-open-preset');
-                const titleEl = document.getElementById('modalNewTransactionLabel');
-                const refundOf = rel?.getAttribute?.('data-tx-refund-of');
-                const refundAccountId = rel?.getAttribute?.('data-tx-refund-account-id');
-                const refundLabel = rel?.getAttribute?.('data-tx-refund-label');
-                const refundCategoryId = rel?.getAttribute?.('data-tx-refund-category-id');
-
-                if (refundOf) {
-                    if (titleEl) {
-                        titleEl.textContent = 'Novo estorno';
-                    }
-                    if (typeSelect) {
-                        typeSelect.value = 'expense';
-                        typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    if (mode === 'cards_only') {
-                        if (accountSel && refundAccountId) {
-                            accountSel.value = String(refundAccountId);
-                        }
-                        syncInstallments(true);
-                        syncAccountMeta();
-                    } else if (paymentFlow) {
-                        paymentFlow.value = '__credit__';
-                        paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
-                        if (accountSel && refundAccountId) {
-                            accountSel.value = String(refundAccountId);
-                        }
-                        syncInstallments(true);
-                        syncAccountMeta();
-                    }
-                    if (installmentsSelect) {
-                        installmentsSelect.value = '1';
-                    }
-                    if (refundCheck) {
-                        refundCheck.checked = true;
-                    }
-                    if (refundOfHidden) {
-                        refundOfHidden.value = String(refundOf);
-                    }
-                    if (refundLinkedLabel) {
-                        refundLinkedLabel.textContent = refundLabel ? String(refundLabel) : `#${refundOf}`;
-                    }
-                    if (refundLinkedHint) {
-                        refundLinkedHint.classList.remove('d-none');
-                    }
-                    // Sugestão de descrição.
-                    const desc = document.getElementById('description');
-                    if (desc && refundLabel) {
-                        desc.value = `Estorno: ${refundLabel}`;
-                    }
-                    const allocWrap = document.getElementById('tx-category-allocations-wrap');
-                    if (allocWrap) {
-                        const rows = allocWrap.querySelectorAll('.tx-cat-alloc-row');
-                        rows.forEach((row, idx) => {
-                            const cat = row.querySelector('.js-tx-split-cat');
-                            const am = row.querySelector('.js-tx-split-amount');
-                            if (am) {
-                                am.value = '';
-                            }
-                            if (idx === 0) {
-                                row.classList.remove('d-none');
-                                if (cat) {
-                                    cat.value = refundCategoryId ? String(refundCategoryId) : '';
-                                }
-                            } else {
-                                row.classList.add('d-none');
-                                if (cat) {
-                                    cat.value = '';
-                                }
-                            }
-                        });
-                        if (typeof txFilterSplitCats === 'function') {
-                            txFilterSplitCats(false);
-                        }
-                        syncTxAllocRemoveButtons();
-                    }
-                    syncRefundUi();
-                    return;
-                }
-
-                const copyEnc = rel?.getAttribute?.('data-tx-copy-prefill');
-                if (copyEnc) {
-                    let copyPrefill = null;
-                    try {
-                        copyPrefill = JSON.parse(decodeURIComponent(copyEnc));
-                    } catch {
-                        copyPrefill = null;
-                    }
-                    if (copyPrefill && typeof copyPrefill === 'object') {
-                        if (titleEl) {
-                            titleEl.textContent = 'Copiar para novo lançamento';
-                        }
-                        if (refundCheck) {
-                            refundCheck.checked = false;
-                        }
-                        syncRefundUi();
-                        applyRecurringPrefill(copyPrefill);
-                        return;
-                    }
-                }
-
-                if (preset !== 'income' && preset !== 'expense') {
-                    if (titleEl) {
-                        titleEl.textContent = 'Novo lançamento';
-                    }
-                    // Garante que estorno não “vaze” entre aberturas.
-                    if (refundCheck) refundCheck.checked = false;
-                    syncRefundUi();
-                    return;
-                }
-                if (titleEl) {
-                    titleEl.textContent = preset === 'income' ? 'Nova receita' : 'Nova despesa';
-                }
-                if (typeSelect) {
-                    typeSelect.value = preset === 'income' ? 'income' : 'expense';
-                    typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                if (paymentFlow && (mode === 'both' || mode === 'regular_only')) {
-                    if (preset === 'income') {
-                        const firstRegular = Array.from(paymentFlow.options).find(
-                            (o) => o.value && o.value !== '__credit__',
-                        );
-                        paymentFlow.value = firstRegular ? firstRegular.value : '';
-                    } else {
-                        paymentFlow.value = mode === 'both' ? '__credit__' : '';
-                    }
-                    paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                if (mode === 'cards_only' && accountSel) {
-                    const firstCard = Array.from(accountSel.options).find((o) => o.value !== '');
-                    if (firstCard) {
-                        accountSel.value = firstCard.value;
-                    }
-                    syncAccountMeta();
-                }
-                if (refundCheck) refundCheck.checked = false;
-                syncRefundUi();
-            });
-        }
-
         const syncTxAllocRemoveButtons = () => {
             const wrap = document.getElementById('tx-category-allocations-wrap');
             if (!wrap) {
@@ -2027,12 +1883,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncAccountMeta();
             }
         };
-
-        if (modalNewTx) {
-            modalNewTx.addEventListener('hidden.bs.modal', () => {
-                resetNewTransactionModalForm();
-            });
-        }
 
         const applyRecurringPrefill = (prefill) => {
             if (!prefill || typeof prefill !== 'object') {
@@ -2232,6 +2082,212 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             syncCofrinhoSection();
         };
+
+        const modalNewTx = document.getElementById('modalNewTransaction');
+        if (modalNewTx) {
+            modalNewTx.addEventListener('show.bs.modal', (ev) => {
+                const rel = ev.relatedTarget;
+                const preset = rel?.getAttribute?.('data-tx-open-preset');
+                const titleEl = document.getElementById('modalNewTransactionLabel');
+                const refundOf = rel?.getAttribute?.('data-tx-refund-of');
+                const refundAccountId = rel?.getAttribute?.('data-tx-refund-account-id');
+                const refundLabel = rel?.getAttribute?.('data-tx-refund-label');
+                const refundCategoryId = rel?.getAttribute?.('data-tx-refund-category-id');
+
+                if (refundOf) {
+                    if (titleEl) {
+                        titleEl.textContent = 'Novo estorno';
+                    }
+                    if (typeSelect) {
+                        typeSelect.value = 'expense';
+                        typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (mode === 'cards_only') {
+                        if (accountSel && refundAccountId) {
+                            accountSel.value = String(refundAccountId);
+                        }
+                        syncInstallments(true);
+                        syncAccountMeta();
+                    } else if (paymentFlow) {
+                        paymentFlow.value = '__credit__';
+                        paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (accountSel && refundAccountId) {
+                            accountSel.value = String(refundAccountId);
+                        }
+                        syncInstallments(true);
+                        syncAccountMeta();
+                    }
+                    if (installmentsSelect) {
+                        installmentsSelect.value = '1';
+                    }
+                    if (refundCheck) {
+                        refundCheck.checked = true;
+                    }
+                    if (refundOfHidden) {
+                        refundOfHidden.value = String(refundOf);
+                    }
+                    if (refundLinkedLabel) {
+                        refundLinkedLabel.textContent = refundLabel ? String(refundLabel) : `#${refundOf}`;
+                    }
+                    if (refundLinkedHint) {
+                        refundLinkedHint.classList.remove('d-none');
+                    }
+                    // Sugestão de descrição.
+                    const desc = document.getElementById('description');
+                    if (desc && refundLabel) {
+                        desc.value = `Estorno: ${refundLabel}`;
+                    }
+                    const allocWrap = document.getElementById('tx-category-allocations-wrap');
+                    if (allocWrap) {
+                        const rows = allocWrap.querySelectorAll('.tx-cat-alloc-row');
+                        rows.forEach((row, idx) => {
+                            const cat = row.querySelector('.js-tx-split-cat');
+                            const am = row.querySelector('.js-tx-split-amount');
+                            if (am) {
+                                am.value = '';
+                            }
+                            if (idx === 0) {
+                                row.classList.remove('d-none');
+                                if (cat) {
+                                    cat.value = refundCategoryId ? String(refundCategoryId) : '';
+                                }
+                            } else {
+                                row.classList.add('d-none');
+                                if (cat) {
+                                    cat.value = '';
+                                }
+                            }
+                        });
+                        if (typeof txFilterSplitCats === 'function') {
+                            txFilterSplitCats(false);
+                        }
+                        syncTxAllocRemoveButtons();
+                    }
+                    syncRefundUi();
+                    return;
+                }
+
+                const cofrinhoEnc = rel?.getAttribute?.('data-tx-cofrinho-prefill');
+                if (cofrinhoEnc) {
+                    let cofrinhoPrefill = null;
+                    try {
+                        cofrinhoPrefill = JSON.parse(decodeURIComponent(cofrinhoEnc));
+                    } catch {
+                        cofrinhoPrefill = null;
+                    }
+                    if (cofrinhoPrefill && typeof cofrinhoPrefill === 'object') {
+                        applyCofrinhoPrefill(cofrinhoPrefill);
+                        return;
+                    }
+                }
+
+                const cofrinhoId = rel?.getAttribute?.('data-cofrinho-id');
+                const cofrinhoKind = rel?.getAttribute?.('data-cofrinho-kind');
+                const cofrinhoName = rel?.getAttribute?.('data-cofrinho-name');
+
+                if (cofrinhoId && cofrinhoKind) {
+                    const catOption = txForm.querySelector(
+                        `option[data-tx-cofrinho="${cofrinhoKind === 'retirada' ? 'withdraw' : 'invest'}"]`
+                    );
+                    const categoryId = catOption ? catOption.value : '';
+
+                    let paymentMethod = '';
+                    let accountId = '';
+                    const regularAccounts = payload.regular || [];
+                    if (regularAccounts.length > 0) {
+                        const firstAcc = regularAccounts[0];
+                        accountId = String(firstAcc.id);
+                        if (Array.isArray(firstAcc.methods) && firstAcc.methods.length > 0) {
+                            paymentMethod = firstAcc.methods[0];
+                        } else if (paymentFlow && paymentFlow.options.length > 1) {
+                            const opt = Array.from(paymentFlow.options).find(
+                                (o) => o.value && o.value !== '__credit__'
+                            );
+                            paymentMethod = opt ? opt.value : 'Pix';
+                        } else {
+                            paymentMethod = 'Pix';
+                        }
+                    }
+
+                    const prefill = {
+                        kind: cofrinhoKind,
+                        type: cofrinhoKind === 'retirada' ? 'income' : 'expense',
+                        category_id: categoryId,
+                        financial_project_id: cofrinhoId,
+                        description:
+                            (cofrinhoKind === 'retirada' ? 'Retirada: ' : 'Aporte: ') +
+                            (cofrinhoName || ''),
+                        payment_method: paymentMethod,
+                        account_id: accountId,
+                    };
+
+                    applyCofrinhoPrefill(prefill);
+                    return;
+                }
+
+                const copyEnc = rel?.getAttribute?.('data-tx-copy-prefill');
+                if (copyEnc) {
+                    let copyPrefill = null;
+                    try {
+                        copyPrefill = JSON.parse(decodeURIComponent(copyEnc));
+                    } catch {
+                        copyPrefill = null;
+                    }
+                    if (copyPrefill && typeof copyPrefill === 'object') {
+                        if (titleEl) {
+                            titleEl.textContent = 'Copiar para novo lançamento';
+                        }
+                        if (refundCheck) {
+                            refundCheck.checked = false;
+                        }
+                        syncRefundUi();
+                        applyRecurringPrefill(copyPrefill);
+                        return;
+                    }
+                }
+
+                if (preset !== 'income' && preset !== 'expense') {
+                    if (titleEl) {
+                        titleEl.textContent = 'Novo lançamento';
+                    }
+                    // Garante que estorno não “vaze” entre aberturas.
+                    if (refundCheck) refundCheck.checked = false;
+                    syncRefundUi();
+                    return;
+                }
+                if (titleEl) {
+                    titleEl.textContent = preset === 'income' ? 'Nova receita' : 'Nova despesa';
+                }
+                if (typeSelect) {
+                    typeSelect.value = preset === 'income' ? 'income' : 'expense';
+                    typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (paymentFlow && (mode === 'both' || mode === 'regular_only')) {
+                    if (preset === 'income') {
+                        const firstRegular = Array.from(paymentFlow.options).find(
+                            (o) => o.value && o.value !== '__credit__',
+                        );
+                        paymentFlow.value = firstRegular ? firstRegular.value : '';
+                    } else {
+                        paymentFlow.value = mode === 'both' ? '__credit__' : '';
+                    }
+                    paymentFlow.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (mode === 'cards_only' && accountSel) {
+                    const firstCard = Array.from(accountSel.options).find((o) => o.value !== '');
+                    if (firstCard) {
+                        accountSel.value = firstCard.value;
+                    }
+                    syncAccountMeta();
+                }
+                if (refundCheck) refundCheck.checked = false;
+                syncRefundUi();
+            });
+
+            modalNewTx.addEventListener('hidden.bs.modal', () => {
+                resetNewTransactionModalForm();
+            });
+        }
 
         let cofrinhoPrefillParsed = null;
         try {
