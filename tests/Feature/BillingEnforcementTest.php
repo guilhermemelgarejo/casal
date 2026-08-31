@@ -20,7 +20,16 @@ class BillingEnforcementTest extends TestCase
         ]);
     }
 
-    public function test_dashboard_redirects_to_billing_when_couple_has_no_active_subscription(): void
+    protected function tearDown(): void
+    {
+        config([
+            'duozen.billing_disabled' => true,
+        ]);
+
+        parent::tearDown();
+    }
+
+    public function test_dashboard_redirects_to_couple_when_couple_has_no_active_subscription(): void
     {
         $this->enforceBilling();
 
@@ -29,7 +38,17 @@ class BillingEnforcementTest extends TestCase
 
         $this->actingAs($user)
             ->get('/dashboard')
-            ->assertRedirect('/billing');
+            ->assertRedirect('/couple');
+    }
+
+    public function test_billing_index_redirects_to_couple(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $this->actingAs($user)
+            ->get('/billing')
+            ->assertRedirect('/couple');
     }
 
     public function test_dashboard_is_allowed_when_any_member_has_active_subscription(): void

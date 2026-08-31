@@ -11,24 +11,15 @@ use Stripe\Exception\ApiErrorException;
 
 class BillingController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        $user->loadMissing('couple.users', 'couple.billingOwner');
-
-        return view('billing.index', [
-            'billingEnforced' => Billing::isEnforced(),
-            'coupleHasAccess' => $user->coupleHasBillingAccess(),
-            'isSubscriber' => $user->subscribed('default'),
-            'trialDays' => config('duozen.trial_days'),
-            'billingOwner' => $user->couple?->billingOwner,
-        ]);
+        return redirect()->route('couple.index');
     }
 
     public function checkout(Request $request): RedirectResponse
     {
         if (! Billing::isEnforced()) {
-            return redirect()->route('billing.index');
+            return redirect()->route('couple.index');
         }
 
         $priceId = config('duozen.stripe_price_id');
@@ -37,7 +28,7 @@ class BillingController extends Controller
         }
 
         if ($request->user()->coupleHasBillingAccess()) {
-            return redirect()->route('billing.index')
+            return redirect()->route('couple.index')
                 ->with('info', 'O casal já possui assinatura ativa.');
         }
 
@@ -46,7 +37,7 @@ class BillingController extends Controller
             ->trialDays((int) config('duozen.trial_days'))
             ->checkout([
                 'success_url' => route('billing.success').'?session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('billing.index'),
+                'cancel_url' => route('couple.index'),
             ])
             ->redirect();
     }
@@ -54,11 +45,11 @@ class BillingController extends Controller
     public function portal(Request $request): RedirectResponse
     {
         if (! $request->user()->subscribed('default')) {
-            return redirect()->route('billing.index')
+            return redirect()->route('couple.index')
                 ->with('error', 'Apenas quem ativou o plano pode abrir o portal de faturamento.');
         }
 
-        return $request->user()->redirectToBillingPortal(route('billing.index'));
+        return $request->user()->redirectToBillingPortal(route('couple.index'));
     }
 
     public function success(Request $request): RedirectResponse
@@ -70,8 +61,8 @@ class BillingController extends Controller
 
         $sessionId = $request->query('session_id');
         if (! is_string($sessionId) || $sessionId === '') {
-            return redirect()->route('billing.index')
-                ->with('error', 'Falta identificar a sessão de pagamento. Se o cartão já foi aceito, abra novamente a página Assinatura ou aguarde a confirmação por webhook.');
+            return redirect()->route('couple.index')
+                ->with('error', 'Falta identificar a sessão de pagamento. Se o cartão já foi aceito, abra novamente a página do Casal ou aguarde a confirmação por webhook.');
         }
 
         $user = $request->user();
@@ -84,7 +75,7 @@ class BillingController extends Controller
             }
 
             if ($session->mode !== 'subscription' || empty($session->subscription)) {
-                return redirect()->route('billing.index')
+                return redirect()->route('couple.index')
                     ->with('error', 'Esta sessão não corresponde a uma assinatura.');
             }
 
@@ -105,7 +96,7 @@ class BillingController extends Controller
                 'message' => $e->getMessage(),
             ]);
 
-            return redirect()->route('billing.index')
+            return redirect()->route('couple.index')
                 ->with('error', 'Não foi possível confirmar a assinatura com o Stripe. Tente de novo ou verifique a conexão com a internet e o webhook.');
         }
 

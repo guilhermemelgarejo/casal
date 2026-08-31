@@ -132,8 +132,8 @@
                                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                             </span>
                             <span>Faturas de Cartão</span>
-                            @if(count($creditCardInvoiceReminders ?? []) > 0)
-                                <span class="dz-nav-link__badge">{{ count($creditCardInvoiceReminders) }}</span>
+                            @if(count($sidebarInvoiceReminders ?? []) > 0)
+                                <span class="dz-nav-link__badge">{{ count($sidebarInvoiceReminders) }}</span>
                             @endif
                         </a>
                     </li>
@@ -177,16 +177,6 @@
                             <span>Contato</span>
                         </a>
                     </li>
-                    @if(Auth::check() && Auth::user()->couple_id)
-                        <li class="dz-nav-item">
-                            <a href="{{ route('billing.index') }}" class="dz-nav-link {{ request()->routeIs('billing*') ? 'active' : '' }}">
-                                <span class="dz-nav-link__icon">
-                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                                </span>
-                                <span>Assinatura</span>
-                            </a>
-                        </li>
-                    @endif
                 </ul>
             </div>
 
@@ -298,8 +288,8 @@
                             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                         </span>
                         <span>Faturas de Cartão</span>
-                        @if(count($creditCardInvoiceReminders ?? []) > 0)
-                            <span class="dz-nav-link__badge">{{ count($creditCardInvoiceReminders) }}</span>
+                        @if(count($sidebarInvoiceReminders ?? []) > 0)
+                            <span class="dz-nav-link__badge">{{ count($sidebarInvoiceReminders) }}</span>
                         @endif
                     </a>
                 </li>
@@ -343,16 +333,6 @@
                             <span>Contato</span>
                         </a>
                     </li>
-                @if(Auth::check() && Auth::user()->couple_id)
-                    <li class="dz-nav-item">
-                        <a href="{{ route('billing.index') }}" class="dz-nav-link {{ request()->routeIs('billing*') ? 'active' : '' }}">
-                            <span class="dz-nav-link__icon">
-                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                            </span>
-                            <span>Assinatura</span>
-                        </a>
-                    </li>
-                @endif
             </ul>
 
             <!-- Rodapé do Drawer -->
@@ -398,6 +378,25 @@
                 </div>
 
                 <div class="dz-topbar__right">
+                    @if(Auth::check() && Auth::user()->couple_id)
+                        <div class="d-flex align-items-center gap-2 flex-wrap" id="onboarding-tx-actions">
+                            @if (($canCreateAccountTransfer ?? false) === true)
+                                <button type="button" class="dz-btn dz-btn-outline" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" title="Transferência entre contas correntes">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                    <span>Transferir</span>
+                                </button>
+                            @endif
+                            <button type="button" class="dz-btn dz-btn-success" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="income" title="Registrar uma receita">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                <span>Receita</span>
+                            </button>
+                            <button type="button" class="dz-btn dz-btn-danger" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="expense" title="Registrar uma despesa">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                <span>Despesa</span>
+                            </button>
+                        </div>
+                    @endif
+
                     @isset($actions)
                         {{ $actions }}
                     @endisset
@@ -492,6 +491,12 @@
             window.__DUOZEN_ONBOARDING__ = @json($onboardingTourConfig);
         </script>
         <script src="{{ asset('js/onboarding-tour.js') }}?v={{ file_exists($onboardingTourJs) ? filemtime($onboardingTourJs) : 1 }}" defer></script>
+    @endif
+
+    <!-- Modais Globais de Lançamentos e Transferências -->
+    @if(Auth::check() && Auth::user()->couple_id)
+        @include('transactions.partials.transaction-modals')
+        @include('accounts.partials.account-transfer-modal')
     @endif
 
     <!-- Scripts do Sistema DuoZen 2.0 -->

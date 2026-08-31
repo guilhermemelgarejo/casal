@@ -6,6 +6,7 @@ use App\Mail\InvitationMail;
 use App\Models\Category;
 use App\Models\Couple;
 use App\Models\CouplePlannedIncome;
+use App\Support\Billing;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,10 +18,43 @@ class CoupleController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $couple = $user->couple?->loadMissing('users');
+        $couple = $user->couple?->loadMissing('users', 'billingOwner');
         $canReplayOnboardingTour = $couple !== null && $user->passesCoupleBillingGate();
 
-        return view('couple.index', compact('user', 'couple', 'canReplayOnboardingTour'));
+        $billingEnforced = Billing::isEnforced();
+        $coupleHasAccess = $user->coupleHasBillingAccess();
+        $isSubscriber = $user->subscribed('default');
+        $trialDays = (int) config('duozen.trial_days');
+        $billingOwner = $couple?->billingOwner;
+
+        $subscription = $user->subscription('default') ?? $billingOwner?->subscription('default');
+        $isOnTrial = $subscription?->onTrial() ?? false;
+        $trialEndsAt = $subscription?->trial_ends_at;
+        $endsAt = $subscription?->ends_at;
+
+        $daysRemainingInTrial = null;
+        if ($isOnTrial && $trialEndsAt) {
+            $daysRemainingInTrial = max(0, (int) now()->diffInDays($trialEndsAt, false));
+        }
+
+        $isCancelled = $subscription?->canceled() ?? false;
+
+        return view('couple.index', compact(
+            'user',
+            'couple',
+            'canReplayOnboardingTour',
+            'billingEnforced',
+            'coupleHasAccess',
+            'isSubscriber',
+            'trialDays',
+            'billingOwner',
+            'subscription',
+            'isOnTrial',
+            'trialEndsAt',
+            'endsAt',
+            'daysRemainingInTrial',
+            'isCancelled'
+        ));
     }
 
     public function create(Request $request)

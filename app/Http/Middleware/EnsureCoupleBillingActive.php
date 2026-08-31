@@ -26,7 +26,7 @@ class EnsureCoupleBillingActive
             return $next($request);
         }
 
-        return redirect()->route('billing.index')
+        return redirect()->route('couple.index')
             ->with('info', 'Para continuar, ative a assinatura do casal. Você pode começar pelo período de teste — é só cadastrar um cartão no Stripe Checkout.');
     }
 }

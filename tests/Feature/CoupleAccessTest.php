@@ -91,4 +91,29 @@ class CoupleAccessTest extends TestCase
         $this->assertNull($only->fresh()->couple_id);
         $this->assertNull($couple->fresh()->billing_owner_user_id);
     }
+
+    public function test_tela_casal_renderiza_com_sucesso_para_usuario_com_casal(): void
+    {
+        $couple = Couple::factory()->create(['name' => 'Casal Teste', 'monthly_income' => 7500.00]);
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $response = $this->actingAs($user)->get(route('couple.index'));
+
+        $response->assertOk();
+        $response->assertSee('Espaço do Casal');
+        $response->assertSee('Casal Teste');
+        $response->assertSee('Assinatura & Plano DuoZen', false);
+    }
+
+    public function test_tela_casal_renderiza_com_sucesso_para_usuario_sem_casal(): void
+    {
+        $user = User::factory()->create(['couple_id' => null]);
+
+        $response = $this->actingAs($user)->get(route('couple.index'));
+
+        $response->assertOk();
+        $response->assertSee('Criem um espaço financeiro para dois');
+        $response->assertSee('Criar um novo casal');
+        $response->assertSee('Entrar num casal existente');
+    }
 }
