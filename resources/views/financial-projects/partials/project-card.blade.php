@@ -19,7 +19,7 @@
         <div class="cofrinhos-project-card__accent" aria-hidden="true"></div>
         
         <!-- TOPO DO CARD: AVATAR, TÍTULO, BADGES E BOTÕES DE AÇÃO RÁPIDA -->
-        <div class="cofrinhos-project-card__top d-flex align-items-start justify-content-between gap-2 mb-2.5">
+        <div class="cofrinhos-project-card__top d-flex align-items-start justify-content-between gap-2 mb-2">
             <div class="d-flex align-items-start min-w-0 flex-grow-1" style="gap: 0.95rem;">
                 <div class="cofrinhos-project-card__avatar flex-shrink-0" aria-hidden="true">
                     @if($p->isBitcoin())
@@ -37,20 +37,20 @@
                     @endif
                 </div>
                 <div class="min-w-0 flex-grow-1">
-                    <div class="d-flex align-items-center gap-1.5 flex-wrap mb-0.5">
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                         <h3 class="cofrinhos-project-card__title mb-0 text-truncate" style="font-size: 1rem; font-weight: 700; color: var(--dz-text-title);" title="{{ $p->name }}">{{ $p->name }}</h3>
                         @if(! $p->is_active)
-                            <span class="badge rounded-pill bg-secondary-subtle text-secondary" style="font-size: 0.65rem;">Inativo</span>
+                            <span class="badge rounded-pill flex-shrink-0 bg-secondary-subtle text-secondary" style="font-size: 0.65rem;">Inativo</span>
                         @elseif($p->isBitcoin())
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #D97706;">₿ Bitcoin</span>
+                            <span class="badge rounded-pill flex-shrink-0" style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #D97706;">₿ Bitcoin</span>
                         @elseif($isAsset)
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: var(--dz-primary-subtle); color: var(--dz-primary);">{{ $p->asset_code ?: $p->assetTypeLabel() }}</span>
+                            <span class="badge rounded-pill flex-shrink-0" style="font-size: 0.65rem; background: var(--dz-primary-subtle); color: var(--dz-primary);">{{ $p->asset_code ?: $p->assetTypeLabel() }}</span>
                         @elseif($isComplete)
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #059669;">Concluído</span>
+                            <span class="badge rounded-pill flex-shrink-0" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #059669;">Concluído</span>
                         @elseif($target !== null)
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: var(--dz-primary-subtle); color: var(--dz-primary);">Com meta</span>
+                            <span class="badge rounded-pill flex-shrink-0" style="font-size: 0.65rem; background: var(--dz-primary-subtle); color: var(--dz-primary);">Com meta</span>
                         @else
-                            <span class="badge rounded-pill" style="font-size: 0.65rem; background: var(--dz-bg-card-subtle); color: var(--dz-text-secondary); border: 1px solid var(--dz-border);">Livre</span>
+                            <span class="badge rounded-pill flex-shrink-0" style="font-size: 0.65rem; background: var(--dz-bg-card-subtle); color: var(--dz-text-secondary); border: 1px solid var(--dz-border);">Livre</span>
                         @endif
                     </div>
                     @if($isAsset)
@@ -141,7 +141,7 @@
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                     <span class="small text-secondary fw-semibold" style="font-size: 0.75rem;">Quantidade acumulada</span>
                     @if($quote && $p->is_active)
-                        <div class="d-inline-flex align-items-center gap-1.5 px-2 py-0.5 rounded-pill" style="background: var(--dz-bg-card-subtle); border: 1px solid var(--dz-border); font-size: 0.7rem;">
+                        <div class="d-inline-flex align-items-center gap-2 px-2 py-0.5 rounded-pill" style="background: var(--dz-bg-card-subtle); border: 1px solid var(--dz-border); font-size: 0.7rem;">
                             <span>Cotação: <strong id="quote-price-{{ $p->id }}">{{ $quote->formattedPrice() }}</strong></span>
                             <button
                                 type="button"
@@ -190,7 +190,7 @@
                 @endif
             @else
                 {{-- Seção Tradicional em R$ --}}
-                <span class="small text-secondary fw-semibold d-block mb-0.5" style="font-size: 0.75rem;">Guardado agora</span>
+                <span class="small text-secondary fw-semibold d-block mb-1" style="font-size: 0.75rem;">Guardado agora</span>
                 <div class="fs-4 fw-bold mb-2 duozen-privacy-blur" style="color: var(--dz-text-title); font-size: 1.35rem; line-height: 1.15;">R$ {{ number_format($saved, 2, ',', '.') }}</div>
                 @if($target !== null)
                     @if($pct !== null)

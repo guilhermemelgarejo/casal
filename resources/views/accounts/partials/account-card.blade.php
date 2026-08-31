@@ -25,7 +25,7 @@
                     </div>
                     <div class="min-w-0">
                         <h3 class="accounts-modern-card__title mb-1 text-truncate">{{ $account->name }}</h3>
-                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
                             <span class="accounts-modern-card__badge {{ $isCard ? 'accounts-modern-card__badge--card' : 'accounts-modern-card__badge--regular' }}">
                                 {{ $typeLabel }}
                             </span>

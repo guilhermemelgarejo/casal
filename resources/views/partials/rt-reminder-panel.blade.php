@@ -98,7 +98,7 @@
                         @endphp
                         <div class="dz-reminder-chip dz-reminder-chip--card {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}">
                             <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-1.5">
+                                <div class="d-flex align-items-center gap-2">
                                     <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(124, 58, 237, 0.15); font-size: 0.85rem;">💳</span>
                                     <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(124, 58, 237, 0.15); color: #7C3AED;"><span class="d-none">Faturas de cartão</span>Fatura</span>
                                 </div>
@@ -129,7 +129,7 @@
                         @endphp
                         <div class="dz-reminder-chip dz-reminder-chip--recurring">
                             <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-1.5">
+                                <div class="d-flex align-items-center gap-2">
                                     <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.85rem;">🔁</span>
                                     <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;"><span class="d-none">Recorrentes</span>Mensal</span>
                                 </div>
@@ -154,7 +154,7 @@
                     @foreach($multipleReminders as $rec)
                         <div class="dz-reminder-chip dz-reminder-chip--shortcut">
                             <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-1.5">
+                                <div class="d-flex align-items-center gap-2">
                                     <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(245, 158, 11, 0.15); font-size: 0.85rem;">⚡</span>
                                     <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">Atalho</span>
                                 </div>

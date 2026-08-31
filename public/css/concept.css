@@ -4387,3 +4387,10 @@ body.duozen-onboarding-active {
     overflow-x: hidden;
 }
 
+/* Utilitários complementares de espaçamento */
+.gap-1\.5 { gap: 0.375rem !important; }
+.gap-2\.5 { gap: 0.625rem !important; }
+.mb-0\.5 { margin-bottom: 0.125rem !important; }
+.mb-1\.5 { margin-bottom: 0.375rem !important; }
+.mb-2\.5 { margin-bottom: 0.625rem !important; }
+.pt-2\.5 { padding-top: 0.625rem !important; }
