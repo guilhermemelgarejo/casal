@@ -221,7 +221,7 @@
         </div>
 
         <!-- RODAPÉ DO CARD: BOTÕES DE APORTE, RETIRADA E JUROS ALINHADOS NA MESMA LINHA -->
-        <div class="d-flex align-items-center gap-2 pt-2.5 border-top mt-auto" style="border-color: var(--dz-border-subtle) !important;">
+        <div class="d-flex align-items-center gap-2 pt-1 mt-auto">
             @if(! $p->is_active)
                 <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-pill bg-body-secondary border border-secondary-subtle small text-secondary w-100">
                     <span>Cofrinho desativado</span>
