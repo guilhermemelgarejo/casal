@@ -1,24 +1,22 @@
-<section class="card border-0 shadow-sm profile-section-card mb-4">
-    <div class="profile-section-head profile-section-head--danger">
-        <div class="d-flex align-items-start justify-content-between gap-3">
-            <div>
-                <span class="profile-section-kicker text-danger">Zona de risco</span>
-                <h2 class="h5 mb-1 fw-semibold text-danger">Excluir conta</h2>
-                <p class="small text-secondary mb-0">Excluir a conta remove seus dados de usuário de forma permanente. O casal e os dados compartilhados podem continuar a existir para o outro membro.</p>
-            </div>
-            <span class="profile-section-icon profile-section-icon--danger" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z" /></svg>
-            </span>
+<div class="dz-card p-3 p-sm-4" style="border-color: rgba(239, 68, 68, 0.25);">
+    <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+        <div>
+            <span class="dz-kpi-card__label d-block mb-1 text-danger" style="font-size: 0.72rem; letter-spacing: 0.05em;">Zona de Risco</span>
+            <h2 class="h5 fw-bold mb-1 text-danger">Excluir conta</h2>
+            <p class="small text-secondary mb-0" style="font-size: 0.82rem;">Excluir a conta remove seus dados de usuário de forma permanente. O casal e os dados compartilhados podem continuar a existir para o outro membro.</p>
+        </div>
+        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--danger flex-shrink-0" style="width: 38px; height: 38px; border-radius: var(--dz-radius-md); font-size: 1.1rem;">
+            ⚠️
         </div>
     </div>
 
-    <div class="card-body p-4">
-        <div class="profile-danger-panel">
-            <p class="small text-secondary mb-3">Antes de excluir, confirme se não há pendências no casal ou assinatura.</p>
-            <x-danger-button type="button" class="rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#modal-confirm-user-deletion">
-                Excluir a minha conta
-            </x-danger-button>
-        </div>
+    <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3 p-3 rounded-3" style="background: var(--dz-danger-subtle, rgba(239, 68, 68, 0.08)); border: 1px dashed rgba(239, 68, 68, 0.25);">
+        <p class="small text-secondary mb-0" style="font-size: 0.82rem; line-height: 1.4;">
+            Antes de excluir, confirme se não há pendências no casal ou assinatura.
+        </p>
+        <button type="button" class="dz-btn dz-btn-danger flex-shrink-0 text-nowrap" data-bs-toggle="modal" data-bs-target="#modal-confirm-user-deletion">
+            Excluir a minha conta
+        </button>
     </div>
 
     <x-modal name="confirm-user-deletion" maxWidth="md" :force-show="$errors->userDeletion->isNotEmpty()">
@@ -27,42 +25,41 @@
             @method('delete')
 
             <div class="modal-header tx-modal-head--danger">
-                <h2 class="modal-title h5 mb-0" id="modal-confirm-user-deletion-label">
+                <h2 class="modal-title h5 mb-0 fw-bold" id="modal-confirm-user-deletion-label">
                     Excluir conta?
                 </h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
 
-            <div class="modal-body">
-                <p class="text-secondary small mb-0">
-                    Esta ação é <strong class="text-body">irreversível</strong>. Confirme com a sua senha.
+            <div class="modal-body p-3 p-sm-4">
+                <p class="text-secondary small mb-3">
+                    Esta ação é <strong class="text-danger">irreversível</strong>. Todos os seus dados pessoais serão removidos permanentemente. Digite sua senha para confirmar:
                 </p>
 
-                <div class="mt-3">
-                    <x-input-label for="password" value="Senha" class="visually-hidden" />
-
-                    <x-text-input
+                <div class="mb-2">
+                    <label for="password" class="form-label small fw-semibold mb-1" style="color: var(--dz-text-title);">Sua Senha Atual</label>
+                    <input
                         id="password"
                         name="password"
                         type="password"
-                        class="mt-1 rounded-3"
-                        placeholder="Senha atual"
+                        class="form-control rounded-3"
+                        placeholder="Digite sua senha atual..."
                         autocomplete="current-password"
+                        style="background: var(--dz-bg-card); border-color: var(--dz-border);"
                     />
-
-                    <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
+                    <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-1" />
                 </div>
             </div>
 
-            <div class="modal-footer">
-                <x-secondary-button type="button" data-bs-dismiss="modal" class="rounded-pill px-4">
+            <div class="modal-footer d-flex align-items-center justify-content-end gap-2">
+                <button type="button" data-bs-dismiss="modal" class="dz-btn dz-btn-outline">
                     Cancelar
-                </x-secondary-button>
+                </button>
 
-                <x-danger-button class="rounded-pill px-4">
+                <button type="submit" class="dz-btn dz-btn-danger">
                     Excluir definitivamente
-                </x-danger-button>
+                </button>
             </div>
         </form>
     </x-modal>
-</section>
+</div>

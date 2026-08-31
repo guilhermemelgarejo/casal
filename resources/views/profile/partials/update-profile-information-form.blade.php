@@ -1,52 +1,48 @@
-<section class="card border-0 shadow-sm profile-section-card mb-4">
-    <div class="profile-section-head profile-section-head--account">
-        <div class="d-flex align-items-start justify-content-between gap-3">
-            <div>
-                <span class="profile-section-kicker">Identidade</span>
-                <h2 class="h5 mb-1 fw-semibold">Dados do perfil</h2>
-                <p class="small text-secondary mb-0">Nome, e-mail e verificação de e-mail quando estiver ativa na aplicação.</p>
-            </div>
-            <span class="profile-section-icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a3 3 0 11-6 0 3 3 0 016 0zM6 21a6 6 0 0112 0" /></svg>
-            </span>
+<div class="dz-card p-3 p-sm-4 h-100 d-flex flex-column">
+    <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+        <div>
+            <span class="dz-kpi-card__label d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Identidade</span>
+            <h2 class="h5 fw-bold mb-1" style="color: var(--dz-text-title);">Dados do perfil</h2>
+            <p class="small text-secondary mb-0" style="font-size: 0.82rem;">Nome, e-mail e verificação da conta na aplicação.</p>
+        </div>
+        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary flex-shrink-0" style="width: 38px; height: 38px; border-radius: var(--dz-radius-md); font-size: 1.1rem;">
+            👤
         </div>
     </div>
 
-    <div class="card-body p-4">
-        <form id="send-verification" method="post" action="{{ route('verification.send') }}">
-            @csrf
-        </form>
+    <form id="send-verification" method="post" action="{{ route('verification.send') }}">
+        @csrf
+    </form>
 
-        <form method="post" action="{{ route('profile.update') }}" class="vstack gap-3">
-            @csrf
-            @method('patch')
+    <form method="post" action="{{ route('profile.update') }}" class="d-flex flex-column justify-content-between flex-grow-1">
+        @csrf
+        @method('patch')
 
-            <div class="profile-form-panel">
-                <x-input-label for="name" value="Nome" />
-                <x-text-input id="name" name="name" type="text" class="mt-1 rounded-3" :value="old('name', $user->name)" required autofocus autocomplete="name" />
-                <x-input-error class="mt-2" :messages="$errors->get('name')" />
+        <div class="d-flex flex-column gap-3 mb-3">
+            <div>
+                <label for="name" class="form-label small fw-semibold mb-1" style="color: var(--dz-text-title);">Nome</label>
+                <input id="name" name="name" type="text" class="form-control rounded-3" value="{{ old('name', $user->name) }}" required autofocus autocomplete="name" style="background: var(--dz-bg-card); border-color: var(--dz-border);" />
+                <x-input-error class="mt-1" :messages="$errors->get('name')" />
             </div>
 
-            <div class="profile-form-panel">
-                <x-input-label for="email" value="E-mail" />
-                <x-text-input id="email" name="email" type="email" class="mt-1 rounded-3" :value="old('email', $user->email)" required autocomplete="username" />
-                <x-input-error class="mt-2" :messages="$errors->get('email')" />
+            <div>
+                <label for="email" class="form-label small fw-semibold mb-1" style="color: var(--dz-text-title);">E-mail</label>
+                <input id="email" name="email" type="email" class="form-control rounded-3" value="{{ old('email', $user->email) }}" required autocomplete="username" style="background: var(--dz-bg-card); border-color: var(--dz-border);" />
+                <x-input-error class="mt-1" :messages="$errors->get('email')" />
 
                 @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
-                    <div class="profile-inline-notice mt-3">
-                        <span class="profile-inline-notice__icon" aria-hidden="true">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12H8m8 0a4 4 0 10-8 0m8 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-4.5 7.794" /></svg>
-                        </span>
+                    <div class="mt-2.5 p-2.5 rounded-3 d-flex align-items-start gap-2" style="background: var(--dz-warning-subtle); border: 1px solid rgba(245, 158, 11, 0.3);">
+                        <span class="flex-shrink-0" style="font-size: 1rem;">⚠️</span>
                         <div class="min-w-0">
-                            <p class="small mb-2 text-secondary">
+                            <p class="small mb-1 text-secondary" style="font-size: 0.8rem;">
                                 O seu e-mail ainda não foi verificado.
                             </p>
-                            <button form="send-verification" type="submit" class="btn btn-link btn-sm p-0 text-decoration-none">
+                            <button form="send-verification" type="submit" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size: 0.8rem; color: var(--dz-primary); font-weight: 600;">
                                 Reenviar e-mail de verificação
                             </button>
 
                             @if (session('status') === 'verification-link-sent')
-                                <p class="mt-2 mb-0 small text-success fw-medium">
+                                <p class="mt-1 mb-0 small text-success fw-medium" style="font-size: 0.78rem;">
                                     Foi enviado um novo link para o seu e-mail.
                                 </p>
                             @endif
@@ -54,16 +50,18 @@
                     </div>
                 @endif
             </div>
+        </div>
 
-            <div class="d-flex align-items-center gap-3 flex-wrap pt-1">
-                <x-primary-button class="rounded-pill px-4">Salvar</x-primary-button>
+        <div class="d-flex align-items-center gap-2 pt-1 mt-auto">
+            <button type="submit" class="dz-btn dz-btn-primary">
+                Salvar
+            </button>
 
-                @if (session('status') === 'profile-updated')
-                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle px-3 py-2">
-                        Alterações salvas
-                    </span>
-                @endif
-            </div>
-        </form>
-    </div>
-</section>
+            @if (session('status') === 'profile-updated')
+                <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2.5 py-1" style="font-size: 0.75rem;">
+                    ✓ Alterações salvas
+                </span>
+            @endif
+        </div>
+    </form>
+</div>

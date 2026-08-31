@@ -26,16 +26,16 @@
         @endif
     </x-slot>
 
-    <div class="container-xxl py-4 px-3 px-lg-4 profile-page">
+    <div class="container-xxl py-3 py-sm-4 px-2 px-sm-3 px-lg-4 profile-page">
         @if (session('success'))
-            <x-alert type="success" class="mb-4" :message="session('success')" />
+            <x-alert type="success" class="mb-3 mb-sm-4" :message="session('success')" />
         @endif
         @if (session('error'))
-            <x-alert type="danger" class="mb-4" :message="session('error')" />
+            <x-alert type="danger" class="mb-3 mb-sm-4" :message="session('error')" />
         @endif
 
         <!-- TOP KPIS DUOZEN 2.0 -->
-        <section class="dz-kpi-grid mb-4">
+        <section class="dz-kpi-grid mb-3 mb-sm-4">
             <!-- Usuário -->
             <div class="dz-card dz-kpi-card">
                 <div class="dz-kpi-card__head">
@@ -99,7 +99,7 @@
                     </div>
                 </div>
                 <div>
-                    <div class="dz-kpi-card__value text-success">
+                    <div class="dz-kpi-card__value text-success" style="font-size: 1.25rem;">
                         Protegida
                     </div>
                     <div class="dz-kpi-card__footer">
@@ -109,14 +109,20 @@
             </div>
         </section>
 
-            <div class="row g-4 align-items-start">
-                <div class="col-lg-6">
-                    @include('profile.partials.update-profile-information-form')
-                </div>
-                <div class="col-lg-6">
-                    @include('profile.partials.update-password-form')
-                    @include('profile.partials.delete-user-form')
-                </div>
+        {{-- CARDS PRINCIPAIS: DADOS DO PERFIL & ALTERAR SENHA (MESMA ALTURA) --}}
+        <div class="row g-3 g-sm-4 align-items-stretch mb-3 mb-sm-4">
+            <div class="col-12 col-lg-6 d-flex flex-column">
+                @include('profile.partials.update-profile-information-form')
+            </div>
+            <div class="col-12 col-lg-6 d-flex flex-column">
+                @include('profile.partials.update-password-form')
+            </div>
+        </div>
+
+        {{-- ZONA DE RISCO: EXCLUIR CONTA --}}
+        <div class="row g-3 g-sm-4">
+            <div class="col-12">
+                @include('profile.partials.delete-user-form')
             </div>
         </div>
     </div>
