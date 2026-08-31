@@ -570,6 +570,32 @@
                                 <input id="transfer_date_dash" name="date" type="text" class="form-control mt-1" value="{{ old('_form') === 'account-transfer' && old('date') ? old('date') : date('Y-m-d') }}" data-duozen-flatpickr="date" required>
                                 <x-input-error :messages="$errors->get('date')" class="mt-2" />
                             </div>
+
+                            <div>
+                                <x-input-label for="transfer_pm_dash" value="Forma de pagamento (registro)" />
+                                <select id="transfer_pm_dash" name="payment_method" class="form-select mt-1" required>
+                                    @foreach (($transferPaymentMethods ?? \App\Support\PaymentMethods::forRegularAccounts()) as $pm)
+                                        <option value="{{ $pm }}" @selected(old('_form') === 'account-transfer' ? old('payment_method') === $pm : $loop->first)>
+                                            {{ $pm }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
+                            </div>
+
+                            <div>
+                                <x-input-label for="transfer_desc_dash" value="Descrição (opcional)" />
+                                <input
+                                    id="transfer_desc_dash"
+                                    name="description"
+                                    type="text"
+                                    class="form-control mt-1"
+                                    maxlength="255"
+                                    placeholder="Ex.: Ajuste entre contas"
+                                    value="{{ old('_form') === 'account-transfer' ? old('description') : '' }}"
+                                >
+                                <x-input-error :messages="$errors->get('description')" class="mt-2" />
+                            </div>
                         </div>
 
                         <div class="modal-footer dashboard-transfer-modal__foot">

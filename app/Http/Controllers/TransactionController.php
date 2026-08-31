@@ -1079,73 +1079,47 @@ class TransactionController extends Controller
     }
 
     /**
-     * Redireciona sem `prefill_recurring` na query, para a modal de novo lançamento não reabrir após gravar.
+     * Redireciona de volta para a tela de origem (sem prefill de recorrente/cofrinho na query,
+     * para a modal de novo lançamento não reabrir após gravar).
      */
     private function redirectAfterSuccessfulTransactionStore(Request $request): RedirectResponse
     {
         $flash = ['success' => 'Lançamento realizado!'];
 
-        $month = null;
-        $year = null;
-        $accountId = null;
+        $referer = $request->headers->get('referer') ?: url()->previous(route('transactions.index'));
+        if (is_string($referer) && $referer !== '') {
+            $parsed = parse_url($referer);
+            if ($parsed !== false) {
+                if (isset($parsed['host']) && $parsed['host'] !== $request->getHost()) {
+                    return redirect()->route('transactions.index')->with($flash);
+                }
 
-        $referer = $request->headers->get('referer');
-        if (is_string($referer)) {
-            $path = (string) (parse_url($referer, PHP_URL_PATH) ?? '');
-            $queryString = parse_url($referer, PHP_URL_QUERY);
-            if (is_string($queryString) && $queryString !== '') {
-                parse_str($queryString, $q);
-                unset($q['prefill_recurring'], $q['prefill_cofrinho'], $q['prefill_cofrinho_kind']);
-                if (isset($q['month'])) {
-                    $m = (int) $q['month'];
-                    if ($m >= 1 && $m <= 12) {
-                        $month = $m;
-                    }
+                $scheme = isset($parsed['scheme']) ? $parsed['scheme'].'://' : '';
+                $host = $parsed['host'] ?? '';
+                $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+                $user = $parsed['user'] ?? '';
+                $pass = isset($parsed['pass']) ? ':'.$parsed['pass'] : '';
+                $auth = ($user !== '' || $pass !== '') ? "{$user}{$pass}@" : '';
+                $path = $parsed['path'] ?? '/';
+
+                $query = [];
+                if (isset($parsed['query']) && $parsed['query'] !== '') {
+                    parse_str($parsed['query'], $query);
+                    unset($query['prefill_recurring'], $query['prefill_cofrinho'], $query['prefill_cofrinho_kind']);
                 }
-                if (isset($q['year'])) {
-                    $y = (int) $q['year'];
-                    if ($y >= 2000 && $y <= 2100) {
-                        $year = $y;
-                    }
-                }
-                if (isset($q['account_id']) && $q['account_id'] !== '') {
-                    $accountId = (int) $q['account_id'];
-                }
-                if (($month === null || $year === null) && isset($q['period']) && is_string($q['period'])) {
-                    $periodParts = explode('-', $q['period']);
-                    if (count($periodParts) >= 2) {
-                        $py = (int) $periodParts[0];
-                        $pm = (int) $periodParts[1];
-                        if ($pm >= 1 && $pm <= 12 && $py >= 2000 && $py <= 2100) {
-                            $month = $pm;
-                            $year = $py;
-                        }
-                    }
+
+                $queryString = http_build_query($query);
+                $fragment = isset($parsed['fragment']) && $parsed['fragment'] !== '' ? '#'.$parsed['fragment'] : '';
+
+                $targetUrl = $scheme.$auth.$host.$port.$path.($queryString !== '' ? '?'.$queryString : '').$fragment;
+
+                if ($targetUrl !== '') {
+                    return redirect()->to($targetUrl)->with($flash);
                 }
             }
-
-            $trimPath = rtrim($path, '/') ?: '/';
-            $isDashboard = $trimPath === '/dashboard' || str_ends_with($trimPath, '/dashboard');
-
-            if ($isDashboard && $month !== null && $year !== null) {
-                $params = array_filter(
-                    [
-                        'period' => sprintf('%04d-%02d', $year, $month),
-                        'account_id' => $accountId,
-                    ],
-                    fn ($v) => $v !== null && $v !== ''
-                );
-
-                return redirect()->route('dashboard', $params)->with($flash);
-            }
-
         }
 
-        $d = Carbon::parse((string) $request->input('date'));
-
-        return redirect()->route('dashboard', [
-            'period' => sprintf('%04d-%02d', (int) $d->year, (int) $d->month),
-        ])->with($flash);
+        return redirect()->route('transactions.index')->with($flash);
     }
 
     /**

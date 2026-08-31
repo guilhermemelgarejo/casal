@@ -134,13 +134,41 @@ class AccountTransferController extends Controller
             $income->syncCategorySplits($splitRowIn);
         });
 
-        $previous = (string) url()->previous();
-        if ($previous === '' || str_contains($previous, '/accounts/transfer')) {
-            $previous = route('accounts.index');
+        $referer = $request->headers->get('referer') ?: url()->previous(route('accounts.index'));
+        if (is_string($referer) && $referer !== '') {
+            $parsed = parse_url($referer);
+            if ($parsed !== false) {
+                if (isset($parsed['host']) && $parsed['host'] !== $request->getHost()) {
+                    return redirect()->route('accounts.index')->with('success', 'Transferência registrada: saída em '.$from->name.' e entrada em '.$to->name.'.');
+                }
+
+                $path = $parsed['path'] ?? '/';
+                if ($path === '/accounts/transfer' || str_ends_with($path, '/accounts/transfer')) {
+                    return redirect()->route('accounts.index')->with('success', 'Transferência registrada: saída em '.$from->name.' e entrada em '.$to->name.'.');
+                }
+
+                $scheme = isset($parsed['scheme']) ? $parsed['scheme'].'://' : '';
+                $host = $parsed['host'] ?? '';
+                $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+                $user = $parsed['user'] ?? '';
+                $pass = isset($parsed['pass']) ? ':'.$parsed['pass'] : '';
+                $auth = ($user !== '' || $pass !== '') ? "{$user}{$pass}@" : '';
+
+                $query = [];
+                if (isset($parsed['query']) && $parsed['query'] !== '') {
+                    parse_str($parsed['query'], $query);
+                }
+                $queryString = http_build_query($query);
+                $fragment = isset($parsed['fragment']) && $parsed['fragment'] !== '' ? '#'.$parsed['fragment'] : '';
+
+                $targetUrl = $scheme.$auth.$host.$port.$path.($queryString !== '' ? '?'.$queryString : '').$fragment;
+
+                if ($targetUrl !== '') {
+                    return redirect()->to($targetUrl)->with('success', 'Transferência registrada: saída em '.$from->name.' e entrada em '.$to->name.'.');
+                }
+            }
         }
 
-        return redirect()
-            ->to($previous)
-            ->with('success', 'Transferência registrada: saída em '.$from->name.' e entrada em '.$to->name.'.');
+        return redirect()->route('accounts.index')->with('success', 'Transferência registrada: saída em '.$from->name.' e entrada em '.$to->name.'.');
     }
 }

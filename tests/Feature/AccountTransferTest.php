@@ -149,4 +149,77 @@ class AccountTransferTest extends TestCase
         $this->assertSame('1000.00', $from->fresh()->balance);
         $this->assertSame('0.00', $to->fresh()->balance);
     }
+
+    public function test_tela_de_lancamentos_exibe_botao_transferir_quando_ha_duas_ou_mais_contas_correntes(): void
+    {
+        [$couple, $user, $from, $to] = $this->coupleWithTwoRegularAccounts();
+
+        $response = $this->actingAs($user)->get(route('transactions.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-bs-target="#modalAccountTransfer"', false);
+        $response->assertSee('Transferir', false);
+        $response->assertSee('id="modalAccountTransfer"', false);
+    }
+
+    public function test_tela_de_lancamentos_nao_exibe_botao_transferir_quando_ha_apenas_uma_conta_corrente(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta Única',
+            'kind' => Account::KIND_REGULAR,
+            'color' => '#111111',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('transactions.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('data-bs-target="#modalAccountTransfer"', false);
+        $response->assertDontSee('id="modalAccountTransfer"', false);
+    }
+
+    public function test_transferencia_iniciada_da_tela_de_lancamentos_redireciona_com_sucesso(): void
+    {
+        [$couple, $user, $from, $to] = $this->coupleWithTwoRegularAccounts();
+
+        $response = $this->actingAs($user)->post(route('accounts.transfer'), [
+            '_form' => 'account-transfer',
+            'from_account_id' => $from->id,
+            'to_account_id' => $to->id,
+            'amount' => '150,00',
+            'date' => '2026-04-10',
+            'payment_method' => 'Pix',
+            'description' => 'Transferência via tela de lançamentos',
+        ], ['referer' => route('transactions.index')]);
+
+        $response->assertRedirect(route('transactions.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertSame('850.00', $from->fresh()->balance);
+        $this->assertSame('150.00', $to->fresh()->balance);
+    }
+
+    public function test_transferencia_iniciada_do_dashboard_com_periodo_redireciona_mantendo_url(): void
+    {
+        [$couple, $user, $from, $to] = $this->coupleWithTwoRegularAccounts();
+
+        $fromUrl = route('dashboard', ['period' => '2026-05', 'account_id' => $from->id]);
+
+        $response = $this->actingAs($user)->post(route('accounts.transfer'), [
+            '_form' => 'account-transfer',
+            'from_account_id' => $from->id,
+            'to_account_id' => $to->id,
+            'amount' => '50,00',
+            'date' => '2026-05-12',
+            'payment_method' => 'Pix',
+            'description' => 'Transferência no painel',
+        ], ['referer' => $fromUrl]);
+
+        $response->assertRedirect($fromUrl);
+        $response->assertSessionHas('success');
+    }
 }
+
