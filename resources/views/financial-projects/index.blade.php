@@ -50,14 +50,22 @@
         $quote = $isAsset ? ($quotes[$quoteKey] ?? null) : null;
         $quotePrice = $quote?->price;
 
-        $saved = $isAsset ? (float) $project->currentEstimatedValue($quotePrice) : (float) $project->savedProgress();
-        $invested = $isAsset ? (float) $project->totalInvestedBrl() : (float) $project->savedProgress();
+        if ($isAsset) {
+            $saved = (float) $project->currentEstimatedValue($quotePrice);
+            $invested = (float) $project->totalInvestedBrl();
+            $profit = $project->profitOrLoss($quotePrice);
+            $profitPct = $project->profitOrLossPct($quotePrice);
+        } else {
+            $metrics = $project->fiatProfitMetrics();
+            $saved = (float) $metrics['saved'];
+            $invested = (float) $metrics['principal'];
+            $profit = (float) $metrics['profit'];
+            $profitPct = (float) $metrics['profit_pct'];
+        }
+
         $target = $project->target_amount !== null ? (float) $project->target_amount : null;
         $remaining = $target !== null ? max(0.0, $target - $saved) : null;
         $pct = ($target !== null && $target > 0.00001) ? min(100.0, ($saved / $target) * 100.0) : null;
-
-        $profit = $isAsset ? $project->profitOrLoss($quotePrice) : 0.0;
-        $profitPct = $isAsset ? $project->profitOrLossPct($quotePrice) : null;
 
         return [
             'project' => $project,

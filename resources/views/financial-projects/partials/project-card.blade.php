@@ -180,7 +180,7 @@
                 @if($invested > 0)
                     <div id="profit-container-{{ $p->id }}" class="d-flex align-items-center justify-content-between rounded-3 border mb-2 {{ $profit >= 0 ? 'border-success-subtle bg-success-subtle' : 'border-danger-subtle bg-danger-subtle' }}" style="padding: 0.55rem 0.95rem;">
                         <span class="small fw-semibold text-secondary" style="font-size: 0.72rem;">Rentabilidade</span>
-                        <span id="profit-badge-{{ $p->id }}" class="small fw-bold {{ $profit >= 0 ? 'text-success' : 'text-danger' }}" style="font-size: 0.78rem;">
+                        <span id="profit-badge-{{ $p->id }}" class="small fw-bold {{ $profit >= 0 ? 'text-success' : 'text-danger' }} duozen-privacy-blur" style="font-size: 0.78rem;">
                             {{ $profit >= 0 ? '+' : '' }}R$ {{ number_format($profit, 2, ',', '.') }}
                             @if($profitPct !== null)
                                 ({{ ($profitPct >= 0 ? '+' : '') . number_format($profitPct, 2, ',', '.') }}%)
@@ -198,15 +198,25 @@
                             <div class="progress-bar {{ $isComplete ? 'bg-success' : 'bg-primary' }}" style="width: {{ number_format((float) $pct, 2, '.', '') }}%; border-radius: 9999px;"></div>
                         </div>
                     @endif
-                    <div class="d-flex align-items-center justify-content-between text-secondary small mb-1" style="font-size: 0.75rem;">
+                    <div class="d-flex align-items-center justify-content-between text-secondary small mb-2" style="font-size: 0.75rem;">
                         <span>Falta: <strong class="text-body duozen-privacy-blur">R$ {{ number_format((float) $remaining, 2, ',', '.') }}</strong></span>
                         <span>Avanço: <strong class="text-body">{{ number_format((float) $pct, 1, ',', '.') }}%</strong></span>
                     </div>
                 @else
-                    <p class="small text-secondary mb-1" style="font-size: 0.78rem; line-height: 1.35;">
+                    <p class="small text-secondary mb-2" style="font-size: 0.78rem; line-height: 1.35;">
                         Use como reserva livre ou edite o cofrinho para definir uma meta financeira.
                     </p>
                 @endif
+
+                <div id="profit-container-{{ $p->id }}" class="d-flex align-items-center justify-content-between rounded-3 border mb-2 {{ $profit >= 0 ? 'border-success-subtle bg-success-subtle' : 'border-danger-subtle bg-danger-subtle' }}" style="padding: 0.55rem 0.95rem;">
+                    <span class="small fw-semibold text-secondary" style="font-size: 0.72rem;">Rentabilidade</span>
+                    <span id="profit-badge-{{ $p->id }}" class="small fw-bold {{ $profit >= 0 ? 'text-success' : 'text-danger' }} duozen-privacy-blur" style="font-size: 0.78rem;">
+                        {{ $profit >= 0 ? '+' : '' }}R$ {{ number_format($profit, 2, ',', '.') }}
+                        @if($profitPct !== null)
+                            ({{ ($profitPct >= 0 ? '+' : '') . number_format($profitPct, 2, ',', '.') }}%)
+                        @endif
+                    </span>
+                </div>
             @endif
         </div>
 

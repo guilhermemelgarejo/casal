@@ -258,4 +258,174 @@ class FinancialProjectInterestTest extends TestCase
 
         $this->assertDatabaseHas('financial_projects', ['id' => $project->id]);
     }
+
+    public function test_profitability_indicator_is_calculated_and_displayed_on_fiat_cofrinho(): void
+    {
+        ['user' => $user, 'account' => $account, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        // Aporte: 1000.00
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Aporte inicial',
+            'amount' => '1000.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-01-10',
+            'reference_month' => 1,
+            'reference_year' => 2026,
+        ]);
+
+        // Retirada: 200.00
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Retirada parcial',
+            'amount' => '200.00',
+            'payment_method' => 'Pix',
+            'type' => 'income',
+            'date' => '2026-02-10',
+            'reference_month' => 2,
+            'reference_year' => 2026,
+        ]);
+
+        // Juros: 80.00
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '80.00',
+            'date' => '2026-03-01',
+            'note' => 'Rendimento CDB',
+        ]);
+
+        $project->refresh();
+
+        $this->assertSame(1000.00, $project->totalDeposits());
+        $this->assertSame(200.00, $project->totalWithdrawals());
+        $this->assertSame(80.00, $project->totalInterest());
+        $this->assertSame(800.00, $project->netDeposited());
+        $this->assertSame(880.00, $project->savedProgress());
+        $this->assertSame(80.00, $project->profitOrLoss());
+        $this->assertSame(10.00, $project->profitOrLossPct());
+
+        $this->actingAs($user)
+            ->get(route('cofrinhos.index'))
+            ->assertOk()
+            ->assertSee('Rentabilidade')
+            ->assertSee('+R$ 80,00')
+            ->assertSee('(+10,00%)');
+    }
+
+    public function test_profitability_zero_when_no_interest(): void
+    {
+        ['user' => $user, 'account' => $account, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Aporte único',
+            'amount' => '500.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-01-10',
+            'reference_month' => 1,
+            'reference_year' => 2026,
+        ]);
+
+        $project->refresh();
+
+        $this->assertSame(500.00, $project->totalDeposits());
+        $this->assertSame(0.00, $project->totalWithdrawals());
+        $this->assertSame(0.00, $project->totalInterest());
+        $this->assertSame(500.00, $project->netDeposited());
+        $this->assertSame(500.00, $project->savedProgress());
+        $this->assertSame(0.00, $project->profitOrLoss());
+        $this->assertSame(0.00, $project->profitOrLossPct());
+
+        $this->actingAs($user)
+            ->get(route('cofrinhos.index'))
+            ->assertOk()
+            ->assertSee('Rentabilidade')
+            ->assertSee('+R$ 0,00')
+            ->assertSee('(+0,00%)');
+    }
+
+    public function test_profitability_resets_and_tracks_current_position_accurately_when_past_cycle_emptied(): void
+    {
+        ['user' => $user, 'account' => $account, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        // 1. Saldo inicial importado como Ajuste
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '3924.34',
+            'date' => '2025-12-31',
+            'note' => 'Ajuste',
+        ]);
+
+        // 2. Retirada que esvaziou a posição anterior
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Retirada total',
+            'amount' => '3924.34',
+            'payment_method' => 'Pix',
+            'type' => 'income',
+            'date' => '2026-06-24',
+            'reference_month' => 6,
+            'reference_year' => 2026,
+        ]);
+
+        // 3. Novo ciclo: Aporte de 10.000,00
+        Transaction::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'account_id' => $account->id,
+            'financial_project_id' => $project->id,
+            'description' => 'Aporte 10k',
+            'amount' => '10000.00',
+            'payment_method' => 'Pix',
+            'type' => 'expense',
+            'date' => '2026-07-10',
+            'reference_month' => 7,
+            'reference_year' => 2026,
+        ]);
+
+        // 4. Juros do novo ciclo: 109,13
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '109.13',
+            'date' => '2026-08-01',
+            'note' => 'Juros mês',
+        ]);
+
+        $project->refresh();
+
+        $metrics = $project->fiatProfitMetrics();
+        $this->assertSame(10109.13, $metrics['saved']);
+        $this->assertSame(10000.00, $metrics['principal']);
+        $this->assertSame(109.13, $metrics['profit']);
+        $this->assertSame(1.09, $metrics['profit_pct']);
+
+        $this->actingAs($user)
+            ->get(route('cofrinhos.index'))
+            ->assertOk()
+            ->assertSee('+R$ 109,13')
+            ->assertSee('(+1,09%)');
+    }
 }

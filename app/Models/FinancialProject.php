@@ -111,10 +111,96 @@ class FinancialProject extends Model
         return (float) ($this->asset_avg_price ?? 0);
     }
 
+    /**
+     * Calcula as métricas de saldo, capital investido e rendimento real para cofrinhos fiat,
+     * considerando a ordem cronológica de aportes, retiradas e juros, e tratando
+     * ajustes iniciais como saldo inicial.
+     *
+     * @return array{saved: float, principal: float, profit: float, profit_pct: float}
+     */
+    public function fiatProfitMetrics(): array
+    {
+        $txs = $this->relationLoaded('transactions')
+            ? $this->transactions
+            : $this->transactions()->get();
+
+        $entries = $this->relationLoaded('entries')
+            ? $this->entries
+            : $this->entries()->get();
+
+        $movements = collect();
+
+        foreach ($txs as $t) {
+            $dateStr = $t->date instanceof \Carbon\Carbon ? $t->date->format('Y-m-d') : (string) $t->date;
+            $movements->push([
+                'date' => $dateStr,
+                'id' => (int) $t->id,
+                'amount' => (float) $t->amount,
+                'type' => $t->type === 'expense' ? 'aporte' : 'retirada',
+            ]);
+        }
+
+        foreach ($entries as $e) {
+            $dateStr = $e->date instanceof \Carbon\Carbon ? $e->date->format('Y-m-d') : (string) $e->date;
+            $isAjuste = trim(strtolower((string) ($e->note ?? ''))) === 'ajuste';
+            $movements->push([
+                'date' => $dateStr,
+                'id' => (int) $e->id,
+                'amount' => (float) $e->amount,
+                'type' => $isAjuste ? 'ajuste_saldo' : 'juros',
+            ]);
+        }
+
+        $sorted = $movements->sortBy(function (array $m): string {
+            return $m['date'] . '_' . sprintf('%08d', $m['id']);
+        })->values();
+
+        $balance = 0.0;
+        $principal = 0.0;
+        $accumulatedInterest = 0.0;
+
+        foreach ($sorted as $m) {
+            if ($m['type'] === 'aporte' || $m['type'] === 'ajuste_saldo') {
+                $principal += $m['amount'];
+                $balance += $m['amount'];
+            } elseif ($m['type'] === 'juros') {
+                $accumulatedInterest += $m['amount'];
+                $balance += $m['amount'];
+            } elseif ($m['type'] === 'retirada') {
+                $withdrawal = $m['amount'];
+                $balance = max(0.0, $balance - $withdrawal);
+
+                if ($balance <= 0.0001) {
+                    $principal = 0.0;
+                    $accumulatedInterest = 0.0;
+                    $balance = 0.0;
+                } else {
+                    if ($withdrawal >= $principal) {
+                        $accumulatedInterest = max(0.0, $accumulatedInterest - ($withdrawal - $principal));
+                        $principal = 0.0;
+                    } else {
+                        $principal = max(0.0, $principal - $withdrawal);
+                    }
+                    $accumulatedInterest = max(0.0, round($balance - $principal, 2));
+                }
+            }
+        }
+
+        $profit = round($balance - $principal, 2);
+        $profitPct = $principal > 0.0001 ? round(($profit / $principal) * 100.0, 2) : 0.0;
+
+        return [
+            'saved' => round($balance, 2),
+            'principal' => round($principal, 2),
+            'profit' => $profit,
+            'profit_pct' => $profitPct,
+        ];
+    }
+
     public function totalInvestedBrl(): float
     {
         if (! $this->isCustomAsset()) {
-            return $this->savedProgress();
+            return $this->fiatProfitMetrics()['principal'];
         }
 
         return round($this->currentAssetQuantity() * $this->averageAssetPrice(), 2);
@@ -135,20 +221,28 @@ class FinancialProject extends Model
 
     public function profitOrLoss(?float $currentQuote = null): float
     {
-        if (! $this->isCustomAsset() || $currentQuote === null || $currentQuote <= 0) {
-            return 0.0;
+        if ($this->isCustomAsset()) {
+            if ($currentQuote === null || $currentQuote <= 0) {
+                return 0.0;
+            }
+
+            return round(($currentQuote - $this->averageAssetPrice()) * $this->currentAssetQuantity(), 2);
         }
 
-        return round(($currentQuote - $this->averageAssetPrice()) * $this->currentAssetQuantity(), 2);
+        return $this->fiatProfitMetrics()['profit'];
     }
 
     public function profitOrLossPct(?float $currentQuote = null): ?float
     {
-        if (! $this->isCustomAsset() || $currentQuote === null || $currentQuote <= 0 || $this->averageAssetPrice() <= 0.00001) {
-            return null;
+        if ($this->isCustomAsset()) {
+            if ($currentQuote === null || $currentQuote <= 0 || $this->averageAssetPrice() <= 0.00001) {
+                return null;
+            }
+
+            return round((($currentQuote / $this->averageAssetPrice()) - 1.0) * 100.0, 2);
         }
 
-        return round((($currentQuote / $this->averageAssetPrice()) - 1.0) * 100.0, 2);
+        return $this->fiatProfitMetrics()['profit_pct'];
     }
 
     /**
@@ -205,30 +299,44 @@ class FinancialProject extends Model
         ];
     }
 
-    /**
-     * Progresso: soma despesas ligadas ao projeto − soma receitas ligadas (retiradas).
-     */
-    public function savedProgress(): float
+    public function totalDeposits(): float
     {
-        $in = (float) Transaction::query()
+        return (float) Transaction::query()
             ->where('couple_id', $this->couple_id)
             ->where('financial_project_id', $this->id)
             ->where('type', 'expense')
             ->sum('amount');
+    }
 
-        $out = (float) Transaction::query()
+    public function totalWithdrawals(): float
+    {
+        return (float) Transaction::query()
             ->where('couple_id', $this->couple_id)
             ->where('financial_project_id', $this->id)
             ->where('type', 'income')
             ->sum('amount');
+    }
 
-        $interest = (float) FinancialProjectEntry::query()
+    public function totalInterest(): float
+    {
+        return (float) FinancialProjectEntry::query()
             ->where('couple_id', $this->couple_id)
             ->where('financial_project_id', $this->id)
-            ->where('type', 'interest')
+            ->where('type', FinancialProjectEntry::TYPE_INTEREST)
             ->sum('amount');
+    }
 
-        return round(($in - $out) + $interest, 2);
+    public function netDeposited(): float
+    {
+        return round($this->totalDeposits() - $this->totalWithdrawals(), 2);
+    }
+
+    /**
+     * Progresso: soma despesas ligadas ao projeto − soma receitas ligadas (retiradas) + juros.
+     */
+    public function savedProgress(): float
+    {
+        return round($this->netDeposited() + $this->totalInterest(), 2);
     }
 
     public function remainingToTarget(): ?float

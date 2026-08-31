@@ -31,6 +31,7 @@ class FinancialProjectController extends Controller
         $couple = Auth::user()->couple;
         $projects = FinancialProject::query()
             ->where('couple_id', $couple->id)
+            ->with(['transactions', 'entries'])
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->get();
