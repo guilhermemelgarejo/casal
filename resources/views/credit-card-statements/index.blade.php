@@ -132,7 +132,7 @@
                                     <h3 class="h5 mb-1 fw-semibold">Escolher cartão</h3>
                                     <p class="small text-secondary mb-0">Um cartão de cada vez — depois vê os ciclos, totais e pagamentos.</p>
                                 </div>
-                                <div class="card-body p-3 p-md-4 p-lg-5 cc-picker-hero-body border-top border-secondary-subtle">
+                                <div class="card-body p-3 p-md-4 cc-picker-hero-body border-top border-secondary-subtle">
                                     <div class="cc-picker-grid">
                                         @foreach ($cardAccounts as $ca)
                                             @include('credit-card-statements.partials.cc-picker-card', [
