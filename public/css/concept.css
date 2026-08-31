@@ -3598,6 +3598,12 @@ body.dz-privacy-active .duozen-privacy-blur,
     border-radius: var(--dz-radius-xl);
     overflow: hidden;
     box-shadow: var(--dz-shadow-sm);
+    transition: var(--dz-transition);
+}
+
+.billing-plan-card:hover {
+    box-shadow: var(--dz-shadow-md);
+    border-color: var(--dz-border-hover);
 }
 
 .billing-card-head {
@@ -3616,8 +3622,18 @@ body.dz-privacy-active .duozen-privacy-blur,
     border-color: rgba(16, 185, 129, 0.2);
 }
 
+.billing-card-head--info {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, var(--dz-bg-card-subtle) 100%);
+    border-color: rgba(6, 182, 212, 0.2);
+}
+
+.billing-card-head--muted {
+    background: var(--dz-bg-card-subtle);
+    border-color: var(--dz-border);
+}
+
 .billing-card-body {
-    padding: 2rem;
+    padding: 1.75rem 2rem;
     background: var(--dz-bg-card);
 }
 
@@ -3626,6 +3642,67 @@ body.dz-privacy-active .duozen-privacy-blur,
     border: 1px dashed var(--dz-border);
     border-radius: var(--dz-radius-md);
     padding: 1.25rem 1.5rem;
+}
+
+.billing-feature-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--dz-radius-md);
+    background: var(--dz-bg-card-subtle);
+    border: 1px solid var(--dz-border-subtle);
+    transition: var(--dz-transition);
+}
+
+.billing-feature-item:hover {
+    background: var(--dz-bg-card-hover);
+    border-color: var(--dz-border);
+    transform: translateY(-1px);
+}
+
+.billing-feature-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--dz-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.billing-faq-card {
+    background: var(--dz-bg-card);
+    border: 1px solid var(--dz-border);
+    border-radius: var(--dz-radius-lg);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--dz-shadow-xs);
+}
+
+.billing-faq-item {
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--dz-border-subtle);
+}
+
+.billing-faq-item:last-child {
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+.billing-trust-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--dz-text-secondary);
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--dz-radius-pill);
+    background: var(--dz-bg-card-subtle);
+    border: 1px solid var(--dz-border-subtle);
 }
 
 /* ==========================================================================
