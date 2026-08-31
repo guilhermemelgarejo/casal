@@ -128,105 +128,60 @@
                 </a>
             </div>
         @else
-            @if ($filterCardId === null)
-                <div class="dz-card cc-picker-hero mb-4 overflow-hidden" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
-                    <div class="cc-picker-hero-head p-3 p-lg-4" style="background: var(--dz-bg-card); border-bottom: 1px solid var(--dz-border-subtle);">
-                        <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary flex-shrink-0" style="width: 44px; height: 44px; font-size: 1.25rem;">
-                                    💳
-                                </div>
-                                <div>
-                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title); font-size: 1.05rem;">Escolher cartão</h3>
-                                        <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700; border: 1px solid var(--dz-primary-border);">
-                                            {{ $cardAccounts->count() }} {{ $cardAccounts->count() === 1 ? 'cartão' : 'cartões' }}
-                                        </span>
-                                    </div>
-                                    <span style="font-size: 0.8rem; color: var(--dz-text-secondary); display: block; margin-top: 0.2rem;">
-                                        Um cartão de cada vez — depois veja os ciclos, totais e pagamentos.
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0">
-                                <button
-                                    type="button"
-                                    class="dz-btn dz-btn-primary"
-                                    style="font-size: 0.8rem; padding: 0.42rem 0.95rem; font-weight: 700;"
-                                    title="Criar fatura manual para um período sem compras no cartão"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#newAvulsaStatementModal"
-                                >
-                                    + Cadastrar fatura avulsa
-                                </button>
-                                <a href="{{ route('accounts.index') }}" class="dz-btn dz-btn-outline" style="font-size: 0.8rem; padding: 0.42rem 0.9rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir para Contas e gerenciar cartões">
-                                    Gerenciar cartões ↗
-                                </a>
-                            </div>
+            <div class="cc-picker-toolbar dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
+                <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.1rem;">
+                            💳
                         </div>
-                    </div>
-                    <div class="cc-picker-hero-body p-3 p-lg-4" style="background: var(--dz-bg-card);">
-                        <div class="cc-picker-grid">
-                            @foreach ($cardAccounts as $ca)
-                                @include('credit-card-statements.partials.cc-picker-card', [
-                                    'account' => $ca,
-                                    'compact' => false,
-                                    'active' => false,
-                                    'pickerSummary' => $cardPickerSummaries[$ca->id] ?? null,
-                                    'hasPastOpenStatements' => $pastOpenStatementAccountIds->contains($ca->id),
-                                ])
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            @else
-                <div class="cc-picker-toolbar dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
-                    <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--primary flex-shrink-0" style="width: 38px; height: 38px; font-size: 1.1rem;">
-                                💳
-                            </div>
-                            <div>
-                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title); font-size: 0.98rem;">Trocar cartão</h3>
-                                    <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700; border: 1px solid var(--dz-primary-border);">
-                                        {{ $cardAccounts->count() }} disponíveis
-                                    </span>
-                                </div>
-                                <span style="font-size: 0.78rem; color: var(--dz-text-secondary); display: block; margin-top: 0.15rem;">
-                                    Selecione outro cartão para alternar a exibição das faturas.
+                        <div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title); font-size: 0.98rem;">
+                                    {{ $filterCardId !== null ? 'Trocar cartão' : 'Escolher cartão' }}
+                                </h3>
+                                <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700; border: 1px solid var(--dz-primary-border);">
+                                    {{ $cardAccounts->count() }} disponíveis
                                 </span>
                             </div>
+                            <span style="font-size: 0.78rem; color: var(--dz-text-secondary); display: block; margin-top: 0.15rem;">
+                                {{ $filterCardId !== null ? 'Selecione outro cartão para alternar a exibição das faturas.' : 'Selecione um cartão para alternar a exibição das faturas.' }}
+                            </span>
                         </div>
-                        <div class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
-                            <button
-                                type="button"
-                                class="dz-btn dz-btn-primary"
-                                style="font-size: 0.78rem; padding: 0.4rem 0.85rem; font-weight: 700;"
-                                title="Criar fatura manual para um período sem compras no cartão"
-                                data-bs-toggle="modal"
-                                data-bs-target="#newAvulsaStatementModal"
-                            >
-                                + Cadastrar fatura avulsa
-                            </button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
+                        <button
+                            type="button"
+                            class="dz-btn dz-btn-primary"
+                            style="font-size: 0.78rem; padding: 0.4rem 0.85rem; font-weight: 700;"
+                            title="Criar fatura manual para um período sem compras no cartão"
+                            data-bs-toggle="modal"
+                            data-bs-target="#newAvulsaStatementModal"
+                        >
+                            + Cadastrar fatura avulsa
+                        </button>
+                        @if ($filterCardId !== null)
                             <a href="{{ route('credit-card-statements.index') }}" class="dz-btn dz-btn-outline" style="font-size: 0.78rem; padding: 0.4rem 0.85rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Voltar à grade de escolha de cartão">
                                 Voltar à escolha
                             </a>
-                        </div>
-                    </div>
-                    <div class="cc-picker-grid cc-picker-grid--toolbar justify-content-start">
-                        @foreach ($cardAccounts as $ca)
-                            @include('credit-card-statements.partials.cc-picker-card', [
-                                'account' => $ca,
-                                'compact' => true,
-                                'active' => (int) $filterCardId === (int) $ca->id,
-                                'pickerSummary' => $cardPickerSummaries[$ca->id] ?? null,
-                                'hasPastOpenStatements' => $pastOpenStatementAccountIds->contains($ca->id),
-                            ])
-                        @endforeach
+                        @else
+                            <a href="{{ route('accounts.index') }}" class="dz-btn dz-btn-outline" style="font-size: 0.78rem; padding: 0.4rem 0.85rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Ir para Contas e gerenciar cartões">
+                                Gerenciar cartões ↗
+                            </a>
+                        @endif
                     </div>
                 </div>
-            @endif
+                <div class="cc-picker-grid cc-picker-grid--toolbar justify-content-start">
+                    @foreach ($cardAccounts as $ca)
+                        @include('credit-card-statements.partials.cc-picker-card', [
+                            'account' => $ca,
+                            'compact' => true,
+                            'active' => (int) $filterCardId === (int) $ca->id,
+                            'pickerSummary' => $cardPickerSummaries[$ca->id] ?? null,
+                            'hasPastOpenStatements' => $pastOpenStatementAccountIds->contains($ca->id),
+                        ])
+                    @endforeach
+                </div>
+            </div>
 
                         @if ($filterCardId !== null)
                             @if ($invoiceCycles->isEmpty())
