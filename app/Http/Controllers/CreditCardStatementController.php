@@ -198,8 +198,25 @@ class CreditCardStatementController extends Controller
         ));
     }
 
-    public function storeAvulsa(Request $request, Account $account)
+    public function storeAvulsa(Request $request, ?Account $account = null)
     {
+        $coupleId = (int) Auth::user()->couple_id;
+
+        if ($account === null || ! $account->exists) {
+            $accountId = $request->input('account_id');
+            $account = Account::query()
+                ->where('couple_id', $coupleId)
+                ->where('kind', Account::KIND_CREDIT_CARD)
+                ->where('id', $accountId)
+                ->first();
+
+            if (! $account) {
+                return back()->withErrors([
+                    'account_id' => 'Selecione um cartão de crédito válido.',
+                ])->withInput();
+            }
+        }
+
         $this->authorizeCreditCardAccount($account);
 
         // Identifica o formulário para reabrir o modal no retorno com erro.
@@ -231,7 +248,6 @@ class CreditCardStatementController extends Controller
             ])->withInput();
         }
 
-        $coupleId = (int) Auth::user()->couple_id;
         $refMonth = (int) $validated['reference_month'];
         $refYear = (int) $validated['reference_year'];
 
@@ -260,7 +276,8 @@ class CreditCardStatementController extends Controller
                 'paid_at' => null,
             ]);
 
-            return back()->with('success', 'Fatura avulsa atualizada.');
+            return redirect()->route('credit-card-statements.index', ['account_id' => $account->id])
+                ->with('success', 'Fatura avulsa atualizada.');
         }
 
         try {
@@ -289,7 +306,8 @@ class CreditCardStatementController extends Controller
             ])->withInput();
         }
 
-        return back()->with('success', 'Fatura avulsa cadastrada.');
+        return redirect()->route('credit-card-statements.index', ['account_id' => $account->id])
+            ->with('success', 'Fatura avulsa cadastrada.');
     }
 
     public function update(Request $request, Account $account, int $referenceYear, int $referenceMonth)

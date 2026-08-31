@@ -390,145 +390,151 @@
                                             </div>
                                         </div>
                                     @endforeach
-                        </div>
+                                </div>
+                            @endif
 
-                        <div class="modal fade" id="statementItemsModal" tabindex="-1" aria-labelledby="statementItemsModalLabel" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
-                                <div class="modal-content cc-statement-items-modal">
-                                    <div class="modal-header align-items-start">
-                                        <div class="min-w-0 pe-2">
-                                            <h2 class="modal-title h5 mb-0" id="statementItemsModalLabel">Itens desta fatura</h2>
-                                            <p class="small text-secondary mb-0 mt-2 fw-semibold" id="statementItemsSubtitle"></p>
+                            <div class="modal fade" id="statementItemsModal" tabindex="-1" aria-labelledby="statementItemsModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
+                                    <div class="modal-content cc-statement-items-modal">
+                                        <div class="modal-header align-items-start">
+                                            <div class="min-w-0 pe-2">
+                                                <h2 class="modal-title h5 mb-0" id="statementItemsModalLabel">Itens desta fatura</h2>
+                                                <p class="small text-secondary mb-0 mt-2 fw-semibold" id="statementItemsSubtitle"></p>
+                                            </div>
+                                            <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                         </div>
-                                        <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="table-responsive cc-statement-items-table-wrap">
-                                            <table class="table table-hover align-middle mb-0 cc-statement-items-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th class="ps-3">Data compra</th>
-                                                        <th>Descrição</th>
-                                                        <th>Parcela</th>
-                                                        <th>Ref.</th>
-                                                        <th class="text-end">Valor nesta fatura</th>
-                                                        <th class="text-end pe-3">Lançamentos</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="statementItemsTbody"></tbody>
-                                            </table>
+                                        <div class="modal-body">
+                                            <div class="table-responsive cc-statement-items-table-wrap">
+                                                <table class="table table-hover align-middle mb-0 cc-statement-items-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="ps-3">Data compra</th>
+                                                            <th>Descrição</th>
+                                                            <th>Parcela</th>
+                                                            <th>Ref.</th>
+                                                            <th class="text-end">Valor nesta fatura</th>
+                                                            <th class="text-end pe-3">Lançamentos</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="statementItemsTbody"></tbody>
+                                                </table>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar a lista de itens" data-bs-dismiss="modal">Fechar</button>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar a lista de itens" data-bs-dismiss="modal">Fechar</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="modal fade" id="payStatementModal" tabindex="-1" aria-labelledby="payStatementModalLabel" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-                                <div class="modal-content cc-statement-form-modal">
-                                    <form id="payStatementForm" method="POST" action="#">
-                                        @csrf
-                                        <div class="modal-header cc-statement-form-modal__head">
-                                            <div>
-                                                <span class="cc-statement-form-modal__kicker">Fatura</span>
-                                                <h2 class="modal-title h5 mb-0" id="payStatementModalLabel">Pagamento da fatura</h2>
+                            <div class="modal fade" id="payStatementModal" tabindex="-1" aria-labelledby="payStatementModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                                    <div class="modal-content cc-statement-form-modal">
+                                        <form id="payStatementForm" method="POST" action="#">
+                                            @csrf
+                                            <div class="modal-header cc-statement-form-modal__head">
+                                                <div>
+                                                    <span class="cc-statement-form-modal__kicker">Fatura</span>
+                                                    <h2 class="modal-title h5 mb-0" id="payStatementModalLabel">Pagamento da fatura</h2>
+                                                </div>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                             </div>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p class="small text-secondary mb-2" id="payStatementSubtitle"></p>
-                                            <p class="small text-secondary mb-3" id="payStatementHint"></p>
-                                            <div class="vstack gap-3">
-                                                <div>
-                                                    <x-input-label for="payStatementAccountId" value="Conta" />
-                                                    <select id="payStatementAccountId" name="account_id" class="form-select mt-1" required>
-                                                        <option value="">Selecione…</option>
-                                                        @foreach ($regularAccounts as $ra)
-                                                            <option value="{{ $ra->id }}" @selected((string) old('account_id') === (string) $ra->id)>{{ $ra->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                            <div class="modal-body">
+                                                <p class="small text-secondary mb-2" id="payStatementSubtitle"></p>
+                                                <p class="small text-secondary mb-3" id="payStatementHint"></p>
+                                                <div class="vstack gap-3">
+                                                    <div>
+                                                        <x-input-label for="payStatementAccountId" value="Conta" />
+                                                        <select id="payStatementAccountId" name="account_id" class="form-select mt-1" required>
+                                                            <option value="">Selecione…</option>
+                                                            @foreach ($regularAccounts as $ra)
+                                                                <option value="{{ $ra->id }}" @selected((string) old('account_id') === (string) $ra->id)>{{ $ra->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                                    </div>
+                                                    <div>
+                                                        <x-input-label for="payStatementPaymentMethod" value="Forma de pagamento" />
+                                                        <select id="payStatementPaymentMethod" name="payment_method" class="form-select mt-1" required>
+                                                            @foreach (\App\Support\PaymentMethods::forRegularAccounts() as $pm)
+                                                                <option value="{{ $pm }}" @selected(old('payment_method') === $pm)>{{ $pm }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
+                                                    </div>
+                                                    <p class="small text-secondary mb-0">
+                                                        Categoria: <strong>{{ \App\Models\Category::NAME_CREDIT_CARD_INVOICE_PAYMENT }}</strong> (fixa para pagamento de fatura).
+                                                    </p>
+                                                    <div>
+                                                        <x-input-label for="payStatementPaidDate" value="Data do pagamento" />
+                                                        <input type="text" id="payStatementPaidDate" name="paid_date" data-duozen-flatpickr="date" class="form-control mt-1" required autocomplete="off" value="{{ old('paid_date', now()->format('Y-m-d')) }}">
+                                                        <x-input-error :messages="$errors->get('paid_date')" class="mt-2" />
+                                                    </div>
+                                                    <div>
+                                                        <x-input-label for="payStatementAmount" value="Valor (opcional)" />
+                                                        <input type="text" inputmode="decimal" id="payStatementAmount" name="amount" class="form-control mt-1" value="{{ old('amount') }}" placeholder="">
+                                                        <x-input-error :messages="$errors->get('amount')" class="mt-2" />
+                                                    </div>
                                                 </div>
+                                                <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente no <a href="{{ route('dashboard') }}">Painel</a>.</p>
+                                            </div>
+                                            <div class="modal-footer cc-statement-form-modal__footer">
+                                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem registrar pagamento" data-bs-dismiss="modal">Cancelar</button>
+                                                <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar o pagamento desta fatura como lançamento">Criar lançamento</x-primary-button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="editStatementModal" tabindex="-1" aria-labelledby="editStatementModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content cc-statement-form-modal">
+                                        <form id="editStatementForm" method="POST" action="#">
+                                            @csrf
+                                            @method('PUT')
+                                            <div class="modal-header cc-statement-form-modal__head">
                                                 <div>
-                                                    <x-input-label for="payStatementPaymentMethod" value="Forma de pagamento" />
-                                                    <select id="payStatementPaymentMethod" name="payment_method" class="form-select mt-1" required>
-                                                        @foreach (\App\Support\PaymentMethods::forRegularAccounts() as $pm)
-                                                            <option value="{{ $pm }}" @selected(old('payment_method') === $pm)>{{ $pm }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
+                                                    <span class="cc-statement-form-modal__kicker">Ciclo</span>
+                                                    <h2 class="modal-title h5 mb-0" id="editStatementModalLabel">Editar fatura</h2>
                                                 </div>
-                                                <p class="small text-secondary mb-0">
-                                                    Categoria: <strong>{{ \App\Models\Category::NAME_CREDIT_CARD_INVOICE_PAYMENT }}</strong> (fixa para pagamento de fatura).
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="small text-secondary mb-3" id="editStatementSubtitle"></p>
+                                                <div class="vstack gap-3 mb-0">
+                                                    <div id="editStatementTotalWrap" class="d-none">
+                                                        <x-input-label for="editStatementTotal" value="Total da fatura (avulsa)" />
+                                                        <input type="text" inputmode="decimal" name="spent_total" id="editStatementTotal" class="form-control mt-1" value="{{ old('spent_total') }}">
+                                                        <x-input-error :messages="$errors->get('spent_total')" class="mt-2" />
+                                                    </div>
+
+                                                    <x-input-label for="editStatementDue" value="Vencimento" />
+                                                    <input type="text" name="due_date" id="editStatementDue" data-duozen-flatpickr="date" class="form-control mt-1" autocomplete="off" value="{{ old('due_date') }}">
+                                                    <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
+                                                </div>
+                                                <p class="small text-secondary mt-3 mb-0 d-none" id="editStatementLockedHint">
+                                                    Esta fatura avulsa não pode mais ser editada após registrar pagamentos.
                                                 </p>
-                                                <div>
-                                                    <x-input-label for="payStatementPaidDate" value="Data do pagamento" />
-                                                    <input type="text" id="payStatementPaidDate" name="paid_date" data-duozen-flatpickr="date" class="form-control mt-1" required autocomplete="off" value="{{ old('paid_date', now()->format('Y-m-d')) }}">
-                                                    <x-input-error :messages="$errors->get('paid_date')" class="mt-2" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="payStatementAmount" value="Valor (opcional)" />
-                                                    <input type="text" inputmode="decimal" id="payStatementAmount" name="amount" class="form-control mt-1" value="{{ old('amount') }}" placeholder="">
-                                                    <x-input-error :messages="$errors->get('amount')" class="mt-2" />
-                                                </div>
                                             </div>
-                                            <p class="small text-secondary mt-3 mb-0">Para desfazer um pagamento, exclua o lançamento correspondente no <a href="{{ route('dashboard') }}">Painel</a>.</p>
-                                        </div>
-                                        <div class="modal-footer cc-statement-form-modal__footer">
-                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem registrar pagamento" data-bs-dismiss="modal">Cancelar</button>
-                                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar o pagamento desta fatura como lançamento">Criar lançamento</x-primary-button>
-                                        </div>
-                                    </form>
+                                            <div class="modal-footer cc-statement-form-modal__footer">
+                                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem salvar alterações" data-bs-dismiss="modal">Cancelar</button>
+                                                <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar vencimento e dados da fatura">Salvar</x-primary-button>
+                                            </div>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="modal fade" id="editStatementModal" tabindex="-1" aria-labelledby="editStatementModalLabel" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content cc-statement-form-modal">
-                                    <form id="editStatementForm" method="POST" action="#">
-                                        @csrf
-                                        @method('PUT')
-                                        <div class="modal-header cc-statement-form-modal__head">
-                                            <div>
-                                                <span class="cc-statement-form-modal__kicker">Ciclo</span>
-                                                <h2 class="modal-title h5 mb-0" id="editStatementModalLabel">Editar fatura</h2>
-                                            </div>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p class="small text-secondary mb-3" id="editStatementSubtitle"></p>
-                                            <div class="vstack gap-3 mb-0">
-                                                <div id="editStatementTotalWrap" class="d-none">
-                                                    <x-input-label for="editStatementTotal" value="Total da fatura (avulsa)" />
-                                                    <input type="text" inputmode="decimal" name="spent_total" id="editStatementTotal" class="form-control mt-1" value="{{ old('spent_total') }}">
-                                                    <x-input-error :messages="$errors->get('spent_total')" class="mt-2" />
-                                                </div>
-
-                                                <x-input-label for="editStatementDue" value="Vencimento" />
-                                                <input type="text" name="due_date" id="editStatementDue" data-duozen-flatpickr="date" class="form-control mt-1" autocomplete="off" value="{{ old('due_date') }}">
-                                                <x-input-error :messages="$errors->get('due_date')" class="mt-2" />
-                                            </div>
-                                            <p class="small text-secondary mt-3 mb-0 d-none" id="editStatementLockedHint">
-                                                Esta fatura avulsa não pode mais ser editada após registrar pagamentos.
-                                            </p>
-                                        </div>
-                                        <div class="modal-footer cc-statement-form-modal__footer">
-                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem salvar alterações" data-bs-dismiss="modal">Cancelar</button>
-                                            <x-primary-button type="submit" class="rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar vencimento e dados da fatura">Salvar</x-primary-button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+                            <p class="small text-secondary mt-3 mb-0">
+                                <a href="{{ route('dashboard') }}">Painel</a> — em faturas normais, o total é calculado pelos itens do cartão. Em fatura <strong>avulsa</strong>, o total pode ser ajustado até existir um pagamento.
+                            </p>
+                        @endif
 
                         <div class="modal fade" id="newAvulsaStatementModal" tabindex="-1" aria-labelledby="newAvulsaStatementModalLabel" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content cc-statement-form-modal">
-                                    <form method="POST" action="{{ route('credit-card-statements.store-avulsa', [$cardAccounts->firstWhere('id', $filterCardId)]) }}">
+                                    <form method="POST" action="{{ route('credit-card-statements.store-avulsa-direct') }}">
                                         @csrf
                                         <input type="hidden" name="_form" value="cc-statement-avulsa">
                                         <div class="modal-header cc-statement-form-modal__head">
@@ -543,11 +549,21 @@
                                                 Use para registrar uma fatura sem itens lançados. A referência (mês/ano) não poderá ser alterada depois.
                                             </p>
                                             <div class="row g-3">
+                                                <div class="col-12">
+                                                    <x-input-label for="avulsaAccountId" value="Cartão de crédito" />
+                                                    <select id="avulsaAccountId" name="account_id" class="form-select mt-1" required>
+                                                        <option value="">Selecione o cartão…</option>
+                                                        @foreach ($cardAccounts as $ca)
+                                                            <option value="{{ $ca->id }}" @selected((string) old('account_id', $filterCardId ?? ($cardAccounts->count() === 1 ? $cardAccounts->first()->id : null)) === (string) $ca->id)>{{ $ca->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
+                                                </div>
                                                 <div class="col-6">
                                                     <x-input-label for="avulsaRefMonth" value="Mês de referência" />
                                                     <select id="avulsaRefMonth" name="reference_month" class="form-select mt-1" required>
                                                         @for ($m = 1; $m <= 12; $m++)
-                                                            <option value="{{ $m }}" @selected((int) old('reference_month') === $m)>{{ sprintf('%02d', $m) }}</option>
+                                                            <option value="{{ $m }}" @selected((int) old('reference_month', now()->month) === $m)>{{ sprintf('%02d', $m) }}</option>
                                                         @endfor
                                                     </select>
                                                     <x-input-error :messages="$errors->get('reference_month')" class="mt-2" />
@@ -577,10 +593,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <p class="small text-secondary mt-3 mb-0">
-                            <a href="{{ route('dashboard') }}">Painel</a> — em faturas normais, o total é calculado pelos itens do cartão. Em fatura <strong>avulsa</strong>, o total pode ser ajustado até existir um pagamento.
-                        </p>
 
                         @php
                             $openEdit = session('open_statement_edit');
@@ -885,8 +897,6 @@
                                 })();
                             </script>
                         @endpush
-                            @endif
-                        @endif
                     @endif
     </div>
 </x-app-layout>

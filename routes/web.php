@@ -83,6 +83,8 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::delete('/accounts/{account}', [AccountController::class, 'destroy'])->name('accounts.destroy');
 
     Route::get('/faturas-cartao', [CreditCardStatementController::class, 'index'])->name('credit-card-statements.index');
+    Route::post('/faturas-cartao/avulsa', [CreditCardStatementController::class, 'storeAvulsa'])
+        ->name('credit-card-statements.store-avulsa-direct');
     Route::post('/faturas-cartao/{account}/avulsa', [CreditCardStatementController::class, 'storeAvulsa'])
         ->name('credit-card-statements.store-avulsa');
     Route::put('/faturas-cartao/{account}/{referenceYear}/{referenceMonth}', [CreditCardStatementController::class, 'update'])

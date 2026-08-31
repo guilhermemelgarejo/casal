@@ -447,6 +447,41 @@ class CreditCardStatementTest extends TestCase
         ])->assertNotFound();
     }
 
+    public function test_modal_fatura_avulsa_presente_na_escolha_de_cartoes(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        $this->actingAs($user)->get(route('credit-card-statements.index'))
+            ->assertOk()
+            ->assertSee('Escolher cartão', false)
+            ->assertSee('data-bs-target="#newAvulsaStatementModal"', false)
+            ->assertSee('id="newAvulsaStatementModal"', false)
+            ->assertSee('name="account_id"', false);
+    }
+
+    public function test_cadastrar_fatura_avulsa_via_rota_direta_com_account_id(): void
+    {
+        extract($this->seedCoupleWithAccounts());
+
+        $res = $this->actingAs($user)->post(route('credit-card-statements.store-avulsa-direct'), [
+            'account_id' => $card->id,
+            'reference_month' => 2,
+            'reference_year' => 2026,
+            'spent_total' => '250,00',
+            'due_date' => '2026-02-15',
+        ]);
+
+        $res->assertSessionHasNoErrors();
+        $res->assertRedirect(route('credit-card-statements.index', ['account_id' => $card->id]));
+
+        $this->assertDatabaseHas('credit_card_statements', [
+            'account_id' => $card->id,
+            'reference_month' => 2,
+            'reference_year' => 2026,
+            'is_avulsa' => true,
+        ]);
+    }
+
     public function test_cadastrar_fatura_avulsa_aparece_na_lista_mesmo_sem_itens(): void
     {
         extract($this->seedCoupleWithAccounts());
