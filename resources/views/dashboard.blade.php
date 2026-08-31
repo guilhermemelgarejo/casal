@@ -40,19 +40,8 @@
         <div>
             <h1 class="dz-page-title dashboard-title">Painel Financeiro</h1>
             <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
-                Visão do período para <span class="fw-semibold text-body">{{ $couple->name ?? 'o casal' }}</span>
+                Visão geral para <span class="fw-semibold text-body">{{ $couple->name ?? 'o casal' }}</span>
             </div>
-        </div>
-
-        <!-- Navegador de Período -->
-        <div class="dz-period-nav">
-            <a href="{{ route('dashboard', array_merge(request()->query(), ['period' => $prevPeriod])) }}" class="dz-period-nav__btn" title="Mês anterior">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
-            </a>
-            <span class="dz-period-nav__label">{{ ucfirst($periodLabel) }}</span>
-            <a href="{{ route('dashboard', array_merge(request()->query(), ['period' => $nextPeriod])) }}" class="dz-period-nav__btn" title="Próximo mês">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-            </a>
         </div>
     </x-slot>
 
