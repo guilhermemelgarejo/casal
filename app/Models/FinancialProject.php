@@ -156,42 +156,36 @@ class FinancialProject extends Model
         })->values();
 
         $balance = 0.0;
-        $principal = 0.0;
-        $accumulatedInterest = 0.0;
+        $totalInvestedInCycle = 0.0;
+        $totalInterestInCycle = 0.0;
 
         foreach ($sorted as $m) {
             if ($m['type'] === 'aporte' || $m['type'] === 'ajuste_saldo') {
-                $principal += $m['amount'];
+                $totalInvestedInCycle += $m['amount'];
                 $balance += $m['amount'];
             } elseif ($m['type'] === 'juros') {
-                $accumulatedInterest += $m['amount'];
+                $totalInterestInCycle += $m['amount'];
                 $balance += $m['amount'];
             } elseif ($m['type'] === 'retirada') {
                 $withdrawal = $m['amount'];
                 $balance = max(0.0, $balance - $withdrawal);
 
                 if ($balance <= 0.0001) {
-                    $principal = 0.0;
-                    $accumulatedInterest = 0.0;
                     $balance = 0.0;
-                } else {
-                    if ($withdrawal >= $principal) {
-                        $accumulatedInterest = max(0.0, $accumulatedInterest - ($withdrawal - $principal));
-                        $principal = 0.0;
-                    } else {
-                        $principal = max(0.0, $principal - $withdrawal);
-                    }
-                    $accumulatedInterest = max(0.0, round($balance - $principal, 2));
+                    $totalInvestedInCycle = 0.0;
+                    $totalInterestInCycle = 0.0;
                 }
             }
         }
 
-        $profit = round($balance - $principal, 2);
-        $profitPct = $principal > 0.0001 ? round(($profit / $principal) * 100.0, 2) : 0.0;
+        $profit = round($totalInterestInCycle, 2);
+        $profitPct = $totalInvestedInCycle > 0.0001
+            ? round(($profit / $totalInvestedInCycle) * 100.0, 2)
+            : 0.0;
 
         return [
             'saved' => round($balance, 2),
-            'principal' => round($principal, 2),
+            'principal' => round($totalInvestedInCycle, 2),
             'profit' => $profit,
             'profit_pct' => $profitPct,
         ];

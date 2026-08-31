@@ -312,14 +312,14 @@ class FinancialProjectInterestTest extends TestCase
         $this->assertSame(800.00, $project->netDeposited());
         $this->assertSame(880.00, $project->savedProgress());
         $this->assertSame(80.00, $project->profitOrLoss());
-        $this->assertSame(10.00, $project->profitOrLossPct());
+        $this->assertSame(8.00, $project->profitOrLossPct());
 
         $this->actingAs($user)
             ->get(route('cofrinhos.index'))
             ->assertOk()
             ->assertSee('Rentabilidade')
             ->assertSee('+R$ 80,00')
-            ->assertSee('(+10,00%)');
+            ->assertSee('(+8,00%)');
     }
 
     public function test_profitability_zero_when_no_interest(): void
