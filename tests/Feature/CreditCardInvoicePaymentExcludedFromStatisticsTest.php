@@ -113,6 +113,7 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'name' => 'CC',
             'kind' => Account::KIND_REGULAR,
             'color' => '#111',
+            'balance' => '500.00',
         ]);
 
         $cat = Category::create([
@@ -122,8 +123,28 @@ class CreditCardInvoicePaymentExcludedFromStatisticsTest extends TestCase
             'color' => '#222',
         ]);
 
+        $catIncome = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Salário',
+            'type' => 'income',
+            'color' => '#10B981',
+        ]);
+
         $m = (int) date('m');
         $y = (int) date('Y');
+
+        $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $checking->id,
+            'description' => 'Depósito Inicial',
+            'amount' => '1000.00',
+            'payment_method' => 'Pix',
+            'type' => 'income',
+            'date' => now()->toDateString(),
+            'reference_month' => $m,
+            'reference_year' => $y,
+        ], [['category_id' => $catIncome->id, 'amount' => '1000.00']]);
 
         $this->createTransactionWithSplits([
             'couple_id' => $couple->id,

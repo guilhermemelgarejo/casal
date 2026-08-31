@@ -35,7 +35,7 @@
     $settlementDebtor = $user1Expense < $user2Expense ? $user1Short : $user2Short;
     $settlementCreditor = $user1Expense < $user2Expense ? $user2Short : $user1Short;
 @endphp
-<x-app-layout>
+<x-app-layout :installment-groups-modal-payload="$installmentGroupsModalPayload ?? []" :tx-cofrinho-prefill="$txCofrinhoPrefill ?? null" :tx-recurring-prefill="$txRecurringPrefill ?? null">
     <x-slot name="header">
         <div>
             <h1 class="dz-page-title dashboard-title">Painel Financeiro</h1>
@@ -56,24 +56,6 @@
         </div>
     </x-slot>
 
-    <x-slot name="actions">
-        <div class="d-flex align-items-center gap-2 flex-wrap" id="onboarding-tx-actions">
-            @if (($canCreateAccountTransfer ?? false) === true)
-                <button type="button" class="dz-btn dz-btn-outline" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" title="Transferência entre contas correntes">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                    Transferir
-                </button>
-            @endif
-            <button type="button" class="dz-btn dz-btn-success" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="income" title="Registrar uma receita">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                Receita
-            </button>
-            <button type="button" class="dz-btn dz-btn-danger" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="expense" title="Registrar uma despesa">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                Despesa
-            </button>
-        </div>
-    </x-slot>
 
     <!-- ALERTAS DO SISTEMA -->
     @if (session('success'))
@@ -309,9 +291,11 @@
                 <span>🏦 Contas Bancárias & Saldos</span>
             </h3>
             <div class="d-flex align-items-center gap-3">
-                <button type="button" class="btn btn-link p-0 text-decoration-none" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary);" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer">
-                    Transferir ⇄
-                </button>
+                @if(($canCreateAccountTransfer ?? false) === true)
+                    <button type="button" class="btn btn-link p-0 text-decoration-none" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary);" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer">
+                        Transferir ⇄
+                    </button>
+                @endif
                 <a href="{{ route('accounts.index') }}" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
                     Gerenciar contas ↗
                 </a>
@@ -508,105 +492,6 @@
         </div>
     </div>
 
-    <!-- Modais Reais da Aplicação -->
-    @include('transactions.partials.transaction-modals')
-
-    @if (($canCreateAccountTransfer ?? false) === true)
-        @php
-            $transferModalOpen = $errors->any() && old('_form') === 'account-transfer';
-        @endphp
-        <div class="modal fade" id="modalAccountTransfer" tabindex="-1" aria-labelledby="modalAccountTransferLabel" aria-hidden="true" data-open-on-load="{{ $transferModalOpen ? '1' : '0' }}">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content dashboard-transfer-modal">
-                    <form action="{{ route('accounts.transfer') }}" method="POST" class="d-flex flex-column">
-                        @csrf
-                        <input type="hidden" name="_form" value="account-transfer">
-
-                        <div class="modal-header align-items-start tx-modal-head dashboard-transfer-modal__head">
-                            <div class="pe-3">
-                                <h2 class="modal-title h5 mb-1" id="modalAccountTransferLabel">Transferir entre contas</h2>
-                                <p class="small text-secondary mb-0 fw-normal">
-                                    Registra uma <strong>despesa</strong> na origem e uma <strong>receita</strong> no destino. Apenas contas correntes.
-                                </p>
-                            </div>
-                            <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                        </div>
-
-                        <div class="modal-body vstack gap-3 dashboard-transfer-modal__body">
-                            <div>
-                                <x-input-label for="transfer_from_dash" value="Conta de origem" />
-                                <select id="transfer_from_dash" name="from_account_id" class="form-select mt-1" required>
-                                    <option value="" disabled @selected(old('_form') !== 'account-transfer' || ! old('from_account_id'))>Selecione…</option>
-                                    @foreach ($regularAccounts as $acc)
-                                        <option value="{{ $acc->id }}" @selected(old('_form') === 'account-transfer' && (int) old('from_account_id') === $acc->id)>
-                                            {{ $acc->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('from_account_id')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_to_dash" value="Conta de destino" />
-                                <select id="transfer_to_dash" name="to_account_id" class="form-select mt-1" required>
-                                    <option value="" disabled @selected(old('_form') !== 'account-transfer' || ! old('to_account_id'))>Selecione…</option>
-                                    @foreach ($regularAccounts as $acc)
-                                        <option value="{{ $acc->id }}" @selected(old('_form') === 'account-transfer' && (int) old('to_account_id') === $acc->id)>
-                                            {{ $acc->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('to_account_id')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_amount_dash" value="Valor (R$)" />
-                                <input id="transfer_amount_dash" name="amount" type="text" class="form-control mt-1" placeholder="0,00" value="{{ old('_form') === 'account-transfer' ? old('amount') : '' }}" required data-duozen-currency="1">
-                                <x-input-error :messages="$errors->get('amount')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_date_dash" value="Data" />
-                                <input id="transfer_date_dash" name="date" type="text" class="form-control mt-1" value="{{ old('_form') === 'account-transfer' && old('date') ? old('date') : date('Y-m-d') }}" data-duozen-flatpickr="date" required>
-                                <x-input-error :messages="$errors->get('date')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_pm_dash" value="Forma de pagamento (registro)" />
-                                <select id="transfer_pm_dash" name="payment_method" class="form-select mt-1" required>
-                                    @foreach (($transferPaymentMethods ?? \App\Support\PaymentMethods::forRegularAccounts()) as $pm)
-                                        <option value="{{ $pm }}" @selected(old('_form') === 'account-transfer' ? old('payment_method') === $pm : $loop->first)>
-                                            {{ $pm }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_desc_dash" value="Descrição (opcional)" />
-                                <input
-                                    id="transfer_desc_dash"
-                                    name="description"
-                                    type="text"
-                                    class="form-control mt-1"
-                                    maxlength="255"
-                                    placeholder="Ex.: Ajuste entre contas"
-                                    value="{{ old('_form') === 'account-transfer' ? old('description') : '' }}"
-                                >
-                                <x-input-error :messages="$errors->get('description')" class="mt-2" />
-                            </div>
-                        </div>
-
-                        <div class="modal-footer dashboard-transfer-modal__foot">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary">Confirmar Transferência</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
 
     @if (! empty($focusTransactionId))
         @push('scripts')

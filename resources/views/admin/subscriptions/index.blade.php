@@ -25,6 +25,13 @@
 
     <div class="py-4 admin-subs-page">
         <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
+            @if (session('success'))
+                <x-alert type="success" class="mb-0" :message="session('success')" />
+            @endif
+            @if (session('error'))
+                <x-alert type="danger" class="mb-0" :message="session('error')" />
+            @endif
+
             <section class="admin-subs-hero card border-0 shadow-sm">
                 <div class="card-body p-4 p-lg-5">
                     <div class="row g-4 align-items-center">

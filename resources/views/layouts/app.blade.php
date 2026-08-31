@@ -379,18 +379,18 @@
 
                 <div class="dz-topbar__right">
                     @if(Auth::check() && Auth::user()->couple_id)
-                        <div class="d-flex align-items-center gap-2 flex-wrap" id="onboarding-tx-actions">
+                        <div class="d-flex align-items-center gap-2 flex-wrap flex-sm-nowrap" id="onboarding-tx-actions">
                             @if (($canCreateAccountTransfer ?? false) === true)
-                                <button type="button" class="dz-btn dz-btn-outline" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" title="Transferência entre contas correntes">
+                                <button type="button" class="dz-btn dz-btn-outline text-nowrap" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" title="Transferência entre contas correntes">
                                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                     <span>Transferir</span>
                                 </button>
                             @endif
-                            <button type="button" class="dz-btn dz-btn-success" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="income" title="Registrar uma receita">
+                            <button type="button" class="dz-btn dz-btn-success text-nowrap" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="income" title="Registrar uma receita">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                 <span>Receita</span>
                             </button>
-                            <button type="button" class="dz-btn dz-btn-danger" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="expense" title="Registrar uma despesa">
+                            <button type="button" class="dz-btn dz-btn-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="expense" title="Registrar uma despesa">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                 <span>Despesa</span>
                             </button>

@@ -116,7 +116,7 @@
             @else
                 {{-- Conta Corrente: Saldo Principal --}}
                 <div class="mb-3">
-                    <span class="text-secondary fw-semibold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.65rem;">Saldo em conta</span>
+                    <span class="text-secondary fw-semibold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.65rem;">Saldo atual</span>
                     <div class="fs-3 fw-bold {{ $accBal >= 0 ? 'text-body' : 'text-danger' }} duozen-privacy-blur mt-0.5">
                         R$ {{ number_format($accBal, 2, ',', '.') }}
                     </div>

@@ -2,13 +2,25 @@
 
 namespace App\View\Components;
 
+use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Services\CreditCardInvoiceReminders;
+use App\Support\PaymentMethods;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Component;
 use Illuminate\View\View;
 
 class AppLayout extends Component
 {
+    use PreparesTransactionModalPayload;
+
+    public function __construct(
+        public mixed $installmentGroupsModalPayload = [],
+        public mixed $txCofrinhoPrefill = null,
+        public mixed $txRecurringPrefill = null,
+    ) {
+    }
+
     /**
      * Get the view / contents that represents the component.
      */
@@ -25,16 +37,44 @@ class AppLayout extends Component
         $user1Short = explode(' ', trim($user1Name))[0];
         $user2Short = $user2Name ? explode(' ', trim($user2Name))[0] : null;
 
-        $creditCardInvoiceReminders = [];
+        $sidebarInvoiceReminders = [];
         if ($couple) {
             try {
-                $creditCardInvoiceReminders = app(CreditCardInvoiceReminders::class)->openStatementsForCouple($couple, (int) now()->month, (int) now()->year);
+                $sidebarInvoiceReminders = app(CreditCardInvoiceReminders::class)->openStatementsForCouple($couple, (int) now()->month, (int) now()->year);
             } catch (\Throwable $e) {
-                $creditCardInvoiceReminders = [];
+                $sidebarInvoiceReminders = [];
             }
         }
 
-        return view('layouts.app', [
+        $now = Carbon::now();
+        $modalPayload = [
+            'categories' => collect(),
+            'accounts' => collect(),
+            'accountsSortedForFilter' => collect(),
+            'regularAccounts' => collect(),
+            'cardAccounts' => collect(),
+            'fundingOld' => 'account',
+            'paymentFlowOld' => '',
+            'txFormMode' => 'regular_only',
+            'txAccountsPayload' => ['regular' => [], 'cards' => []],
+            'refDefaultMonth' => (int) $now->copy()->addMonth()->month,
+            'refDefaultYear' => (int) $now->copy()->addMonth()->year,
+            'years' => range($now->year - 5, $now->year + 5),
+            'editTransactionModalMeta' => null,
+            'financialProjects' => collect(),
+        ];
+
+        $canCreateAccountTransfer = false;
+        $transferPaymentMethods = PaymentMethods::forRegularAccounts();
+        $transferModalOpen = old('_form') === 'account-transfer' && session('errors') !== null;
+
+        if ($user && $couple) {
+            $modalPayload = $this->transactionModalPayload();
+            $regularAccounts = $modalPayload['regularAccounts'] ?? collect();
+            $canCreateAccountTransfer = $regularAccounts->count() >= 2;
+        }
+
+        return view('layouts.app', array_merge([
             'couple' => $couple,
             'coupleUsers' => $coupleUsers,
             'user1' => $user1,
@@ -43,7 +83,14 @@ class AppLayout extends Component
             'user2Name' => $user2Name,
             'user1Short' => $user1Short,
             'user2Short' => $user2Short,
-            'creditCardInvoiceReminders' => $creditCardInvoiceReminders,
-        ]);
+            'sidebarInvoiceReminders' => $sidebarInvoiceReminders,
+            'canCreateAccountTransfer' => $canCreateAccountTransfer,
+            'transferPaymentMethods' => $transferPaymentMethods,
+            'transferModalOpen' => $transferModalOpen,
+            'installmentGroupsModalPayload' => $this->installmentGroupsModalPayload,
+            'txCofrinhoPrefill' => $this->txCofrinhoPrefill,
+            'txRecurringPrefill' => $this->txRecurringPrefill,
+        ], $modalPayload));
     }
 }
+

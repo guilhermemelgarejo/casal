@@ -2,7 +2,7 @@
     $money = fn ($val) => 'R$ ' . number_format((float) $val, 2, ',', '.');
     $hasActiveFilters = $filterAccountId || $filterCategoryId || $filterUserId || $filterType || $searchQuery;
 @endphp
-<x-app-layout>
+<x-app-layout :installment-groups-modal-payload="$installmentGroupsModalPayload ?? []">
     <x-slot name="header">
         <div>
             <div class="d-flex align-items-center gap-2">
@@ -28,22 +28,6 @@
         </div>
     </x-slot>
 
-    <x-slot name="actions">
-        @if (($canCreateAccountTransfer ?? false) === true)
-            <button type="button" class="dz-btn dz-btn-outline" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer" title="Transferência entre contas correntes">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                Transferir
-            </button>
-        @endif
-        <button type="button" class="dz-btn dz-btn-success" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="income" title="Registrar uma receita">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-            Receita
-        </button>
-        <button type="button" class="dz-btn dz-btn-danger" data-bs-toggle="modal" data-bs-target="#modalNewTransaction" data-tx-open-preset="expense" title="Registrar uma despesa">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-            Despesa
-        </button>
-    </x-slot>
 
     <div class="container-xxl py-4 px-3 px-lg-4">
         @if (session('success'))
@@ -179,139 +163,5 @@
         </div>
 
     </div>
-
-    <!-- Modais Reais da Aplicação -->
-    @include('transactions.partials.transaction-modals')
-
-    @if (($canCreateAccountTransfer ?? false) === true)
-        @php
-            $transferModalOpen = $errors->any() && old('_form') === 'account-transfer';
-        @endphp
-        <div class="modal fade" id="modalAccountTransfer" tabindex="-1" aria-labelledby="modalAccountTransferLabel" aria-hidden="true" data-open-on-load="{{ $transferModalOpen ? '1' : '0' }}">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content dashboard-transfer-modal">
-                    <form action="{{ route('accounts.transfer') }}" method="POST" class="d-flex flex-column">
-                        @csrf
-                        <input type="hidden" name="_form" value="account-transfer">
-
-                        <div class="modal-header align-items-start tx-modal-head dashboard-transfer-modal__head">
-                            <div class="pe-3">
-                                <h2 class="modal-title h5 mb-1" id="modalAccountTransferLabel">Transferir entre contas</h2>
-                                <p class="small text-secondary mb-0 fw-normal">
-                                    Registra uma <strong>despesa</strong> na origem e uma <strong>receita</strong> no destino. Apenas contas correntes.
-                                </p>
-                            </div>
-                            <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                        </div>
-
-                        <div class="modal-body vstack gap-3 dashboard-transfer-modal__body">
-                            <div>
-                                <x-input-label for="transfer_from_tx" value="Conta de origem" />
-                                <select id="transfer_from_tx" name="from_account_id" class="form-select mt-1" required>
-                                    <option value="" disabled @selected(old('_form') !== 'account-transfer' || ! old('from_account_id'))>Selecione…</option>
-                                    @foreach ($regularAccounts as $acc)
-                                        <option value="{{ $acc->id }}" data-balance-label="{{ number_format((float) $acc->balance, 2, ',', '.') }}" @selected(old('_form') === 'account-transfer' && (int) old('from_account_id') === $acc->id)>
-                                            {{ $acc->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="form-text mb-0" id="transfer_from_tx_meta" aria-live="polite"></p>
-                                <x-input-error :messages="$errors->get('from_account_id')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_to_tx" value="Conta de destino" />
-                                <select id="transfer_to_tx" name="to_account_id" class="form-select mt-1" required>
-                                    <option value="" disabled @selected(old('_form') !== 'account-transfer' || ! old('to_account_id'))>Selecione…</option>
-                                    @foreach ($regularAccounts as $acc)
-                                        <option value="{{ $acc->id }}" data-balance-label="{{ number_format((float) $acc->balance, 2, ',', '.') }}" @selected(old('_form') === 'account-transfer' && (int) old('to_account_id') === $acc->id)>
-                                            {{ $acc->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="form-text mb-0" id="transfer_to_tx_meta" aria-live="polite"></p>
-                                <x-input-error :messages="$errors->get('to_account_id')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_amount_tx" value="Valor (R$)" />
-                                <x-text-input id="transfer_amount_tx" name="amount" type="text" inputmode="decimal" class="mt-1 block w-full money-input" placeholder="0,00" value="{{ old('_form') === 'account-transfer' ? old('amount') : '' }}" required data-duozen-currency="1" />
-                                <x-input-error :messages="$errors->get('amount')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_date_tx" value="Data" />
-                                <x-text-input id="transfer_date_tx" name="date" type="text" data-duozen-flatpickr="date" class="mt-1 block w-full flatpickr-date" value="{{ old('_form') === 'account-transfer' && old('date') ? old('date') : now()->format('Y-m-d') }}" required autocomplete="off" />
-                                <x-input-error :messages="$errors->get('date')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_pm_tx" value="Forma de pagamento (registro)" />
-                                <select id="transfer_pm_tx" name="payment_method" class="form-select mt-1" required>
-                                    @foreach (($transferPaymentMethods ?? \App\Support\PaymentMethods::forRegularAccounts()) as $pm)
-                                        <option value="{{ $pm }}" @selected(old('_form') === 'account-transfer' ? old('payment_method') === $pm : $loop->first)>
-                                            {{ $pm }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('payment_method')" class="mt-2" />
-                            </div>
-
-                            <div>
-                                <x-input-label for="transfer_desc_tx" value="Descrição (opcional)" />
-                                <x-text-input
-                                    id="transfer_desc_tx"
-                                    name="description"
-                                    type="text"
-                                    class="mt-1"
-                                    maxlength="255"
-                                    placeholder="Ex.: Ajuste entre contas"
-                                    value="{{ old('_form') === 'account-transfer' ? old('description') : '' }}"
-                                />
-                                <x-input-error :messages="$errors->get('description')" class="mt-2" />
-                            </div>
-                        </div>
-
-                        <div class="modal-footer dashboard-transfer-modal__footer flex-wrap gap-2 border-top">
-                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar sem transferir" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary rounded-pill px-4" data-bs-toggle="tooltip" data-bs-placement="top" title="Registrar a transferência entre as contas escolhidas">Confirmar transferência</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        @push('scripts')
-            <script>
-                document.addEventListener('DOMContentLoaded', function () {
-                    const transferModal = document.getElementById('modalAccountTransfer');
-                    if (transferModal && transferModal.dataset.openOnLoad === '1' && typeof bootstrap !== 'undefined') {
-                        bootstrap.Modal.getOrCreateInstance(transferModal).show();
-                    }
-
-                    const fromSel = document.getElementById('transfer_from_tx');
-                    const toSel = document.getElementById('transfer_to_tx');
-                    const fromMeta = document.getElementById('transfer_from_tx_meta');
-                    const toMeta = document.getElementById('transfer_to_tx_meta');
-
-                    const syncTransferMeta = () => {
-                        if (fromMeta && fromSel) {
-                            const opt = fromSel.selectedOptions?.[0];
-                            const bal = opt?.dataset?.balanceLabel;
-                            fromMeta.textContent = fromSel.value ? `Saldo atual: R$ ${bal || '—'}` : '';
-                        }
-                        if (toMeta && toSel) {
-                            const opt = toSel.selectedOptions?.[0];
-                            const bal = opt?.dataset?.balanceLabel;
-                            toMeta.textContent = toSel.value ? `Saldo atual: R$ ${bal || '—'}` : '';
-                        }
-                    };
-
-                    fromSel?.addEventListener('change', syncTransferMeta);
-                    toSel?.addEventListener('change', syncTransferMeta);
-                    syncTransferMeta();
-                });
-            </script>
-        @endpush
-    @endif
 </x-app-layout>
+

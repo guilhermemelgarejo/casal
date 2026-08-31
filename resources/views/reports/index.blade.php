@@ -117,6 +117,12 @@
     </x-slot>
 
     <div class="container-xxl py-4 px-3 px-lg-4 reports-page">
+        @if (session('success'))
+            <x-alert type="success" class="mb-4" :message="session('success')" />
+        @endif
+        @if (session('error'))
+            <x-alert type="danger" class="mb-4" :message="session('error')" />
+        @endif
 
         <!-- TOP KPIS DUOZEN 2.0 -->
         <section class="dz-kpi-grid mb-4">

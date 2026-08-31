@@ -36,6 +36,13 @@
 
     <div class="py-4 cofrinhos-page cofrinhos-movements-page">
         <div class="container-xxl px-3 px-lg-4 d-grid gap-4">
+            @if (session('success'))
+                <x-alert type="success" class="mb-0" :message="session('success')" />
+            @endif
+            @if (session('error'))
+                <x-alert type="danger" class="mb-0" :message="session('error')" />
+            @endif
+
             <section class="cofrinhos-movements-hero card border-0 shadow-sm" style="--cofrinho-accent: {{ e($cardAccent) }}">
                 <div class="cofrinhos-project-card__accent" aria-hidden="true"></div>
                 <div class="card-body p-4">

@@ -27,7 +27,7 @@ trait PreparesTransactionModalPayload
             ->excludingInternalTransferCategories()
             ->orderBy('name')
             ->get();
-        $accounts = $couple->accounts;
+        $accounts = $couple->accounts()->get();
 
         $accountsSortedForFilter = $accounts->sortBy(function (Account $a) {
             return [
@@ -140,7 +140,7 @@ trait PreparesTransactionModalPayload
             ->orderBy('name')
             ->get();
 
-        return [
+        $payload = [
             'categories' => $categories,
             'accounts' => $accounts,
             'accountsSortedForFilter' => $accountsSortedForFilter,
@@ -156,5 +156,9 @@ trait PreparesTransactionModalPayload
             'editTransactionModalMeta' => $editTransactionModalMeta,
             'financialProjects' => $financialProjects,
         ];
+
+        view()->share($payload);
+
+        return $payload;
     }
 }

@@ -15,7 +15,7 @@
 
     <x-slot name="actions">
         @if ($couple)
-            <div class="d-flex align-items-center gap-2 w-100 justify-content-end">
+            <div class="d-flex align-items-center gap-2">
                 @if (!empty($canReplayOnboardingTour))
                     <form action="{{ route('onboarding.restart') }}" method="POST" class="m-0 p-0 d-inline-flex flex-shrink-0">
                         @csrf

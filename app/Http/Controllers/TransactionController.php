@@ -136,6 +136,14 @@ class TransactionController extends Controller
         $categories = $couple->categories()->orderBy('name')->get();
         $coupleUsers = $couple->users()->orderBy('name')->get();
 
+        view()->share([
+            'installmentGroupsModalPayload' => $installmentGroupsModalPayload,
+            'creditCardPurchaseRowMeta' => $creditCardPurchaseRowMeta,
+            'canCreateAccountTransfer' => $canCreateAccountTransfer,
+            'transferPaymentMethods' => $transferPaymentMethods,
+            'focusTransactionId' => $focusTransactionId,
+        ]);
+
         return view('transactions.index', array_merge(
             compact(
                 'couple',
