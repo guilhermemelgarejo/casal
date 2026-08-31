@@ -3488,14 +3488,14 @@ body.dz-privacy-active .duozen-privacy-blur,
 }
 
 .cc-picker-hero-head {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--dz-border);
-    background: var(--dz-bg-card-subtle);
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--dz-border-subtle);
+    background: var(--dz-bg-card);
 }
 
 .cc-picker-hero-body {
     background: var(--dz-bg-card);
-    padding: 1.25rem !important;
+    padding: 1.25rem 1.5rem !important;
 }
 
 .cc-picker-toolbar {
@@ -3503,7 +3503,7 @@ body.dz-privacy-active .duozen-privacy-blur,
     border: 1px solid var(--dz-border) !important;
     border-radius: var(--dz-radius-lg);
     box-shadow: var(--dz-shadow-sm);
-    padding: 1rem 1.25rem !important;
+    padding: 1.25rem 1.5rem !important;
 }
 
 .cc-picker-toolbar-inner {
