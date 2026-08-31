@@ -388,21 +388,17 @@
                                     <div class="dz-bank-icon" style="background: {{ $acc['color'] }};">
                                         {{ strtoupper(substr($acc['name'], 0, 2)) }}
                                     </div>
-                                    <div>
-                                        <h4 class="dz-account-card__name">{{ $acc['name'] }}</h4>
+                                    <div class="min-w-0">
+                                        <h4 class="dz-account-card__name text-truncate">{{ $acc['name'] }}</h4>
                                         <span class="dz-account-card__tag">{{ $acc['type_label'] }} • {{ $acc['owner'] }}</span>
                                     </div>
                                 </div>
-                                <span class="dz-partner-tag">
-                                    <span class="dz-partner-tag__dot" style="background: {{ $acc['color'] }};"></span>
-                                    {{ $acc['owner'] }}
-                                </span>
+                                <div class="dz-account-card__balance-block text-end flex-shrink-0">
+                                    <div class="dz-account-card__balance-label">Saldo Atual</div>
+                                    <div class="dz-account-card__balance dz-privacy-blur">{{ $money($acc['balance']) }}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div style="font-size: 0.75rem; color: var(--dz-text-secondary); margin-bottom: 0.2rem;">Saldo Atual</div>
-                                <div class="dz-account-card__balance dz-privacy-blur">{{ $money($acc['balance']) }}</div>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem; border-top: 1px solid var(--dz-border-subtle); padding-top: 0.75rem; margin-top: 0.5rem;">
+                            <div class="dz-account-card__footer">
                                 <button type="button" class="dz-btn dz-btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; width: 100%;" data-open-concept-modal="transfer">
                                     Transferir
                                 </button>

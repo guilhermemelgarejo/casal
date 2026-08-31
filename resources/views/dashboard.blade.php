@@ -311,21 +311,21 @@
                             <div class="dz-bank-icon" style="background: {{ $acc->color ?: '#7C3AED' }};">
                                 {{ strtoupper(substr($acc->name, 0, 2)) }}
                             </div>
-                            <div>
-                                <h4 class="dz-account-card__name">{{ $acc->name }}</h4>
+                            <div class="min-w-0">
+                                <h4 class="dz-account-card__name text-truncate">{{ $acc->name }}</h4>
                                 <span class="dz-account-card__tag">
                                     Conta Corrente {{ $acc->yieldsInterest() ? '• 📈 Rende juros' : '' }}
                                 </span>
                             </div>
                         </div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--dz-text-secondary); margin-bottom: 0.2rem;">Saldo em Conta</div>
-                        <div class="dz-account-card__balance dz-privacy-blur {{ (float)$acc->balance >= 0 ? '' : 'text-danger' }}">
-                            {{ $money($acc->balance) }}
+                        <div class="dz-account-card__balance-block text-end flex-shrink-0">
+                            <div class="dz-account-card__balance-label">Saldo em Conta</div>
+                            <div class="dz-account-card__balance dz-privacy-blur {{ (float)$acc->balance >= 0 ? '' : 'text-danger' }}">
+                                {{ $money($acc->balance) }}
+                            </div>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; border-top: 1px solid var(--dz-border-subtle); padding-top: 0.75rem; margin-top: 0.5rem;">
+                    <div class="dz-account-card__footer">
                         @if ((int) ($filterAccountId ?? 0) === (int) $acc->id)
                             <a href="{{ route('dashboard', array_diff_key(request()->query(), ['account_id' => ''])) }}#lancamentos" class="dz-btn dz-btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; width: 100%;">
                                 ✓ Filtrado (Limpar) ✕
