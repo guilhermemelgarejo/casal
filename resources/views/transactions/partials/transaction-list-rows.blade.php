@@ -81,7 +81,31 @@
             </div>
             <div class="tx-list-row-cell tx-list-row-payment small text-body-secondary tx-cell-truncate" data-label="Pagamento / conta">
                 @if($accRow?->isCreditCard())
-                    <div class="text-truncate" title="Cartão · {{ $accRow->name }}"><span class="fw-medium text-body">Cartão</span><span class="text-muted"> · {{ $accRow->name }}</span></div>
+                    @php
+                        $refM = (int) ($transaction->reference_month ?? $transaction->date->month);
+                        $refY = (int) ($transaction->reference_year ?? $transaction->date->year);
+                        $refLabel = sprintf('%02d/%d', $refM, $refY);
+                        $statementUrl = route('credit-card-statements.index', [
+                            'account_id' => $accRow->id,
+                            'reference_month' => $refM,
+                            'reference_year' => $refY,
+                        ]).'#statement-cycle-'.$accRow->id.'-'.$refY.'-'.$refM;
+                        $isInstallment = ($delMeta['peerCount'] ?? 1) > 1 || (($ccRowMeta['installment_count'] ?? 1) > 1);
+                    @endphp
+                    <div class="text-truncate" title="Cartão · {{ $accRow->name }} (Fatura {{ $refLabel }})"><span class="fw-medium text-body">Cartão</span><span class="text-muted"> · {{ $accRow->name }}</span></div>
+                    <div class="text-truncate" style="font-size: 0.72rem; line-height: 1.2; margin-top: 1px;">
+                        <a
+                            href="{{ $statementUrl }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-decoration-none d-inline-flex align-items-center gap-1"
+                            style="color: var(--dz-primary, #6366f1); font-weight: 500;"
+                            title="{{ $isInstallment ? 'Abrir 1ª fatura ('.$refLabel.') em nova aba' : 'Abrir fatura '.$refLabel.' em nova aba' }}"
+                        >
+                            <span>Fatura {{ $refLabel }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: -1px;"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                        </a>
+                    </div>
                 @elseif($transaction->payment_method || $accRow)
                     <div class="text-truncate" title="{{ $transaction->payment_method ?: '—' }} · {{ $accRow?->name ?? '—' }}"><span class="fw-medium text-body">{{ $transaction->payment_method ?: '—' }}</span><span class="text-muted"> · {{ $accRow?->name ?? '—' }}</span></div>
                 @else
