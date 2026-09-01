@@ -316,6 +316,7 @@ class FinancialProjectController extends Controller
                     : (float) $transaction->amount * -1;
 
                 return [
+                    'id' => (int) $transaction->id,
                     'source' => 'transaction',
                     'kind' => $kind,
                     'date' => $transaction->date,
@@ -355,6 +356,7 @@ class FinancialProjectController extends Controller
                     : ($isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho');
 
                 return [
+                    'id' => (int) $entry->id,
                     'source' => $entry->type,
                     'kind' => $kind,
                     'date' => $entry->date,
@@ -455,7 +457,7 @@ class FinancialProjectController extends Controller
         abort_unless((int) $entry->couple_id === (int) Auth::user()->couple_id, 403);
         $entry->delete();
 
-        return redirect()->route('cofrinhos.index')->with('success', 'Juros removidos.');
+        return redirect()->back(fallback: route('cofrinhos.index'))->with('success', 'Juros removidos.');
     }
 
     private function authorizeCofrinho(FinancialProject $cofrinho): void

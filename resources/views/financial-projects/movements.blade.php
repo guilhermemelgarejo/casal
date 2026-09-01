@@ -138,6 +138,7 @@
                                     <th>Conta</th>
                                     <th>Registrado por</th>
                                     <th class="text-end">Valor (R$)</th>
+                                    <th class="text-end pe-3">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -148,6 +149,7 @@
                                         $assetQty = $movement['asset_quantity'] ?? null;
                                         $unitPrice = $movement['asset_unit_price'] ?? null;
                                         $resultingPm = $movement['asset_resulting_avg_price'] ?? null;
+                                        $isInterest = ($movement['source'] ?? '') === \App\Models\FinancialProjectEntry::TYPE_INTEREST;
                                     @endphp
                                     <tr>
                                         <td class="text-nowrap">{{ optional($movement['date'])->format('d/m/Y') }}</td>
@@ -198,10 +200,38 @@
                                                 {{ $isOut ? '-' : '+' }}R$ {{ number_format(abs($amount), 2, ',', '.') }}
                                             </span>
                                         </td>
+                                        <td class="text-end text-nowrap pe-3">
+                                            @if($isInterest && !empty($movement['id']))
+                                                <form
+                                                    action="{{ route('cofrinhos.interest.destroy', $movement['id']) }}"
+                                                    method="POST"
+                                                    class="d-inline"
+                                                    data-confirm-title="Excluir rendimento"
+                                                    data-confirm="Excluir este lançamento de juros/rendimento? O saldo do cofrinho será recalculado."
+                                                    data-confirm-accept="Sim, excluir"
+                                                    data-confirm-cancel="Cancelar"
+                                                >
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button
+                                                        type="submit"
+                                                        class="btn btn-link text-danger btn-sm p-0"
+                                                        data-bs-toggle="tooltip"
+                                                        data-bs-placement="top"
+                                                        title="Excluir este rendimento"
+                                                        aria-label="Excluir rendimento"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="d-inline-block" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="text-secondary small">—</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr class="cofrinhos-empty-row">
-                                        <td colspan="{{ $isAsset ? 9 : 6 }}">
+                                        <td colspan="{{ $isAsset ? 10 : 7 }}">
                                             <div class="cofrinhos-empty-state text-center">
                                                 <div class="cofrinhos-empty-state__icon mx-auto mb-3" aria-hidden="true">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 8c-3.866 0-7 1.343-7 3s3.134 3 7 3 7-1.343 7-3-3.134-3-7-3zM5 11v4c0 1.657 3.134 3 7 3s7-1.343 7-3v-4" /></svg>

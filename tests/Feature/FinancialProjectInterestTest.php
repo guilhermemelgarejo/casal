@@ -167,6 +167,43 @@ class FinancialProjectInterestTest extends TestCase
             ->assertDontSee('Registro fora da primeira página');
     }
 
+    public function test_can_delete_interest_and_it_shows_delete_button_on_movements_page(): void
+    {
+        ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        $entry = FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '1.59',
+            'date' => '2026-07-04',
+            'note' => 'Rendimento teste',
+        ]);
+
+        $this->assertSame(1.59, $project->fresh()->savedProgress());
+
+        // Verifica que o botão de exclusão aparece na página de movimentações
+        $this->actingAs($user)
+            ->get(route('cofrinhos.movements', $project))
+            ->assertOk()
+            ->assertSee('Rendimento teste')
+            ->assertSee(route('cofrinhos.interest.destroy', $entry));
+
+        // Exclui os juros
+        $this->actingAs($user)
+            ->from(route('cofrinhos.movements', $project))
+            ->delete(route('cofrinhos.interest.destroy', $entry))
+            ->assertRedirect(route('cofrinhos.movements', $project))
+            ->assertSessionHas('success', 'Juros removidos.');
+
+        $this->assertDatabaseMissing('financial_project_entries', [
+            'id' => $entry->id,
+        ]);
+
+        $this->assertSame(0.00, $project->fresh()->savedProgress());
+    }
+
     public function test_cannot_delete_interest_of_another_couple(): void
     {
         ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
