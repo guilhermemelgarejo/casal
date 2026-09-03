@@ -9,5 +9,7 @@ Artisan::command('inspire', function () {
 
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('db:backup-drive')->dailyAt('23:30');
+Schedule::call(function () {
+    Artisan::call('db:backup-drive');
+})->dailyAt('23:40')->name('db:backup-drive');
 
