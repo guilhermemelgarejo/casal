@@ -5526,6 +5526,23 @@ body.duozen-onboarding-active {
     transform: rotate(90deg);
 }
 
+.cat-page .cat-collapse-toggle {
+    color: var(--bs-secondary-color);
+    transition: color 0.15s ease;
+}
+
+.cat-page .cat-collapse-toggle:hover {
+    color: var(--bs-body-color);
+}
+
+.cat-page .cat-collapse-toggle__arrow {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cat-page .cat-collapse-toggle:not(.collapsed) .cat-collapse-toggle__arrow {
+    transform: rotate(90deg);
+}
+
 .cofrinhos-page .cofrinhos-quote-pill {
     display: inline-flex;
     align-items: center;

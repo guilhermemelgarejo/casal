@@ -246,4 +246,99 @@ class CategoryCrudTest extends TestCase
 
         $this->assertDatabaseMissing('categories', ['id' => $category->id]);
     }
+
+    public function test_usuario_pode_desativar_e_reativar_categoria(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Restaurantes',
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+
+        // Desativar
+        $res = $this->actingAs($user)->patch(route('categories.toggle-active', $category));
+        $res->assertSessionHas('success', 'Categoria desativada com sucesso.');
+        $this->assertDatabaseHas('categories', [
+            'id' => $category->id,
+            'is_active' => false,
+        ]);
+
+        // Reativar
+        $res = $this->actingAs($user)->patch(route('categories.toggle-active', $category));
+        $res->assertSessionHas('success', 'Categoria reativada com sucesso.');
+        $this->assertDatabaseHas('categories', [
+            'id' => $category->id,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_nao_pode_desativar_categoria_do_sistema(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $fixed = Category::create([
+            'couple_id' => $couple->id,
+            'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
+            'type' => 'expense',
+            'system_key' => Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT,
+            'is_active' => true,
+        ]);
+
+        $res = $this->actingAs($user)->patch(route('categories.toggle-active', $fixed));
+        $res->assertSessionHasErrors('category');
+        $this->assertDatabaseHas('categories', [
+            'id' => $fixed->id,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_categorias_inativas_aparecem_na_secao_desativadas_da_index(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $activeCat = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Categoria Ativa',
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        $inactiveCat = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Categoria Inativa',
+            'type' => 'expense',
+            'is_active' => false,
+        ]);
+
+        $res = $this->actingAs($user)->get(route('categories.index'));
+        $res->assertSee('Categoria Ativa');
+        $res->assertSee('Categoria Inativa');
+        $res->assertSee('Categorias desativadas');
+    }
+
+    public function test_categorias_inativas_nao_aparecem_no_modal_de_novo_lancamento(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Supermercado Ativo',
+            'type' => 'expense',
+            'is_active' => true,
+        ]);
+        Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Lojas Inativo',
+            'type' => 'expense',
+            'is_active' => false,
+        ]);
+
+        $res = $this->actingAs($user)->get(route('transactions.index'));
+        $res->assertOk();
+        $categoriesInPayload = view()->shared('categories');
+        $this->assertTrue($categoriesInPayload->contains('name', 'Supermercado Ativo'));
+        $this->assertFalse($categoriesInPayload->contains('name', 'Lojas Inativo'));
+    }
 }

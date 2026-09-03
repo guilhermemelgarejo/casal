@@ -40,7 +40,11 @@ class Category extends Model
 
     public const NAME_ACCOUNT_YIELD = 'Rendimentos';
 
-    protected $fillable = ['couple_id', 'name', 'type', 'color', 'icon', 'system_key'];
+    protected $fillable = ['couple_id', 'name', 'type', 'color', 'icon', 'is_active', 'system_key'];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 
     public function isCreditCardInvoicePayment(): bool
     {
@@ -238,6 +242,11 @@ class Category extends Model
                 ]);
             }
         }
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
     }
 
     /**

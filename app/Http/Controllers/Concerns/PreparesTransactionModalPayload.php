@@ -22,11 +22,6 @@ trait PreparesTransactionModalPayload
         $couple = Auth::user()->couple;
         $now = Carbon::now();
 
-        $categories = $couple->categories()
-            ->excludingCreditCardInvoicePayment()
-            ->excludingInternalTransferCategories()
-            ->orderBy('name')
-            ->get();
         $accounts = $couple->accounts()->get();
 
         $accountsSortedForFilter = $accounts->sortBy(function (Account $a) {
@@ -128,6 +123,21 @@ trait PreparesTransactionModalPayload
                 ];
             }
         }
+
+        $categories = $couple->categories()
+            ->excludingCreditCardInvoicePayment()
+            ->excludingInternalTransferCategories()
+            ->where(function ($query) use ($editTx) {
+                $query->where('is_active', true);
+                if ($editTx) {
+                    $usedCatIds = $editTx->categorySplits->pluck('category_id')->filter()->all();
+                    if (! empty($usedCatIds)) {
+                        $query->orWhereIn('id', $usedCatIds);
+                    }
+                }
+            })
+            ->orderBy('name')
+            ->get();
 
         $financialProjects = FinancialProject::query()
             ->where('couple_id', $couple->id)

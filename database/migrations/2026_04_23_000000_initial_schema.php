@@ -143,10 +143,12 @@ return new class extends Migration
             $table->string('type');
             $table->string('color')->nullable();
             $table->string('icon')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->string('system_key', 64)->nullable();
             $table->timestamps();
 
             $table->unique(['couple_id', 'system_key']);
+            $table->index(['couple_id', 'is_active']);
         });
 
         Schema::create('accounts', function (Blueprint $table) {

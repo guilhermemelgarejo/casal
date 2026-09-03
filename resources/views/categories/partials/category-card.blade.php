@@ -1,14 +1,15 @@
 @php
     $isIncome = $category->type === 'income';
     $isFixed = $category->isReservedSystemCategory();
-    $showBudgetMeta = ! $isIncome && ! $isFixed;
+    $isActive = (bool) ($category->is_active ?? true);
+    $showBudgetMeta = ! $isIncome && ! $isFixed && $isActive;
     $budgetRow = $budgetRow ?? null;
     $spentInMonth = (float) ($spentInMonth ?? 0);
     $coupleIncome = (float) ($coupleIncome ?? 0);
     $editCat = $category->only(['id', 'name', 'type', 'color']);
     $catColor = $category->color ?: '#94a3b8';
 @endphp
-<div class="card border-0 cat-item-card cat-item-card--clean h-100 {{ $isFixed ? 'cat-item-card--fixed' : '' }}" role="listitem" style="--cat-accent: {{ $catColor }}">
+<div class="card border-0 cat-item-card cat-item-card--clean h-100 {{ $isFixed ? 'cat-item-card--fixed' : '' }} {{ ! $isActive ? 'cat-item-card--inactive opacity-75' : '' }}" role="listitem" style="--cat-accent: {{ $catColor }}">
     <div class="cat-item-card__accent" aria-hidden="true"></div>
     <div class="card-body p-0">
         <div class="cat-item-card__top px-3 px-sm-4 py-3">
@@ -25,6 +26,9 @@
                         <h3 class="cat-item-card__title mb-0 text-truncate">{{ $category->name }}</h3>
                         @if ($isFixed)
                             <span class="cat-item-card__type cat-item-card__type--fixed">Fixa</span>
+                        @endif
+                        @if (! $isActive)
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small py-0 px-2" style="font-size: 0.72rem;">Inativa</span>
                         @endif
                     </div>
                     @if ($isFixed)
@@ -49,6 +53,24 @@
                         >
                             Editar
                         </button>
+                        <span class="cat-item-card__action-sep text-secondary" aria-hidden="true">·</span>
+                        @if ($isActive)
+                            <form action="{{ route('categories.toggle-active', $category) }}" method="POST" class="d-inline" data-confirm-title="Desativar categoria" data-confirm="Desativar esta categoria? Ela não aparecerá para novos lançamentos ou orçamentos." data-confirm-accept="Sim, desativar" data-confirm-cancel="Cancelar">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="btn btn-link btn-sm p-0 text-secondary text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Desativar esta categoria">
+                                    Desativar
+                                </button>
+                            </form>
+                        @else
+                            <form action="{{ route('categories.toggle-active', $category) }}" method="POST" class="d-inline">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="btn btn-link btn-sm p-0 text-success text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Reativar esta categoria">
+                                    Reativar
+                                </button>
+                            </form>
+                        @endif
                         <span class="cat-item-card__action-sep text-secondary" aria-hidden="true">·</span>
                         <form class="cat-item-card__delete-form" action="{{ route('categories.destroy', $category) }}" method="POST" data-confirm-title="Excluir categoria" data-confirm="Deseja excluir esta categoria?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                             @csrf

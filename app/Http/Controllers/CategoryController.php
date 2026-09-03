@@ -14,13 +14,16 @@ class CategoryController extends Controller
     {
         $couple = Auth::user()->couple;
         $all = $couple->categories;
-        $categoriesIncome = $all->where('type', 'income')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
-        $categoriesExpense = $all->where('type', 'expense')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $categoriesActive = $all->where('is_active', true);
+        $categoriesInactive = $all->where('is_active', false)->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
+
+        $categoriesIncome = $categoriesActive->where('type', 'income')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $categoriesExpense = $categoriesActive->where('type', 'expense')->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
 
         $budgets = $couple->budgets()
             ->where('month', date('m'))
             ->where('year', date('Y'))
-            ->whereHas('category', fn ($q) => $q->excludingCreditCardInvoicePayment()->excludingInternalTransferCategories())
+            ->whereHas('category', fn ($q) => $q->where('is_active', true)->excludingCreditCardInvoicePayment()->excludingInternalTransferCategories())
             ->get();
         $spentByCategory = TransactionCategorySplit::query()
             ->whereHas('transaction', function ($q) use ($couple) {
@@ -37,6 +40,7 @@ class CategoryController extends Controller
         return view('categories.index', compact(
             'categoriesIncome',
             'categoriesExpense',
+            'categoriesInactive',
             'budgets',
             'spentByCategory',
         ));
@@ -108,6 +112,29 @@ class CategoryController extends Controller
         return back()->with('success', 'Categoria atualizada!');
     }
 
+    public function toggleActive(Category $category)
+    {
+        if ($category->couple_id !== Auth::user()->couple_id) {
+            abort(403);
+        }
+
+        if ($category->isImmutableSystemCategory()) {
+            return back()->withErrors([
+                'category' => 'Esta categoria é do sistema e não pode ser desativada.',
+            ]);
+        }
+
+        $category->update([
+            'is_active' => ! (bool) $category->is_active,
+        ]);
+
+        $msg = $category->is_active
+            ? 'Categoria reativada com sucesso.'
+            : 'Categoria desativada com sucesso.';
+
+        return back()->with('success', $msg);
+    }
+
     public function destroy(Category $category)
     {
         if ($category->couple_id !== Auth::user()->couple_id) {
@@ -125,7 +152,7 @@ class CategoryController extends Controller
             || $category->recurringTransactionCategorySplits()->exists()
         ) {
             return back()->withErrors([
-                'category' => 'Esta categoria possui movimentações, orçamentos ou modelos recorrentes vinculados e não pode ser excluída.',
+                'category' => 'Esta categoria possui movimentações, orçamentos ou modelos recorrentes vinculados e não pode ser excluída. Você pode desativá-la.',
             ]);
         }
 

@@ -222,8 +222,38 @@
                     </section>
                 </div>
             </div>
+
+            @if (isset($categoriesInactive) && $categoriesInactive->isNotEmpty())
+                <div class="cat-inactive-section mt-5 pt-4 border-top border-secondary-subtle">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <button
+                            class="btn btn-link text-decoration-none p-0 d-flex align-items-center gap-2 text-secondary fw-semibold cat-collapse-toggle collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#categories-desativadas-collapse"
+                            aria-expanded="false"
+                            aria-controls="categories-desativadas-collapse"
+                        >
+                            <svg class="cat-collapse-toggle__arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                            <span class="fs-6">Categorias desativadas</span>
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">{{ $categoriesInactive->count() }}</span>
+                        </button>
+                    </div>
+
+                    <div class="collapse" id="categories-desativadas-collapse">
+                        <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-lg-3 pt-2">
+                            @foreach ($categoriesInactive as $cat)
+                                <div class="col">
+                                    @include('categories.partials.category-card', ['category' => $cat])
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
-    </div>
 
     <div
         class="modal fade"
