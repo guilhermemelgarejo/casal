@@ -97,12 +97,17 @@ class Category extends Model
         return $this->isInvestmentsCategory() || $this->isPiggyBankWithdrawalCategory();
     }
 
+    public function isSystemCategory(): bool
+    {
+        return $this->system_key !== null;
+    }
+
     /**
-     * Bloqueio de edição/exclusão na UI de categorias (reservadas + cofrinho).
+     * Bloqueio de edição/exclusão na UI de categorias (reservadas + cofrinho + rendimentos).
      */
     public function isImmutableSystemCategory(): bool
     {
-        return $this->isReservedSystemCategory() || $this->isCofrinhoSystemCategory();
+        return $this->isReservedSystemCategory() || $this->isCofrinhoSystemCategory() || $this->isAccountYield();
     }
 
     /**

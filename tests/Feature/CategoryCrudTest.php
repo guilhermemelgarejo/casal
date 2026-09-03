@@ -341,4 +341,83 @@ class CategoryCrudTest extends TestCase
         $this->assertTrue($categoriesInPayload->contains('name', 'Supermercado Ativo'));
         $this->assertFalse($categoriesInPayload->contains('name', 'Lojas Inativo'));
     }
+
+    public function test_nao_pode_editar_nem_excluir_nem_desativar_categorias_de_cofrinho_e_rendimentos(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        Category::ensureSavingsCategoriesForCouple($couple->id);
+
+        $investments = Category::investmentsForCouple($couple->id);
+        $withdrawal = Category::piggyBankWithdrawalForCouple($couple->id);
+        $yield = Category::accountYieldForCouple($couple->id);
+
+        foreach ([$investments, $withdrawal, $yield] as $systemCat) {
+            $this->assertNotNull($systemCat);
+            $this->assertTrue($systemCat->isImmutableSystemCategory());
+            $this->assertTrue($systemCat->isSystemCategory());
+
+            // Tentativa de update
+            $this->actingAs($user)->put(route('categories.update', $systemCat), [
+                'name' => 'Nome Alterado',
+                'type' => $systemCat->type,
+            ])->assertSessionHasErrors('name');
+
+            // Tentativa de toggle-active
+            $this->actingAs($user)->patch(route('categories.toggle-active', $systemCat))
+                ->assertSessionHasErrors('category');
+
+            // Tentativa de destroy
+            $this->actingAs($user)->delete(route('categories.destroy', $systemCat))
+                ->assertSessionHasErrors('category');
+
+            $this->assertDatabaseHas('categories', [
+                'id' => $systemCat->id,
+                'name' => $systemCat->name,
+                'is_active' => true,
+            ]);
+        }
+    }
+
+    public function test_nao_pode_criar_nem_renomear_para_nome_rendimentos(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        // Tentativa de store
+        $this->actingAs($user)->post(route('categories.store'), [
+            'name' => Category::NAME_ACCOUNT_YIELD,
+            'type' => 'income',
+        ])->assertSessionHasErrors('name');
+
+        // Tentativa de update
+        $custom = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Extra',
+            'type' => 'income',
+        ]);
+
+        $this->actingAs($user)->put(route('categories.update', $custom), [
+            'name' => Category::NAME_ACCOUNT_YIELD,
+            'type' => 'income',
+        ])->assertSessionHasErrors('name');
+    }
+
+    public function test_categorias_de_sistema_exibem_badge_e_ocultam_acoes_de_edicao(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        Category::ensureSavingsCategoriesForCouple($couple->id);
+
+        $res = $this->actingAs($user)->get(route('categories.index'));
+        $res->assertOk();
+
+        // Deve conter o badge Sistema
+        $res->assertSee('Sistema');
+        $res->assertSee('Resgates de cofrinho — gerenciada pelo sistema.');
+        $res->assertSee('Rendimentos de conta — gerenciada pelo sistema.');
+        $res->assertSee('Aportes em cofrinho — gerenciada pelo sistema.');
+    }
 }

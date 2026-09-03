@@ -1,15 +1,16 @@
 @php
     $isIncome = $category->type === 'income';
-    $isFixed = $category->isReservedSystemCategory();
+    $isReserved = $category->isReservedSystemCategory();
+    $isImmutable = $category->isImmutableSystemCategory();
     $isActive = (bool) ($category->is_active ?? true);
-    $showBudgetMeta = ! $isIncome && ! $isFixed && $isActive;
+    $showBudgetMeta = ! $isIncome && ! $isReserved && $isActive;
     $budgetRow = $budgetRow ?? null;
     $spentInMonth = (float) ($spentInMonth ?? 0);
     $coupleIncome = (float) ($coupleIncome ?? 0);
     $editCat = $category->only(['id', 'name', 'type', 'color']);
     $catColor = $category->color ?: '#94a3b8';
 @endphp
-<div class="card border-0 cat-item-card cat-item-card--clean h-100 {{ $isFixed ? 'cat-item-card--fixed' : '' }} {{ ! $isActive ? 'cat-item-card--inactive opacity-75' : '' }}" role="listitem" style="--cat-accent: {{ $catColor }}">
+<div class="card border-0 cat-item-card cat-item-card--clean h-100 {{ $isImmutable ? 'cat-item-card--fixed' : '' }} {{ ! $isActive ? 'cat-item-card--inactive opacity-75' : '' }}" role="listitem" style="--cat-accent: {{ $catColor }}">
     <div class="cat-item-card__accent" aria-hidden="true"></div>
     <div class="card-body p-0">
         <div class="cat-item-card__top px-3 px-sm-4 py-3">
@@ -24,24 +25,32 @@
                 <div class="cat-item-card__text min-w-0">
                     <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
                         <h3 class="cat-item-card__title mb-0 text-truncate">{{ $category->name }}</h3>
-                        @if ($isFixed)
-                            <span class="cat-item-card__type cat-item-card__type--fixed">Fixa</span>
+                        @if ($isImmutable)
+                            <span class="cat-item-card__type cat-item-card__type--fixed">{{ $isReserved ? 'Fixa' : 'Sistema' }}</span>
                         @endif
                         @if (! $isActive)
                             <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small py-0 px-2" style="font-size: 0.72rem;">Inativa</span>
                         @endif
                     </div>
-                    @if ($isFixed)
+                    @if ($isImmutable)
                         <p class="cat-item-card__meta cat-item-card__meta--short small mb-0 mt-1">
                             @if ($category->isCreditCardInvoicePayment())
                                 Quitação de fatura — não editável.
+                            @elseif ($category->isInternalTransferCategory())
+                                Transferência entre contas — não editável.
+                            @elseif ($category->isInvestmentsCategory())
+                                Aportes em cofrinho — gerenciada pelo sistema.
+                            @elseif ($category->isPiggyBankWithdrawalCategory())
+                                Resgates de cofrinho — gerenciada pelo sistema.
+                            @elseif ($category->isAccountYield())
+                                Rendimentos de conta — gerenciada pelo sistema.
                             @else
-                                Reservada ao sistema — não editável.
+                                Categoria de sistema — não editável.
                             @endif
                         </p>
                     @endif
                 </div>
-                @unless ($isFixed)
+                @unless ($isImmutable)
                     <div class="cat-item-card__quick-actions flex-shrink-0">
                         <button
                             type="button"
