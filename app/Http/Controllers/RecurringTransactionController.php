@@ -23,10 +23,16 @@ class RecurringTransactionController extends Controller
             ->orderBy('description')
             ->get();
 
+        $usedCategoryIds = $items->flatMap->categorySplits->pluck('category_id')->filter()->unique()->all();
         $categories = $couple->categories()
-            ->where('is_active', true)
             ->excludingCreditCardInvoicePayment()
             ->excludingInternalTransferCategories()
+            ->where(function ($query) use ($usedCategoryIds) {
+                $query->where('is_active', true);
+                if (! empty($usedCategoryIds)) {
+                    $query->orWhereIn('id', $usedCategoryIds);
+                }
+            })
             ->orderBy('name')
             ->get();
 
@@ -65,7 +71,7 @@ class RecurringTransactionController extends Controller
         $couple = Auth::user()->couple;
         $this->validateTemplateRequest($request, $couple->id);
 
-        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        $amountNormalized = $this->normalizeMoneyString((string) $request->amount);
         $amountCents = (int) round(((float) $amountNormalized) * 100);
 
         $alloc = $this->parseCategoryAllocations(
@@ -115,9 +121,17 @@ class RecurringTransactionController extends Controller
         $this->normalizeAmounts($request);
 
         $couple = Auth::user()->couple;
-        $this->validateTemplateRequest($request, $couple->id);
+        $inputWithRt = array_merge($request->all(), ['recurring_id' => $recurringTransaction->id]);
 
-        $amountNormalized = str_replace(',', '.', (string) $request->amount);
+        try {
+            $this->validateTemplateRequest($request, $couple->id);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->withInput($inputWithRt);
+        }
+
+        $amountNormalized = $this->normalizeMoneyString((string) $request->amount);
         $amountCents = (int) round(((float) $amountNormalized) * 100);
 
         $alloc = $this->parseCategoryAllocations(
@@ -127,12 +141,12 @@ class RecurringTransactionController extends Controller
             (int) $couple->id
         );
         if (isset($alloc['errors'])) {
-            return back()->withErrors($alloc['errors'])->withInput();
+            return back()->withErrors($alloc['errors'])->withInput($inputWithRt);
         }
 
         $accountError = $this->validateAccountContext($request, (int) $couple->id);
         if ($accountError !== null) {
-            return back()->withErrors($accountError)->withInput();
+            return back()->withErrors($accountError)->withInput($inputWithRt);
         }
 
         $isMultiple = $request->boolean('is_multiple', false);
@@ -175,16 +189,49 @@ class RecurringTransactionController extends Controller
         }
     }
 
+    private function normalizeMoneyString(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $str = trim($value);
+        if ($str === '') {
+            return '';
+        }
+
+        // Remove prefixos como R$, espaços não separadores, etc.
+        $str = preg_replace('/[^\d.,]/', '', $str) ?? '';
+
+        $lastComma = strrpos($str, ',');
+        $lastDot = strrpos($str, '.');
+
+        if ($lastComma !== false && $lastDot !== false) {
+            if ($lastComma > $lastDot) {
+                // Formato brasileiro: 1.234,56
+                $str = str_replace('.', '', $str);
+                $str = str_replace(',', '.', $str);
+            } else {
+                // Formato americano: 1,234.56
+                $str = str_replace(',', '', $str);
+            }
+        } elseif ($lastComma !== false) {
+            // Apenas vírgula: 1234,56
+            $str = str_replace(',', '.', $str);
+        }
+
+        return $str;
+    }
+
     private function normalizeAmounts(Request $request): void
     {
         if ($request->has('amount') && is_string($request->amount)) {
-            $request->merge(['amount' => str_replace(',', '.', trim($request->amount))]);
+            $request->merge(['amount' => $this->normalizeMoneyString($request->amount)]);
         }
         if (is_array($request->category_allocations)) {
             $allocs = $request->category_allocations;
             foreach ($allocs as &$row) {
                 if (isset($row['amount']) && is_string($row['amount'])) {
-                    $row['amount'] = str_replace(',', '.', trim($row['amount']));
+                    $row['amount'] = $this->normalizeMoneyString($row['amount']);
                 }
             }
             $request->merge(['category_allocations' => $allocs]);
@@ -219,6 +266,15 @@ class RecurringTransactionController extends Controller
             'category_allocations' => 'required|array|max:5',
             'category_allocations.*.category_id' => 'nullable|exists:categories,id',
             'category_allocations.*.amount' => 'nullable|numeric|min:0.01',
+        ], [
+            'description.required' => 'A descrição é obrigatória.',
+            'amount.required' => 'O valor total é obrigatório.',
+            'amount.numeric' => 'O valor total deve ser um número válido.',
+            'amount.min' => 'O valor total deve ser de pelo menos R$ 0,01.',
+            'category_allocations.required' => 'Informe pelo menos uma categoria.',
+            'category_allocations.*.amount.numeric' => 'O valor da categoria deve ser um número válido.',
+            'category_allocations.*.amount.min' => 'O valor de cada categoria utilizada deve ser maior que zero.',
+            'category_allocations.*.category_id.exists' => 'A categoria selecionada é inválida.',
         ]);
     }
 
@@ -289,7 +345,7 @@ class RecurringTransactionController extends Controller
             if ($cid < 1 || $amtStr === '') {
                 return ['errors' => ['category_allocations' => ['Cada linha utilizada precisa de categoria e valor maior que zero.']]];
             }
-            $cRow = (int) round(((float) str_replace(',', '.', $amtStr)) * 100);
+            $cRow = (int) round(((float) $this->normalizeMoneyString($amtStr)) * 100);
             if ($cRow < 1) {
                 return ['errors' => ['category_allocations' => ['Cada linha utilizada precisa de categoria e valor maior que zero.']]];
             }

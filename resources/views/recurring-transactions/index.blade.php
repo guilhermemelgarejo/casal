@@ -279,6 +279,12 @@
     </div>
 
     @php
+        $isEditingRt = (bool) (old('recurring_id') || old('_method') === 'PUT');
+        $editRtId = old('recurring_id');
+        $rtFormAction = $isEditingRt && $editRtId
+            ? route('recurring-transactions.update', ['recurringTransaction' => $editRtId])
+            : route('recurring-transactions.store');
+
         $rtAllocVisibleRows = 1;
         for ($r = 0; $r < 5; $r++) {
             $ov = old('category_allocations.'.$r.'.category_id');
@@ -293,16 +299,33 @@
             <div class="modal-content border-0 shadow rt-modal-content">
                 <div class="modal-header border-0 pb-0 rt-modal-head">
                     <div>
-                        <h2 class="h5 mb-0 fw-semibold" id="modalRecurringFormLabel">Modelo recorrente</h2>
+                        <h2 class="h5 mb-0 fw-semibold" id="modalRecurringFormLabel">{{ $isEditingRt ? 'Editar modelo' : 'Modelo recorrente' }}</h2>
                         <p class="small text-secondary mb-0" id="rt-modal-subtitle">Preencha os dados e as categorias (soma = valor total).</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body pt-3">
-                    <form method="POST" action="{{ route('recurring-transactions.store') }}" id="formRecurring" class="vstack gap-3">
+                    @if ($errors->any() && old('_form') === 'recurring-transactions')
+                        <div class="alert alert-danger py-2 px-3 small mb-3" id="rt-modal-error-alert" role="alert">
+                            <div class="fw-semibold mb-1">Não foi possível salvar o modelo:</div>
+                            <ul class="mb-0 ps-3">
+                                @foreach ($errors->all() as $err)
+                                    <li>{{ $err }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                    <div class="alert alert-danger py-2 px-3 small mb-3 d-none" id="rt-modal-client-alert" role="alert"></div>
+
+                    <form method="POST" action="{{ $rtFormAction }}" id="formRecurring" class="vstack gap-3">
                         @csrf
                         <input type="hidden" name="_form" value="recurring-transactions">
-                        <div id="rt-method-wrap"></div>
+                        <input type="hidden" name="recurring_id" id="rt-recurring-id" value="{{ old('recurring_id') }}">
+                        <div id="rt-method-wrap">
+                            @if ($isEditingRt)
+                                @method('PUT')
+                            @endif
+                        </div>
 
                         <div class="row g-3">
                             <div class="col-md-8">
@@ -398,7 +421,7 @@
                                             <select
                                                 id="rt-split-cat-{{ $i }}"
                                                 name="category_allocations[{{ $i }}][category_id]"
-                                                class="form-select form-select-sm mt-1 rt-cat-select"
+                                                class="form-select form-select-sm mt-1 rt-cat-select @error('category_allocations.'.$i.'.category_id') is-invalid @enderror"
                                             >
                                                 <option value="" {{ old('category_allocations.'.$i.'.category_id') ? '' : 'selected' }}>Selecione…</option>
                                                 @foreach($categories as $cat)
@@ -407,10 +430,13 @@
                                                         data-type="{{ $cat->type }}"
                                                         {{ (string) old('category_allocations.'.$i.'.category_id') === (string) $cat->id ? 'selected' : '' }}
                                                     >
-                                                        {{ $cat->name }}
+                                                        {{ $cat->name }} {{ ! $cat->is_active ? '(inativa)' : '' }}
                                                     </option>
                                                 @endforeach
                                             </select>
+                                            @error('category_allocations.'.$i.'.category_id')
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
                                         </div>
                                         <div class="col-12 col-sm-6 col-md-4">
                                             <label class="form-label small text-secondary mb-0" for="rt-split-amt-{{ $i }}">Valor (R$)</label>
@@ -420,10 +446,13 @@
                                                 min="0.01"
                                                 name="category_allocations[{{ $i }}][amount]"
                                                 id="rt-split-amt-{{ $i }}"
-                                                class="form-control form-control-sm mt-1 rt-cat-amount"
+                                                class="form-control form-control-sm mt-1 rt-cat-amount @if($errors->has('category_allocations.'.$i.'.amount') || $errors->has('category_allocations')) is-invalid @endif"
                                                 value="{{ old('category_allocations.'.$i.'.amount') }}"
                                                 placeholder="0,00"
                                             >
+                                            @error('category_allocations.'.$i.'.amount')
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
                                         </div>
                                         <div class="col-12 col-sm-6 col-md-2 col-lg-auto d-flex align-items-end justify-content-sm-end justify-content-md-start">
                                             <button
@@ -443,12 +472,23 @@
                             <div class="d-flex flex-wrap gap-2 mb-1">
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="rt-add-cat-row" data-bs-toggle="tooltip" data-bs-placement="top" title="Mostrar mais uma linha de categoria (até 5)">Adicionar categoria</button>
                             </div>
-                            @error('category_allocations')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
+                            @if ($errors->has('category_allocations') || $errors->has('category_allocations.*'))
+                                <div class="text-danger small mt-2">
+                                    @foreach ($errors->get('category_allocations') as $catErr)
+                                        <div>{{ $catErr }}</div>
+                                    @endforeach
+                                    @foreach ($errors->get('category_allocations.*') as $catErrList)
+                                        @foreach ((array) $catErrList as $catErrItem)
+                                            <div>{{ $catErrItem }}</div>
+                                        @endforeach
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
 
                         <div class="modal-footer border-0 px-0 pb-0 pt-2">
                             <button type="button" class="btn btn-outline-secondary rounded-pill px-3" title="Fechar sem salvar" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="rt-submit-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar ou atualizar o modelo recorrente">Salvar</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="rt-submit-btn" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar ou atualizar o modelo recorrente">{{ $isEditingRt ? 'Atualizar' : 'Salvar' }}</button>
                         </div>
                     </form>
                 </div>
@@ -732,9 +772,44 @@
                     }
                 }
 
+                const rtRecurringIdEl = document.getElementById('rt-recurring-id');
+                const clientAlertEl = document.getElementById('rt-modal-client-alert');
+
+                function showClientAlert(msg) {
+                    if (!clientAlertEl) return;
+                    clientAlertEl.textContent = msg;
+                    clientAlertEl.classList.remove('d-none');
+                    clientAlertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+
+                function clearClientAlert() {
+                    if (!clientAlertEl) return;
+                    clientAlertEl.textContent = '';
+                    clientAlertEl.classList.add('d-none');
+                }
+
+                if (allocWrap) {
+                    allocWrap.addEventListener('input', (e) => {
+                        if (e.target && e.target.classList.contains('rt-cat-amount')) {
+                            if (visibleAllocRows().length === 1 && amountInput) {
+                                amountInput.value = e.target.value;
+                            }
+                        }
+                    });
+                    allocWrap.addEventListener('change', (e) => {
+                        if (e.target && e.target.classList.contains('rt-cat-amount')) {
+                            if (visibleAllocRows().length === 1 && amountInput) {
+                                amountInput.value = e.target.value;
+                            }
+                        }
+                    });
+                }
+
                 function openNew() {
                     form.action = storeUrl;
                     methodWrap.innerHTML = '';
+                    if (rtRecurringIdEl) rtRecurringIdEl.value = '';
+                    clearClientAlert();
                     document.getElementById('modalRecurringFormLabel').textContent = 'Novo modelo recorrente';
                     document.getElementById('rt-submit-btn').textContent = 'Criar';
                     form.reset();
@@ -752,6 +827,8 @@
                     const url = updateUrlTemplate.replace(String(dummyId), String(payload.id));
                     form.action = url;
                     methodWrap.innerHTML = '<input type="hidden" name="_method" value="PUT">';
+                    if (rtRecurringIdEl) rtRecurringIdEl.value = String(payload.id);
+                    clearClientAlert();
                     document.getElementById('modalRecurringFormLabel').textContent = 'Editar modelo';
                     document.getElementById('rt-submit-btn').textContent = 'Atualizar';
                     document.getElementById('rt-description').value = payload.description || '';
@@ -783,6 +860,14 @@
 
                 if (amountInput) {
                     const onAmountChange = () => {
+                        const vis = visibleAllocRows();
+                        if (vis.length === 1) {
+                            const amt = vis[0].querySelector('.rt-cat-amount');
+                            if (amt && amt !== document.activeElement) {
+                                amt.value = amountInput.value;
+                            }
+                            return;
+                        }
                         const cents = parseMoneyToCents(amountInput.value);
                         if (cents == null) return;
                         distributeAmountToCategories(cents);
@@ -791,6 +876,66 @@
                     amountInput.addEventListener('change', onAmountChange);
                     amountInput.addEventListener('blur', onAmountChange);
                 }
+
+                form.addEventListener('submit', (ev) => {
+                    clearClientAlert();
+                    const vis = visibleAllocRows();
+
+                    if (vis.length === 1) {
+                        const row = vis[0];
+                        const cat = row.querySelector('.rt-cat-select');
+                        const amt = row.querySelector('.rt-cat-amount');
+
+                        if (amt && amt.value && (!amountInput.value || amountInput.value.trim() === '')) {
+                            amountInput.value = amt.value;
+                        } else if (amountInput && amountInput.value && (!amt || !amt.value || amt.value.trim() === '')) {
+                            if (amt) amt.value = amountInput.value;
+                        } else if (amt && amountInput && amt.value && amountInput.value) {
+                            const totalC = parseMoneyToCents(amountInput.value);
+                            const catC = parseMoneyToCents(amt.value);
+                            if (totalC && catC && totalC !== catC) {
+                                amt.value = formatCentsToMoney(totalC);
+                            }
+                        }
+                    } else if (vis.length > 1) {
+                        const totalCents = parseMoneyToCents(amountInput.value);
+                        let sumCents = 0;
+                        let anyMissingCat = false;
+                        let anyMissingAmt = false;
+                        let usedCount = 0;
+
+                        vis.forEach((r) => {
+                            const cat = r.querySelector('.rt-cat-select');
+                            const amt = r.querySelector('.rt-cat-amount');
+                            const hasCat = Boolean(cat && cat.value && cat.value.trim() !== '');
+                            const hasAmt = Boolean(amt && amt.value && amt.value.trim() !== '');
+
+                            if (hasCat && !hasAmt) anyMissingAmt = true;
+                            if (!hasCat && hasAmt) anyMissingCat = true;
+                            if (hasCat || hasAmt) usedCount++;
+                            if (hasAmt) {
+                                const c = parseMoneyToCents(amt.value);
+                                if (c != null) sumCents += c;
+                            }
+                        });
+
+                        if (usedCount === 0) {
+                            ev.preventDefault();
+                            showClientAlert('Informe pelo menos uma categoria com valor.');
+                            return;
+                        }
+                        if (anyMissingCat || anyMissingAmt) {
+                            ev.preventDefault();
+                            showClientAlert('Cada linha utilizada precisa ter a categoria selecionada e o valor informado.');
+                            return;
+                        }
+                        if (totalCents && sumCents !== totalCents) {
+                            ev.preventDefault();
+                            showClientAlert(`A soma dos valores por categoria (R$ ${(sumCents / 100).toFixed(2).replace('.', ',')}) deve ser exatamente igual ao valor total (R$ ${(totalCents / 100).toFixed(2).replace('.', ',')}).`);
+                            return;
+                        }
+                    }
+                });
 
                 document.addEventListener('click', (ev) => {
                     const btn = ev.target.closest('.btn-rt-edit');

@@ -731,4 +731,98 @@ class RecurringTransactionTest extends TestCase
         $this->assertSame('150.50', (string) $rt->amount);
         $this->assertSame(2, $rt->categorySplits()->count());
     }
+
+    public function test_update_accepts_brazilian_currency_format_with_thousands_separator(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        $rt = RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'description' => 'Escola',
+            'amount' => '1000.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'day_of_month' => 5,
+            'is_active' => true,
+        ]);
+        $rt->syncCategorySplits([
+            ['category_id' => $category->id, 'amount' => '1000.00'],
+        ]);
+
+        $response = $this->actingAs($user)->put(route('recurring-transactions.update', $rt), [
+            '_form' => 'recurring-transactions',
+            'recurring_id' => (string) $rt->id,
+            'description' => 'Escola Mensalidade',
+            'amount' => '1.935,50',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'day_of_month' => 5,
+            'is_active' => '1',
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '1.935,50'],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $rt->refresh();
+        $this->assertSame('Escola Mensalidade', $rt->description);
+        $this->assertSame('1935.50', (string) $rt->amount);
+        $this->assertSame('1935.50', (string) $rt->categorySplits()->first()->amount);
+    }
+
+    public function test_update_validation_failure_preserves_recurring_id_and_edit_modal_state(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        $rt = RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'description' => 'Aluguel',
+            'amount' => '1500.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'day_of_month' => 10,
+            'is_active' => true,
+        ]);
+        $rt->syncCategorySplits([
+            ['category_id' => $category->id, 'amount' => '1500.00'],
+        ]);
+
+        // Envia atualização com valor da categoria diferente do valor total (provoca erro de validação de soma)
+        $response = $this->actingAs($user)->from(route('recurring-transactions.index'))->put(route('recurring-transactions.update', $rt), [
+            '_form' => 'recurring-transactions',
+            'recurring_id' => (string) $rt->id,
+            'description' => 'Aluguel Casa',
+            'amount' => '1600.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'day_of_month' => 10,
+            'is_active' => '1',
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '1500.00'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('recurring-transactions.index'));
+        $response->assertSessionHasErrors('category_allocations');
+        $this->assertSame((int) $rt->id, (int) session('_old_input.recurring_id'));
+
+        // Ao seguir o redirect para a index, o modal deve reabrir com estado de "Editar modelo" e ação de update
+        $follow = $this->actingAs($user)->get(route('recurring-transactions.index'));
+        $html = $follow->getContent();
+
+        $this->assertStringContainsString('Editar modelo', $html);
+        $this->assertStringContainsString('Atualizar', $html);
+        $this->assertStringContainsString('action="' . route('recurring-transactions.update', $rt) . '"', $html);
+        $this->assertStringContainsString('name="_method" value="PUT"', $html);
+        $this->assertStringContainsString('rt-modal-error-alert', $html);
+        $this->assertStringContainsString('A soma dos valores por categoria deve ser exatamente igual ao valor total.', $html);
+    }
 }
