@@ -25,6 +25,10 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/temp-backups/
+*google-credentials*.json
+/storage/app/google-credentials.json
+
 /vendor
 Homestead.json
 Homestead.yaml

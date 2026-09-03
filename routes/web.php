@@ -24,6 +24,7 @@ Route::match(['get', 'post'], '/system/deploy-hook/{token?}', DeployController::
     ->middleware('throttle:10,1')
     ->name('system.deploy-hook');
 
+
 Route::get('/', function () {
     return view('welcome');
 });
