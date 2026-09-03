@@ -24,4 +24,4 @@ Schedule::call(function () {
             'exception' => $e->getMessage(),
         ]);
     }
-})->dailyAt('01:12')->name('db:backup-drive');
+})->dailyAt('03:00')->name('db:backup-drive');
