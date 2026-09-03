@@ -38,17 +38,24 @@ class BackupDatabaseToDrive extends Command
             return self::FAILURE;
         }
 
-        $googleCredentialsPath = $this->resolveCredentialsPath(config('backup.google_drive.credentials_path'));
+        // Validação da forma de autenticação (OAuth 2.0 vs Service Account)
+        $clientId = config('backup.google_drive.client_id');
+        $clientSecret = config('backup.google_drive.client_secret');
+        $refreshToken = config('backup.google_drive.refresh_token');
+        $isOAuth = !empty($clientId) && !empty($clientSecret) && !empty($refreshToken);
 
-        if (!$googleCredentialsPath) {
-            $configured = config('backup.google_drive.credentials_path');
-            $msg = "ERRO: Arquivo de credenciais do Google não encontrado (configurado: '{$configured}'). Verifique se o arquivo JSON da Service Account está em storage/app/google-credentials.json";
-            Log::error("[Backup DB] {$msg}");
-            $this->error($msg);
-            return self::FAILURE;
+        if ($isOAuth) {
+            Log::info('[Backup DB] Modo de autenticação: OAuth 2.0 (Conta Pessoal @gmail.com).');
+        } else {
+            $googleCredentialsPath = $this->resolveCredentialsPath(config('backup.google_drive.credentials_path'));
+            if (!$googleCredentialsPath) {
+                $msg = 'ERRO: Credenciais do Google Drive não configuradas. Preencha GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET e GOOGLE_DRIVE_REFRESH_TOKEN no .env (ou coloque o arquivo JSON da Service Account em storage/app/google-credentials.json).';
+                Log::error("[Backup DB] {$msg}");
+                $this->error($msg);
+                return self::FAILURE;
+            }
+            Log::info("[Backup DB] Modo de autenticação: Service Account ({$googleCredentialsPath}).");
         }
-
-        Log::info("[Backup DB] Credenciais do Google encontradas em: {$googleCredentialsPath}");
 
         if (empty($zipPassword)) {
             Log::warning('[Backup DB] BACKUP_ZIP_PASSWORD não foi definida no .env. O ZIP será gerado sem senha.');
@@ -95,7 +102,7 @@ class BackupDatabaseToDrive extends Command
             // 4. Upload para o Google Drive
             $this->line('3/4 - Enviando arquivo para o Google Drive...');
             Log::info("[Backup DB] 3/4 - Enviando arquivo para o Google Drive (Pasta ID: {$googleFolderId})...");
-            $driveLink = $this->uploadToGoogleDrive($zipFilePath, $zipFileName, $googleCredentialsPath, $googleFolderId);
+            $driveLink = $this->uploadToGoogleDrive($zipFilePath, $zipFileName, $googleFolderId);
             $this->info("Upload concluído! Link do arquivo: {$driveLink}");
             Log::info("[Backup DB] Upload concluído no Google Drive. Link: {$driveLink}");
 
@@ -138,6 +145,32 @@ class BackupDatabaseToDrive extends Command
                 @unlink($zipFilePath);
             }
         }
+    }
+
+    protected function createGoogleDriveService(): GoogleDriveService
+    {
+        $client = new GoogleClient();
+        $client->addScope(GoogleDriveService::DRIVE);
+
+        $clientId = config('backup.google_drive.client_id');
+        $clientSecret = config('backup.google_drive.client_secret');
+        $refreshToken = config('backup.google_drive.refresh_token');
+
+        if (!empty($clientId) && !empty($clientSecret) && !empty($refreshToken)) {
+            $client->setClientId($clientId);
+            $client->setClientSecret($clientSecret);
+            $client->refreshToken($refreshToken);
+
+            return new GoogleDriveService($client);
+        }
+
+        $credentialsPath = $this->resolveCredentialsPath(config('backup.google_drive.credentials_path'));
+        if ($credentialsPath) {
+            $client->setAuthConfig($credentialsPath);
+            return new GoogleDriveService($client);
+        }
+
+        throw new Throwable('Credenciais do Google Drive não configuradas no .env.');
     }
 
     protected function resolveCredentialsPath(?string $configuredPath): ?string
@@ -218,14 +251,9 @@ class BackupDatabaseToDrive extends Command
         $zip->close();
     }
 
-    protected function uploadToGoogleDrive(string $filePath, string $fileName, string $credentialsPath, string $folderId): string
+    protected function uploadToGoogleDrive(string $filePath, string $fileName, string $folderId): string
     {
-        $client = new GoogleClient();
-        $client->setAuthConfig($credentialsPath);
-        // Utiliza permissão total para garantir acesso à pasta compartilhada
-        $client->addScope(GoogleDriveService::DRIVE);
-
-        $service = new GoogleDriveService($client);
+        $service = $this->createGoogleDriveService();
 
         $fileMetadata = new DriveFile([
             'name' => $fileName,
@@ -238,6 +266,7 @@ class BackupDatabaseToDrive extends Command
             'mimeType' => 'application/zip',
             'uploadType' => 'multipart',
             'fields' => 'id, webViewLink, name',
+            'supportsAllDrives' => true,
         ]);
 
         return $uploadedFile->webViewLink ?: "https://drive.google.com/file/d/{$uploadedFile->id}/view";

@@ -18,8 +18,11 @@ return [
     | e ID da pasta de destino no Google Drive onde os backups serão salvos.
     */
     'google_drive' => [
-        'credentials_path' => env('GOOGLE_DRIVE_CREDENTIALS_PATH', storage_path('app/google-credentials.json')),
+        'client_id' => env('GOOGLE_DRIVE_CLIENT_ID', ''),
+        'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET', ''),
+        'refresh_token' => env('GOOGLE_DRIVE_REFRESH_TOKEN', ''),
         'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID', ''),
+        'credentials_path' => env('GOOGLE_DRIVE_CREDENTIALS_PATH', storage_path('app/google-credentials.json')),
     ],
 
     /*
