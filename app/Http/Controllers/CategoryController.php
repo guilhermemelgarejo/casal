@@ -121,7 +121,7 @@ class CategoryController extends Controller
         }
 
         if ($category->transactionCategorySplits()->exists()
-            || $category->budgets()->exists()
+            || $category->budgets()->where('amount', '>', 0)->exists()
             || $category->recurringTransactionCategorySplits()->exists()
         ) {
             return back()->withErrors([

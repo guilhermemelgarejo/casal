@@ -163,4 +163,87 @@ class CategoryCrudTest extends TestCase
 
         $this->assertDatabaseHas('categories', ['id' => $category->id]);
     }
+
+    public function test_usuario_pode_excluir_categoria_sem_vinculos(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Categoria Temporaria',
+            'type' => 'expense',
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('categories.destroy', $category));
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success', 'Categoria excluída!');
+        $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+    }
+
+    public function test_falha_ao_excluir_categoria_exibe_alerta_e_nao_abre_modal_de_cadastro(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Supermercado',
+            'type' => 'expense',
+        ]);
+
+        $tx = $couple->transactions()->create([
+            'user_id' => $user->id,
+            'description' => 'Compras',
+            'amount' => '50.00',
+            'type' => 'expense',
+            'date' => '2026-08-10',
+            'reference_month' => 8,
+            'reference_year' => 2026,
+        ]);
+        $tx->syncCategorySplits([['category_id' => $category->id, 'amount' => '50.00']]);
+
+        $response = $this->actingAs($user)->delete(route('categories.destroy', $category), [
+            '_form' => 'category-destroy',
+        ]);
+        $response->assertSessionHasErrors('category');
+
+        $indexResponse = $this->actingAs($user)->get(route('categories.index'));
+        $indexResponse->assertSee('Não foi possível excluir a categoria');
+        $indexResponse->assertSee('Esta categoria possui movimentações, orçamentos ou modelos recorrentes vinculados e não pode ser excluída.');
+        $indexResponse->assertSee('data-open-on-load="0"', false);
+        $indexResponse->assertDontSee('data-open-on-load="1"');
+    }
+
+    public function test_categoria_com_orcamento_zerado_ou_removido_pode_ser_excluida(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Viagem',
+            'type' => 'expense',
+        ]);
+
+        // Define orçamento inicial
+        $this->actingAs($user)->post(route('budgets.store'), [
+            'category_id' => $category->id,
+            'amount' => '200.00',
+        ])->assertSessionHasNoErrors();
+
+        // Não pode excluir com orçamento > 0
+        $this->actingAs($user)->delete(route('categories.destroy', $category))
+            ->assertSessionHasErrors('category');
+
+        // Zera orçamento (remove)
+        $this->actingAs($user)->post(route('budgets.store'), [
+            'category_id' => $category->id,
+            'amount' => '0',
+        ])->assertSessionHasNoErrors();
+
+        // Agora pode excluir
+        $this->actingAs($user)->delete(route('categories.destroy', $category))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+    }
 }

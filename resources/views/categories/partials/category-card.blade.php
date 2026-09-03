@@ -53,6 +53,7 @@
                         <form class="cat-item-card__delete-form" action="{{ route('categories.destroy', $category) }}" method="POST" data-confirm-title="Excluir categoria" data-confirm="Deseja excluir esta categoria?" data-confirm-accept="Sim, excluir" data-confirm-cancel="Cancelar">
                             @csrf
                             @method('DELETE')
+                            <input type="hidden" name="_form" value="category-destroy">
                             <button type="submit" class="btn btn-link btn-sm cat-item-card__link-delete p-0 text-danger text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir esta categoria">
                                 Excluir
                             </button>

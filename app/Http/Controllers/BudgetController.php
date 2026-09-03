@@ -40,6 +40,20 @@ class BudgetController extends Controller
                 ->withInput();
         }
 
+        if ((float) $request->amount <= 0) {
+            Budget::where([
+                'couple_id' => Auth::user()->couple_id,
+                'category_id' => $request->category_id,
+                'month' => date('m'),
+                'year' => date('Y'),
+            ])->delete();
+
+            return redirect()
+                ->route('categories.index')
+                ->withFragment('orcamento')
+                ->with('success', 'Orçamento atualizado!');
+        }
+
         Budget::updateOrCreate(
             [
                 'couple_id' => Auth::user()->couple_id,

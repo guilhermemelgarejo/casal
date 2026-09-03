@@ -1,7 +1,8 @@
 @php
-    $catFormMode = old('_form', 'category-store');
-    $editingCategoryId = old('editing_category_id');
-    $categoryModalOpen = $errors->any() && in_array($catFormMode, ['category-store', 'category-update'], true);
+    $submittedForm = old('_form');
+    $categoryModalOpen = $errors->any() && in_array($submittedForm, ['category-store', 'category-update'], true);
+    $catFormMode = $categoryModalOpen ? $submittedForm : 'category-store';
+    $editingCategoryId = $categoryModalOpen ? old('editing_category_id') : null;
     $formAction =
         $catFormMode === 'category-update' && $editingCategoryId
             ? route('categories.update', ['category' => $editingCategoryId])
@@ -44,7 +45,7 @@
             <x-alert type="success" class="mb-4" :message="session('success')" />
         @endif
         @if ($errors->any() && ! $categoryModalOpen && old('_form') !== 'budget-store')
-            <x-alert type="danger" class="mb-4" title="Não foi possível salvar">
+            <x-alert type="danger" class="mb-4" :title="$errors->has('category') || old('_form') === 'category-destroy' ? 'Não foi possível excluir a categoria' : 'Não foi possível salvar'">
                 <ul class="mb-0 ps-3 small">
                     @foreach ($errors->all() as $err)
                         <li>{{ $err }}</li>
