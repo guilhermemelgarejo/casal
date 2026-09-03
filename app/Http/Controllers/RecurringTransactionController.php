@@ -61,6 +61,7 @@ class RecurringTransactionController extends Controller
 
     public function store(Request $request)
     {
+        $this->normalizeAmounts($request);
         $couple = Auth::user()->couple;
         $this->validateTemplateRequest($request, $couple->id);
 
@@ -111,6 +112,7 @@ class RecurringTransactionController extends Controller
     public function update(Request $request, RecurringTransaction $recurringTransaction)
     {
         $this->authorizeRecurring($recurringTransaction);
+        $this->normalizeAmounts($request);
 
         $couple = Auth::user()->couple;
         $this->validateTemplateRequest($request, $couple->id);
@@ -170,6 +172,22 @@ class RecurringTransactionController extends Controller
     {
         if ($recurringTransaction->couple_id !== Auth::user()->couple_id) {
             abort(403);
+        }
+    }
+
+    private function normalizeAmounts(Request $request): void
+    {
+        if ($request->has('amount') && is_string($request->amount)) {
+            $request->merge(['amount' => str_replace(',', '.', trim($request->amount))]);
+        }
+        if (is_array($request->category_allocations)) {
+            $allocs = $request->category_allocations;
+            foreach ($allocs as &$row) {
+                if (isset($row['amount']) && is_string($row['amount'])) {
+                    $row['amount'] = str_replace(',', '.', trim($row['amount']));
+                }
+            }
+            $request->merge(['category_allocations' => $allocs]);
         }
     }
 

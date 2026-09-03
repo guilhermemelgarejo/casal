@@ -278,6 +278,16 @@
         </div>
     </div>
 
+    @php
+        $rtAllocVisibleRows = 1;
+        for ($r = 0; $r < 5; $r++) {
+            $ov = old('category_allocations.'.$r.'.category_id');
+            $oa = old('category_allocations.'.$r.'.amount');
+            if (($ov !== null && $ov !== '') || ($oa !== null && $oa !== '')) {
+                $rtAllocVisibleRows = max($rtAllocVisibleRows, $r + 1);
+            }
+        }
+    @endphp
     <div class="modal fade" id="modalRecurringForm" tabindex="-1" aria-labelledby="modalRecurringFormLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content border-0 shadow rt-modal-content">
@@ -302,7 +312,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label" for="rt-amount">Valor total</label>
-                                <input type="text" name="amount" id="rt-amount" class="form-control @error('amount') is-invalid @enderror" value="{{ old('amount') }}" required inputmode="decimal">
+                                <input type="number" step="0.01" min="0.01" name="amount" id="rt-amount" class="form-control @error('amount') is-invalid @enderror" value="{{ old('amount') }}" required placeholder="0,00">
                                 @error('amount')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                         </div>
@@ -378,25 +388,60 @@
                         </div>
 
                         <div class="border rounded-3 p-3 bg-body-tertiary rt-form-cats">
-                            <p class="small fw-semibold text-secondary mb-2 text-uppercase rt-form-cats__title">Categorias e valores</p>
-                            <div class="vstack gap-2" id="rt-cat-rows">
+                            <h3 class="h6 fw-semibold text-secondary mb-1 text-uppercase rt-form-cats__title" id="rt-section-categories-heading">Categorias e valores</h3>
+                            <p class="small text-secondary mb-2">Até 5 linhas. A soma deve ser igual ao valor total.</p>
+                            <div id="rt-category-allocations-wrap">
                                 @for($i = 0; $i < 5; $i++)
-                                    <div class="row g-2 align-items-end rt-cat-row">
-                                        <div class="col-md-7">
-                                            <label class="form-label small mb-1">Categoria</label>
-                                            <select name="category_allocations[{{ $i }}][category_id]" class="form-select form-select-sm rt-cat-select">
-                                                <option value="">—</option>
+                                    <div class="rt-cat-alloc-row row g-2 mb-2 align-items-end {{ $i < $rtAllocVisibleRows ? '' : 'd-none' }}" data-rt-alloc-row="{{ $i }}">
+                                        <div class="col-12 col-md-6 min-w-0">
+                                            <label class="form-label small text-secondary mb-0" for="rt-split-cat-{{ $i }}">Categoria {{ $i + 1 }}</label>
+                                            <select
+                                                id="rt-split-cat-{{ $i }}"
+                                                name="category_allocations[{{ $i }}][category_id]"
+                                                class="form-select form-select-sm mt-1 rt-cat-select"
+                                            >
+                                                <option value="" {{ old('category_allocations.'.$i.'.category_id') ? '' : 'selected' }}>Selecione…</option>
                                                 @foreach($categories as $cat)
-                                                    <option value="{{ $cat->id }}" data-type="{{ $cat->type }}">{{ $cat->name }}</option>
+                                                    <option
+                                                        value="{{ $cat->id }}"
+                                                        data-type="{{ $cat->type }}"
+                                                        {{ (string) old('category_allocations.'.$i.'.category_id') === (string) $cat->id ? 'selected' : '' }}
+                                                    >
+                                                        {{ $cat->name }}
+                                                    </option>
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div class="col-md-5">
-                                            <label class="form-label small mb-1">Valor</label>
-                                            <input type="text" name="category_allocations[{{ $i }}][amount]" class="form-control form-control-sm rt-cat-amount" inputmode="decimal" placeholder="0,00">
+                                        <div class="col-12 col-sm-6 col-md-4">
+                                            <label class="form-label small text-secondary mb-0" for="rt-split-amt-{{ $i }}">Valor (R$)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0.01"
+                                                name="category_allocations[{{ $i }}][amount]"
+                                                id="rt-split-amt-{{ $i }}"
+                                                class="form-control form-control-sm mt-1 rt-cat-amount"
+                                                value="{{ old('category_allocations.'.$i.'.amount') }}"
+                                                placeholder="0,00"
+                                            >
+                                        </div>
+                                        <div class="col-12 col-sm-6 col-md-2 col-lg-auto d-flex align-items-end justify-content-sm-end justify-content-md-start">
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-danger btn-sm js-rt-remove-alloc-row w-100 w-sm-auto"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Remover esta linha de categoria"
+                                                aria-label="Remover esta categoria"
+                                            >
+                                                Remover
+                                            </button>
                                         </div>
                                     </div>
                                 @endfor
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mb-1">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="rt-add-cat-row" data-bs-toggle="tooltip" data-bs-placement="top" title="Mostrar mais uma linha de categoria (até 5)">Adicionar categoria</button>
                             </div>
                             @error('category_allocations')<div class="text-danger small mt-2">{{ $message }}</div>@enderror
                         </div>
@@ -497,22 +542,113 @@
                     });
                 }
 
-                function resetCategoryRows() {
-                    document.querySelectorAll('.rt-cat-row').forEach((row) => {
-                        row.querySelector('.rt-cat-select').value = '';
-                        row.querySelector('.rt-cat-amount').value = '';
+                const allocWrap = document.getElementById('rt-category-allocations-wrap');
+                const addCatBtn = document.getElementById('rt-add-cat-row');
+
+                const allocRows = () => (allocWrap ? Array.from(allocWrap.querySelectorAll('.rt-cat-alloc-row')) : []);
+                const visibleAllocRows = () => allocRows().filter((row) => !row.classList.contains('d-none'));
+
+                function syncRemoveButtons() {
+                    const vis = visibleAllocRows();
+                    const hideAll = vis.length <= 1;
+                    allocRows().forEach((row) => {
+                        const btn = row.querySelector('.js-rt-remove-alloc-row');
+                        if (!btn) return;
+                        const rowHidden = row.classList.contains('d-none');
+                        if (rowHidden || hideAll) {
+                            btn.classList.add('d-none');
+                            btn.setAttribute('disabled', 'disabled');
+                        } else {
+                            btn.classList.remove('d-none');
+                            btn.removeAttribute('disabled');
+                        }
                     });
+                    if (addCatBtn) {
+                        const hasHidden = allocRows().some((row) => row.classList.contains('d-none'));
+                        addCatBtn.classList.toggle('d-none', !hasHidden);
+                    }
+                }
+
+                function removeAllocRow(rowEl) {
+                    const vis = visibleAllocRows();
+                    if (vis.length <= 1) return;
+                    const pos = vis.indexOf(rowEl);
+                    if (pos === -1) return;
+
+                    for (let i = pos; i < vis.length - 1; i += 1) {
+                        const cur = vis[i];
+                        const next = vis[i + 1];
+                        const curCat = cur.querySelector('.rt-cat-select');
+                        const nextCat = next.querySelector('.rt-cat-select');
+                        const curAmt = cur.querySelector('.rt-cat-amount');
+                        const nextAmt = next.querySelector('.rt-cat-amount');
+                        if (curCat && nextCat) curCat.value = nextCat.value;
+                        if (curAmt && nextAmt) curAmt.value = nextAmt.value;
+                    }
+
+                    const last = vis[vis.length - 1];
+                    last.classList.add('d-none');
+                    const lastCat = last.querySelector('.rt-cat-select');
+                    const lastAmt = last.querySelector('.rt-cat-amount');
+                    if (lastCat) lastCat.value = '';
+                    if (lastAmt) lastAmt.value = '';
+
+                    filterCategoryOptions();
+                    syncRemoveButtons();
+                }
+
+                if (addCatBtn) {
+                    addCatBtn.addEventListener('click', () => {
+                        const hidden = allocRows().find((row) => row.classList.contains('d-none'));
+                        if (!hidden) return;
+                        hidden.classList.remove('d-none');
+                        filterCategoryOptions();
+                        syncRemoveButtons();
+                    });
+                }
+
+                if (allocWrap) {
+                    allocWrap.addEventListener('click', (e) => {
+                        const btn = e.target.closest('.js-rt-remove-alloc-row');
+                        if (!btn || !allocWrap.contains(btn)) return;
+                        const row = btn.closest('.rt-cat-alloc-row');
+                        if (row) removeAllocRow(row);
+                    });
+                }
+
+                function resetCategoryRows() {
+                    allocRows().forEach((row, idx) => {
+                        const cat = row.querySelector('.rt-cat-select');
+                        const amt = row.querySelector('.rt-cat-amount');
+                        if (cat) cat.value = '';
+                        if (amt) amt.value = '';
+                        if (idx === 0) {
+                            row.classList.remove('d-none');
+                        } else {
+                            row.classList.add('d-none');
+                        }
+                    });
+                    syncRemoveButtons();
                 }
 
                 function fillCategoryRows(splits) {
                     resetCategoryRows();
-                    const rows = document.querySelectorAll('.rt-cat-row');
-                    (splits || []).slice(0, rows.length).forEach((sp, idx) => {
-                        const row = rows[idx];
-                        if (!row) return;
-                        row.querySelector('.rt-cat-select').value = String(sp.category_id || '');
-                        row.querySelector('.rt-cat-amount').value = sp.amount || '';
-                    });
+                    const rows = allocRows();
+                    const safeSplits = Array.isArray(splits) ? splits : [];
+                    if (safeSplits.length === 0) {
+                        if (rows[0]) rows[0].classList.remove('d-none');
+                    } else {
+                        safeSplits.slice(0, rows.length).forEach((sp, idx) => {
+                            const row = rows[idx];
+                            if (!row) return;
+                            row.classList.remove('d-none');
+                            const cat = row.querySelector('.rt-cat-select');
+                            const amt = row.querySelector('.rt-cat-amount');
+                            if (cat) cat.value = String(sp.category_id || '');
+                            if (amt) amt.value = sp.amount != null ? String(sp.amount) : '';
+                        });
+                    }
+                    syncRemoveButtons();
                 }
 
                 function parseMoneyToCents(raw) {
@@ -541,14 +677,13 @@
                     return Math.round(n * 100);
                 }
 
-                function formatCentsToMoneyBr(cents) {
-                    const v = (Math.round(cents) / 100).toFixed(2);
-                    return v.replace('.', ',');
+                function formatCentsToMoney(cents) {
+                    return (Math.round(cents) / 100).toFixed(2);
                 }
 
                 function distributeAmountToCategories(totalCents) {
                     if (totalCents == null || totalCents < 1) return;
-                    const rows = Array.from(document.querySelectorAll('.rt-cat-row'));
+                    const rows = visibleAllocRows();
                     const mapped = rows
                         .map((row) => {
                             const cat = row.querySelector('.rt-cat-select');
@@ -564,12 +699,12 @@
 
                     if (selected.length < 1) {
                         const target = mapped[0]?.amt;
-                        if (target) target.value = formatCentsToMoneyBr(totalCents);
+                        if (target) target.value = formatCentsToMoney(totalCents);
                         return;
                     }
 
                     if (selected.length === 1) {
-                        selected[0].amt.value = formatCentsToMoneyBr(totalCents);
+                        selected[0].amt.value = formatCentsToMoney(totalCents);
                         return;
                     }
 
@@ -580,7 +715,7 @@
                         const rem = totalCents - base * selected.length;
                         selected.forEach((x, idx) => {
                             const c = base + (idx === selected.length - 1 ? rem : 0);
-                            x.amt.value = formatCentsToMoneyBr(c);
+                            x.amt.value = formatCentsToMoney(c);
                         });
                         return;
                     }
@@ -593,7 +728,7 @@
                             ? totalCents - allocated
                             : Math.floor((totalCents * rowCents) / sumFilled);
                         allocated += newCents;
-                        if (selected[i].amt) selected[i].amt.value = formatCentsToMoneyBr(newCents);
+                        if (selected[i].amt) selected[i].amt.value = formatCentsToMoney(newCents);
                     }
                 }
 
@@ -682,6 +817,8 @@
                         openNew();
                     }
                 });
+
+                syncRemoveButtons();
 
                 @if ($errors->any() && old('_form') === 'recurring-transactions')
                     setFundingUi();

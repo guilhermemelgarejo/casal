@@ -683,4 +683,52 @@ class RecurringTransactionTest extends TestCase
         $this->assertStringContainsString('Múltiplo', $html);
         $this->assertStringContainsString('Atalho', $html);
     }
+
+    public function test_recurring_index_renders_category_allocation_elements_matching_new_transaction(): void
+    {
+        ['couple' => $couple, 'user' => $user] = $this->seedCoupleExpenseSetup();
+
+        $response = $this->actingAs($user)->get(route('recurring-transactions.index'));
+        $response->assertOk();
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('id="rt-category-allocations-wrap"', $html);
+        $this->assertStringContainsString('id="rt-add-cat-row"', $html);
+        $this->assertStringContainsString('js-rt-remove-alloc-row', $html);
+        $this->assertStringContainsString('Categoria 1', $html);
+        $this->assertStringContainsString('Categoria 2', $html);
+    }
+
+    public function test_store_accepts_comma_decimal_amount_and_category_allocations(): void
+    {
+        ['couple' => $couple, 'user' => $user, 'category' => $category, 'account' => $account] = $this->seedCoupleExpenseSetup();
+
+        $secondCategory = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Alimentação',
+            'type' => 'expense',
+            'color' => '#222222',
+        ]);
+
+        $this->actingAs($user)->post(route('recurring-transactions.store'), [
+            '_form' => 'recurring-transactions',
+            'description' => 'Supermercado e Feira',
+            'amount' => '150,50',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'day_of_month' => 10,
+            'is_active' => '1',
+            'category_allocations' => [
+                ['category_id' => $category->id, 'amount' => '100,25'],
+                ['category_id' => $secondCategory->id, 'amount' => '50,25'],
+            ],
+        ])->assertRedirect();
+
+        $rt = RecurringTransaction::query()->where('description', 'Supermercado e Feira')->first();
+        $this->assertNotNull($rt);
+        $this->assertSame('150.50', (string) $rt->amount);
+        $this->assertSame(2, $rt->categorySplits()->count());
+    }
 }
