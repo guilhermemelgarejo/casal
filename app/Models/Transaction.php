@@ -117,6 +117,30 @@ class Transaction extends Model
             if ($ids !== []) {
                 self::$creditCardStatementIdsToSyncAfterDelete[$transaction->id] = $ids;
             }
+
+            $debtInstallments = DebtInstallment::query()
+                ->with('debt')
+                ->where('transaction_id', $transaction->id)
+                ->get();
+
+            foreach ($debtInstallments as $inst) {
+                $debt = $inst->debt;
+                $isAdHocAmortization = $debt && ($debt->isFree() || ($debt->total_installments && $inst->installment_number > $debt->total_installments));
+
+                if ($isAdHocAmortization) {
+                    $inst->delete();
+                } else {
+                    $inst->update([
+                        'status' => DebtInstallment::STATUS_PENDING,
+                        'paid_at' => null,
+                        'transaction_id' => null,
+                    ]);
+                }
+
+                if ($debt && ! $debt->is_active) {
+                    $debt->update(['is_active' => true]);
+                }
+            }
         });
 
         static::deleted(function (Transaction $transaction) {
@@ -434,5 +458,10 @@ class Transaction extends Model
                         ->whereHas('accountModel', fn (Builder $a) => $a->where('kind', Account::KIND_CREDIT_CARD));
                 });
         });
+    }
+
+    public function debtInstallment()
+    {
+        return $this->hasOne(DebtInstallment::class);
     }
 }

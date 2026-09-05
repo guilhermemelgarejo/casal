@@ -217,6 +217,13 @@ class RecurringTransactionController extends Controller
         } elseif ($lastComma !== false) {
             // Apenas vírgula: 1234,56
             $str = str_replace(',', '.', $str);
+        } elseif ($lastDot !== false) {
+            // Apenas ponto: milhar (1.300 ou 15.000) vs decimal (1.50 ou 1300.50)
+            if (substr_count($str, '.') > 1) {
+                $str = str_replace('.', '', $str);
+            } elseif (preg_match('/^\d{1,3}\.\d{3}$/', $str)) {
+                $str = str_replace('.', '', $str);
+            }
         }
 
         return $str;

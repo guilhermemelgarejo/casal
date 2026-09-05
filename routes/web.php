@@ -11,6 +11,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CoupleController;
 use App\Http\Controllers\CreditCardStatementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DebtController;
 use App\Http\Controllers\DeployController;
 use App\Http\Controllers\FinancialProjectController;
 use App\Http\Controllers\OnboardingController;
@@ -77,6 +78,17 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::post('/recorrentes', [RecurringTransactionController::class, 'store'])->name('recurring-transactions.store');
     Route::put('/recorrentes/{recurringTransaction}', [RecurringTransactionController::class, 'update'])->name('recurring-transactions.update');
     Route::delete('/recorrentes/{recurringTransaction}', [RecurringTransactionController::class, 'destroy'])->name('recurring-transactions.destroy');
+
+    Route::get('/dividas', [DebtController::class, 'index'])->name('debts.index');
+    Route::post('/dividas', [DebtController::class, 'store'])->name('debts.store');
+    Route::put('/dividas/{debt}', [DebtController::class, 'update'])->name('debts.update');
+    Route::delete('/dividas/{debt}', [DebtController::class, 'destroy'])->name('debts.destroy');
+    Route::patch('/dividas/{debt}/toggle-active', [DebtController::class, 'toggleActive'])->name('debts.toggle-active');
+    Route::post('/dividas/{debt}/amortize', [DebtController::class, 'amortize'])->name('debts.amortize');
+    Route::post('/dividas/parcelas/{installment}/pagamento', [DebtController::class, 'payInstallment'])->name('debts.installments.pay');
+    Route::post('/dividas/parcelas/{installment}/desfazer', [DebtController::class, 'unpayInstallment'])->name('debts.installments.unpay');
+    Route::patch('/dividas/parcelas/{installment}/resetar-valor', [DebtController::class, 'resetInstallmentAmount'])->name('debts.installments.reset-amount');
+    Route::post('/dividas/{debt}/resetar-parcelas', [DebtController::class, 'resetAllInstallmentsAmount'])->name('debts.reset-all-installments');
     Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
     Route::post('/accounts/transfer', [AccountTransferController::class, 'store'])->name('accounts.transfer');
     Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');

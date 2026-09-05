@@ -433,6 +433,7 @@
         @include('partials.rt-reminder-panel', [
             'reminders' => $recurringReminders ?? collect(),
             'invoiceReminders' => $creditCardInvoiceReminders ?? collect(),
+            'debtReminders' => $debtReminders ?? collect(),
             'month' => $month,
             'year' => $year,
             'embedded' => true,

@@ -313,11 +313,58 @@ return new class extends Migration
             $table->index(['financial_project_id', 'date']);
             $table->index(['couple_id', 'date']);
         });
+
+        Schema::create('debts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('couple_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->string('name');
+            $table->string('creditor')->nullable();
+            $table->string('type', 32)->default('installments');
+            $table->decimal('total_amount', 15, 2)->default(0);
+            $table->decimal('installment_amount', 15, 2)->nullable();
+            $table->unsignedInteger('total_installments')->nullable();
+            $table->unsignedTinyInteger('due_day')->nullable();
+            $table->date('start_date')->nullable();
+            $table->foreignId('default_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_category_id')->nullable()->constrained('categories')->nullOnDelete();
+            $table->string('color', 32)->nullable()->default('#f59e0b');
+            $table->text('notes')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+
+            $table->index(['couple_id', 'is_active']);
+            $table->index(['couple_id', 'type']);
+        });
+
+        Schema::create('debt_installments', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('debt_id')->constrained('debts')->cascadeOnDelete();
+            $table->foreignId('couple_id')->constrained()->cascadeOnDelete();
+            $table->unsignedInteger('installment_number')->default(1);
+            $table->date('due_date')->nullable();
+            $table->decimal('original_amount', 15, 2)->nullable();
+            $table->decimal('amount', 15, 2)->default(0);
+            $table->decimal('paid_amount', 15, 2)->nullable();
+            $table->string('status', 32)->default('pending');
+            $table->date('paid_at')->nullable();
+            $table->foreignId('transaction_id')->nullable()->constrained('transactions')->nullOnDelete();
+            $table->string('barcode')->nullable();
+            $table->string('notes')->nullable();
+            $table->timestamps();
+
+            $table->index(['couple_id', 'due_date']);
+            $table->index(['debt_id', 'installment_number']);
+            $table->index('status');
+        });
     }
 
     public function down(): void
     {
         Schema::disableForeignKeyConstraints();
+
+        Schema::dropIfExists('debt_installments');
+        Schema::dropIfExists('debts');
 
         Schema::dropIfExists('financial_project_entries');
         Schema::dropIfExists('credit_card_statement_payments');

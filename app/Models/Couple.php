@@ -62,6 +62,16 @@ class Couple extends Model
         return $this->hasMany(FinancialProject::class);
     }
 
+    public function debts()
+    {
+        return $this->hasMany(Debt::class);
+    }
+
+    public function debtInstallments()
+    {
+        return $this->hasMany(DebtInstallment::class);
+    }
+
     public function resolvePlannedMonthlyIncomeForMonth(int $year, int $month): float
     {
         $v = CouplePlannedIncome::amountVigenteForMonth((int) $this->id, $year, $month);

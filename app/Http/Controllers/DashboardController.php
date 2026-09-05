@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\PreparesTransactionModalPayload;
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\DebtInstallment;
 use App\Models\FinancialProject;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
@@ -162,6 +163,14 @@ class DashboardController extends Controller
             $couple->accounts()->where('kind', Account::KIND_CREDIT_CARD)->orderBy('name')->get(),
             $now
         );
+
+        $debtReminders = DebtInstallment::query()
+            ->where('couple_id', $couple->id)
+            ->where('status', DebtInstallment::STATUS_PENDING)
+            ->where('due_date', '<=', $now->copy()->endOfMonth()->toDateString())
+            ->with('debt')
+            ->orderBy('due_date')
+            ->get();
 
         $modalPayload = $this->transactionModalPayload();
         /** @var Collection<int, Account> $regularAccounts */
@@ -364,6 +373,7 @@ class DashboardController extends Controller
                 'creditCardPurchaseRowMeta',
                 'recurringReminders',
                 'creditCardInvoiceReminders',
+                'debtReminders',
                 'txRecurringPrefill',
                 'txRecurringPrefillBlockedReason',
                 'txCofrinhoPrefill',

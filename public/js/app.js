@@ -10,6 +10,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
             bs.Tooltip.getOrCreateInstance(el, { container: 'body' });
         });
+
+        // Oculta tooltips ao clicar para evitar que permaneçam abertos
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-bs-toggle="tooltip"]');
+            if (btn) {
+                const inst = bs.Tooltip.getInstance(btn);
+                if (inst) inst.hide();
+            }
+        });
     }
 
     /* Fechamento automático e temporizado de alertas (10s padrão) com pausa em hover */
@@ -264,6 +273,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         button.dataset.duozenOriginalHtml = button.innerHTML;
+        const isIconButton = button.classList.contains('btn-icon')
+            || button.classList.contains('rounded-circle')
+            || button.dataset.loadingSpinnerOnly === 'true'
+            || button.getAttribute('data-loading-text') === '';
+
+        if (isIconButton) {
+            button.innerHTML = '<span class="spinner-border spinner-border-sm duozen-submit-loading__spinner" style="width: 14px; height: 14px; border-width: 2px;" aria-hidden="true"></span>';
+            return;
+        }
+
         const loadingText = button.getAttribute('data-loading-text') || 'Aguarde...';
         button.innerHTML = `<span class="spinner-border spinner-border-sm duozen-submit-loading__spinner" aria-hidden="true"></span><span class="duozen-submit-loading__label">${loadingText}</span>`;
     };
@@ -1416,49 +1435,54 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /** Formulários com data-confirm: diálogo SweetAlert2 em vez de window.confirm */
-    document.querySelectorAll('form[data-confirm]').forEach((form) => {
-        form.addEventListener('submit', (e) => {
-            const msg = form.getAttribute('data-confirm');
-            if (!msg) {
-                return;
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('form[data-confirm]');
+        if (!form) return;
+        const msg = form.getAttribute('data-confirm');
+        if (!msg) {
+            return;
+        }
+        e.preventDefault();
+        const title = form.getAttribute('data-confirm-title') || 'Confirmar';
+        const confirmText = form.getAttribute('data-confirm-accept') || 'Confirmar';
+        const cancelText = form.getAttribute('data-confirm-cancel') || 'Cancelar';
+        const icon = form.getAttribute('data-confirm-icon') || 'warning';
+        const confirmBtnClass = form.getAttribute('data-confirm-btn-class') || 'btn btn-primary px-4';
+        const cancelBtnClass = form.getAttribute('data-confirm-cancel-class') || 'btn btn-outline-secondary px-4';
+
+        const proceed = () => {
+            form.removeAttribute('data-confirm');
+            form.submit();
+        };
+
+        if (typeof Swal === 'undefined') {
+            if (window.confirm(msg)) {
+                proceed();
             }
-            e.preventDefault();
-            const title = form.getAttribute('data-confirm-title') || 'Confirmar';
-            const confirmText = form.getAttribute('data-confirm-accept') || 'Confirmar';
-            const cancelText = form.getAttribute('data-confirm-cancel') || 'Cancelar';
-            const icon = form.getAttribute('data-confirm-icon') || 'warning';
+            return;
+        }
 
-            const proceed = () => {
-                form.submit();
-            };
+        if (bs?.Tooltip) {
+            document.querySelectorAll('.tooltip.show').forEach((t) => t.remove());
+        }
 
-            if (typeof Swal === 'undefined') {
-                if (window.confirm(msg)) {
-                    proceed();
-                }
-                return;
+        Swal.fire({
+            title,
+            text: msg,
+            icon,
+            showCancelButton: true,
+            focusCancel: true,
+            confirmButtonText: confirmText,
+            cancelButtonText: cancelText,
+            customClass: {
+                confirmButton: confirmBtnClass,
+                cancelButton: cancelBtnClass,
+            },
+            buttonsStyling: false,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                proceed();
             }
-
-            Swal.fire({
-                title,
-                text: msg,
-                icon,
-                showCancelButton: true,
-                focusCancel: true,
-                confirmButtonText: confirmText,
-                cancelButtonText: cancelText,
-                confirmButtonColor: '#0d6efd',
-                cancelButtonColor: '#6c757d',
-                customClass: {
-                    confirmButton: 'btn btn-primary px-4',
-                    cancelButton: 'btn btn-outline-secondary px-4',
-                },
-                buttonsStyling: false,
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    proceed();
-                }
-            });
         });
     });
 
