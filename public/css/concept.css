@@ -2083,6 +2083,97 @@ body.dz-privacy-active .duozen-privacy-blur,
     background: linear-gradient(180deg, rgba(244, 63, 94, 0.2) 0%, rgba(30, 41, 59, 0.7) 50%) !important;
 }
 
+.dz-reminder-chip--debt {
+    border-top: 3.5px solid #F59E0B;
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, var(--dz-bg-canvas) 50%);
+}
+
+.dz-reminder-chip--debt:hover {
+    border-color: #F59E0B;
+}
+
+[data-theme="dark"] .dz-reminder-chip--debt {
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(30, 41, 59, 0.7) 50%);
+}
+
+.dz-reminder-type-block:not(:first-child) {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--dz-border-subtle);
+}
+
+.dz-reminder-type-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.dz-reminder-type-title--card {
+    color: #7C3AED;
+}
+[data-theme="dark"] .dz-reminder-type-title--card {
+    color: #A78BFA;
+}
+
+.dz-reminder-type-title--recurring {
+    color: #059669;
+}
+[data-theme="dark"] .dz-reminder-type-title--recurring {
+    color: #34D399;
+}
+
+.dz-reminder-type-title--shortcut {
+    color: #D97706;
+}
+[data-theme="dark"] .dz-reminder-type-title--shortcut {
+    color: #FBBF24;
+}
+
+.dz-reminder-type-title--debt {
+    color: #D97706;
+}
+[data-theme="dark"] .dz-reminder-type-title--debt {
+    color: #FBBF24;
+}
+
+.dz-reminder-type-badge--card {
+    background: rgba(124, 58, 237, 0.12);
+    color: #7C3AED;
+}
+[data-theme="dark"] .dz-reminder-type-badge--card {
+    background: rgba(124, 58, 237, 0.25);
+    color: #DDD6FE;
+}
+
+.dz-reminder-type-badge--recurring {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+}
+[data-theme="dark"] .dz-reminder-type-badge--recurring {
+    background: rgba(16, 185, 129, 0.25);
+    color: #A7F3D0;
+}
+
+.dz-reminder-type-badge--shortcut {
+    background: rgba(245, 158, 11, 0.12);
+    color: #D97706;
+}
+[data-theme="dark"] .dz-reminder-type-badge--shortcut {
+    background: rgba(245, 158, 11, 0.25);
+    color: #FDE68A;
+}
+
+.dz-reminder-type-badge--debt {
+    background: rgba(245, 158, 11, 0.12);
+    color: #D97706;
+}
+[data-theme="dark"] .dz-reminder-type-badge--debt {
+    background: rgba(245, 158, 11, 0.25);
+    color: #FDE68A;
+}
+
 .rt-reminder-strip--embedded .rt-reminder-card {
     border-radius: var(--dz-radius-lg) !important;
     border: 1px solid var(--dz-border) !important;
