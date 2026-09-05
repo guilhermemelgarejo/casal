@@ -66,6 +66,25 @@
                 </div>
             </div>
 
+            <!-- Total de Contas -->
+            <div class="dz-card dz-kpi-card">
+                <div class="dz-kpi-card__head">
+                    <span class="dz-kpi-card__label">Contas Bancárias</span>
+                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                        💼
+                    </div>
+                </div>
+                <div>
+                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
+                        {{ $regularAccounts->count() }}
+                    </div>
+                    <div class="dz-kpi-card__footer">
+                        <span>{{ $accounts->count() }} itens financeiros</span>
+                        <button type="button" class="btn btn-link p-0 fw-bold" style="color: var(--dz-primary); text-decoration: none; font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#modalNewAccount">+ Nova conta</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Limite Disponível de Cartões -->
             <div class="dz-card dz-kpi-card">
                 <div class="dz-kpi-card__head">
@@ -110,65 +129,9 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Total de Contas -->
-            <div class="dz-card dz-kpi-card">
-                <div class="dz-kpi-card__head">
-                    <span class="dz-kpi-card__label">Contas Bancárias</span>
-                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
-                        💼
-                    </div>
-                </div>
-                <div>
-                    <div class="dz-kpi-card__value" style="color: var(--dz-text-title);">
-                        {{ $regularAccounts->count() }}
-                    </div>
-                    <div class="dz-kpi-card__footer">
-                        <span>{{ $accounts->count() }} itens financeiros</span>
-                        <button type="button" class="btn btn-link p-0 fw-bold" style="color: var(--dz-primary); text-decoration: none; font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#modalNewAccount">+ Nova conta</button>
-                    </div>
-                </div>
-            </div>
         </section>
 
-        <!-- SEÇÃO 1: CARTÕES DE CRÉDITO -->
-        <section class="dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
-            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
-                <div class="d-flex align-items-center gap-2">
-                    <span style="font-size: 1.1rem;">💳</span>
-                    <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Cartões de Crédito</h3>
-                    <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700;">
-                        {{ $creditCardAccounts->count() }}
-                    </span>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size: 0.75rem; font-weight: 700;">
-                        Ver todas as Faturas ↗
-                    </a>
-                </div>
-            </div>
-
-            @if($creditCardAccounts->isEmpty())
-                <div class="text-center py-4 px-3" style="background: var(--dz-bg-card-subtle); border-radius: var(--dz-radius-md); border: 1px dashed var(--dz-border);">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">💳</div>
-                    <p class="fw-bold mb-1" style="color: var(--dz-text-title);">Nenhum cartão cadastrado ainda</p>
-                    <p class="small text-secondary mb-3">Cadastre seus cartões de crédito para acompanhar faturas e limites.</p>
-                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
-                        + Adicionar Cartão
-                    </button>
-                </div>
-            @else
-                <div class="row g-3">
-                    @foreach ($creditCardAccounts as $account)
-                        <div class="col-12 col-md-6 col-xl-4">
-                            @include('accounts.partials.account-card', ['account' => $account])
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </section>
-
-        <!-- SEÇÃO 2: CONTAS BANCÁRIAS & SALDOS -->
+        <!-- SEÇÃO 1: CONTAS BANCÁRIAS & SALDOS -->
         <section class="dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
                 <div class="d-flex align-items-center gap-2">
@@ -199,6 +162,43 @@
             @else
                 <div class="row g-3">
                     @foreach ($regularAccounts as $account)
+                        <div class="col-12 col-md-6 col-xl-4">
+                            @include('accounts.partials.account-card', ['account' => $account])
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </section>
+
+        <!-- SEÇÃO 2: CARTÕES DE CRÉDITO -->
+        <section class="dz-card p-3 p-lg-4 mb-4" style="background: var(--dz-bg-card); border-radius: var(--dz-radius-lg); border: 1px solid var(--dz-border);">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 1.1rem;">💳</span>
+                    <h3 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Cartões de Crédito</h3>
+                    <span class="badge rounded-pill" style="background: var(--dz-primary-subtle); color: var(--dz-primary); font-size: 0.72rem; font-weight: 700;">
+                        {{ $creditCardAccounts->count() }}
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('credit-card-statements.index') }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size: 0.75rem; font-weight: 700;">
+                        Ver todas as Faturas ↗
+                    </a>
+                </div>
+            </div>
+
+            @if($creditCardAccounts->isEmpty())
+                <div class="text-center py-4 px-3" style="background: var(--dz-bg-card-subtle); border-radius: var(--dz-radius-md); border: 1px dashed var(--dz-border);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">💳</div>
+                    <p class="fw-bold mb-1" style="color: var(--dz-text-title);">Nenhum cartão cadastrado ainda</p>
+                    <p class="small text-secondary mb-3">Cadastre seus cartões de crédito para acompanhar faturas e limites.</p>
+                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNewAccount">
+                        + Adicionar Cartão
+                    </button>
+                </div>
+            @else
+                <div class="row g-3">
+                    @foreach ($creditCardAccounts as $account)
                         <div class="col-12 col-md-6 col-xl-4">
                             @include('accounts.partials.account-card', ['account' => $account])
                         </div>

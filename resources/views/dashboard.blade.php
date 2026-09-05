@@ -183,12 +183,69 @@
         </div>
     </section>
 
-    <!-- 2. CARTÕES DE CRÉDITO -->
+    <!-- 2. CONTAS BANCÁRIAS E SALDOS -->
     @php
-        $ccAccountsList = $creditCardAccounts ?? collect(($dashboardAccounts ?? $couple->accounts()->get()))->filter(fn($a) => $a->isCreditCard());
         $regAccountsList = ($regularAccounts ?? collect(($dashboardAccounts ?? $couple->accounts()->get()))->filter(fn($a) => !$a->isCreditCard()))->sortByDesc(fn($a) => (float) $a->balance)->values();
+        $ccAccountsList = $creditCardAccounts ?? collect(($dashboardAccounts ?? $couple->accounts()->get()))->filter(fn($a) => $a->isCreditCard());
     @endphp
 
+    @if($regAccountsList->isNotEmpty())
+        <div class="dz-section-head">
+            <h3 class="dz-section-title">
+                <span>🏦 Contas Bancárias & Saldos</span>
+            </h3>
+            <div class="d-flex align-items-center gap-3">
+                @if(($canCreateAccountTransfer ?? false) === true)
+                    <button type="button" class="btn btn-link p-0 text-decoration-none" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary);" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer">
+                        Transferir ⇄
+                    </button>
+                @endif
+                <a href="{{ route('accounts.index') }}" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
+                    Gerenciar contas ↗
+                </a>
+            </div>
+        </div>
+
+        <div class="dz-cards-grid mb-4">
+            @foreach ($regAccountsList as $acc)
+                <!-- Card de Conta Corrente Real -->
+                <div class="dz-card dz-account-card">
+                    <div class="dz-account-card__head">
+                        <div class="dz-account-card__bank">
+                            <div class="dz-bank-icon" style="background: {{ $acc->color ?: '#7C3AED' }};">
+                                {{ strtoupper(substr($acc->name, 0, 2)) }}
+                            </div>
+                            <div class="min-w-0">
+                                <h4 class="dz-account-card__name text-truncate">{{ $acc->name }}</h4>
+                                <span class="dz-account-card__tag">
+                                    Conta Corrente {{ $acc->yieldsInterest() ? '• 📈 Rende juros' : '' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="dz-account-card__balance-block text-end flex-shrink-0">
+                            <div class="dz-account-card__balance-label">Saldo em Conta</div>
+                            <div class="dz-account-card__balance dz-privacy-blur {{ (float)$acc->balance >= 0 ? '' : 'text-danger' }}">
+                                {{ $money($acc->balance) }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dz-account-card__footer">
+                        @if ((int) ($filterAccountId ?? 0) === (int) $acc->id)
+                            <a href="{{ route('dashboard', array_diff_key(request()->query(), ['account_id' => ''])) }}#lancamentos" class="dz-btn dz-btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; width: 100%;">
+                                ✓ Filtrado (Limpar) ✕
+                            </a>
+                        @else
+                            <a href="{{ route('dashboard', array_merge(request()->query(), ['account_id' => $acc->id])) }}#lancamentos" class="dz-btn dz-btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; width: 100%;">
+                                Filtrar Lançamentos ↘
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    <!-- 3. CARTÕES DE CRÉDITO -->
     @if($ccAccountsList->isNotEmpty())
         <div class="dz-section-head">
             <h3 class="dz-section-title">
@@ -267,63 +324,6 @@
                         <a href="{{ route('credit-card-statements.index') }}" style="color: var(--dz-primary); font-weight: 700; text-decoration: none; margin-left: auto;">
                             Ver Fatura ↗
                         </a>
-                    </div>
-                </div>
-            @endforeach
-        </div>
-    @endif
-
-    <!-- 3. CONTAS BANCÁRIAS E SALDOS -->
-    @if($regAccountsList->isNotEmpty())
-        <div class="dz-section-head">
-            <h3 class="dz-section-title">
-                <span>🏦 Contas Bancárias & Saldos</span>
-            </h3>
-            <div class="d-flex align-items-center gap-3">
-                @if(($canCreateAccountTransfer ?? false) === true)
-                    <button type="button" class="btn btn-link p-0 text-decoration-none" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary);" data-bs-toggle="modal" data-bs-target="#modalAccountTransfer">
-                        Transferir ⇄
-                    </button>
-                @endif
-                <a href="{{ route('accounts.index') }}" style="font-size: 0.82rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
-                    Gerenciar contas ↗
-                </a>
-            </div>
-        </div>
-
-        <div class="dz-cards-grid mb-4">
-            @foreach ($regAccountsList as $acc)
-                <!-- Card de Conta Corrente Real -->
-                <div class="dz-card dz-account-card">
-                    <div class="dz-account-card__head">
-                        <div class="dz-account-card__bank">
-                            <div class="dz-bank-icon" style="background: {{ $acc->color ?: '#7C3AED' }};">
-                                {{ strtoupper(substr($acc->name, 0, 2)) }}
-                            </div>
-                            <div class="min-w-0">
-                                <h4 class="dz-account-card__name text-truncate">{{ $acc->name }}</h4>
-                                <span class="dz-account-card__tag">
-                                    Conta Corrente {{ $acc->yieldsInterest() ? '• 📈 Rende juros' : '' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="dz-account-card__balance-block text-end flex-shrink-0">
-                            <div class="dz-account-card__balance-label">Saldo em Conta</div>
-                            <div class="dz-account-card__balance dz-privacy-blur {{ (float)$acc->balance >= 0 ? '' : 'text-danger' }}">
-                                {{ $money($acc->balance) }}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="dz-account-card__footer">
-                        @if ((int) ($filterAccountId ?? 0) === (int) $acc->id)
-                            <a href="{{ route('dashboard', array_diff_key(request()->query(), ['account_id' => ''])) }}#lancamentos" class="dz-btn dz-btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; width: 100%;">
-                                ✓ Filtrado (Limpar) ✕
-                            </a>
-                        @else
-                            <a href="{{ route('dashboard', array_merge(request()->query(), ['account_id' => $acc->id])) }}#lancamentos" class="dz-btn dz-btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; width: 100%;">
-                                Filtrar Lançamentos ↘
-                            </a>
-                        @endif
                     </div>
                 </div>
             @endforeach
