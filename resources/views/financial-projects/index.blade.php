@@ -252,6 +252,24 @@
                                     <x-input-error :messages="$errors->get('asset_type')" class="mt-2" />
                                 </div>
 
+                                <div id="fp-create-fiat-fields" class="vstack gap-2 p-3 rounded-3 border border-secondary-subtle bg-body-secondary {{ old('asset_type', 'fiat') === 'fiat' ? '' : 'd-none' }}">
+                                    <div class="row g-2">
+                                        <div class="col-sm-7">
+                                            <x-input-label for="fp-create-initial-balance" value="Saldo inicial (R$, opcional)" />
+                                            <x-text-input id="fp-create-initial-balance" name="initial_balance" type="text" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('initial_balance') : ''" placeholder="0,00" />
+                                            <x-input-error :messages="$errors->get('initial_balance')" class="mt-2" />
+                                        </div>
+                                        <div class="col-sm-5">
+                                            <x-input-label for="fp-create-initial-balance-date" value="Data do saldo inicial" />
+                                            <x-text-input id="fp-create-initial-balance-date" name="initial_balance_date" type="date" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('initial_balance_date', now()->toDateString()) : now()->toDateString()" />
+                                            <x-input-error :messages="$errors->get('initial_balance_date')" class="mt-2" />
+                                        </div>
+                                    </div>
+                                    <span class="small text-secondary mt-1 d-block">
+                                        💡 Este valor entra como saldo inicial no cofrinho e <strong>não debita</strong> de nenhuma conta bancária.
+                                    </span>
+                                </div>
+
                                 <div id="fp-create-asset-fields" class="vstack gap-3 p-3 rounded-3 border border-secondary-subtle bg-body-secondary {{ old('asset_type', 'fiat') === 'fiat' ? 'd-none' : '' }}">
                                     <div>
                                         <x-input-label for="fp-create-asset-code" value="Código / Ticker do ativo" />
@@ -483,11 +501,19 @@
                     const targetSection = document.getElementById(targetId);
                     if (!targetSection) return;
 
+                    const fiatSection = document.getElementById('fp-create-fiat-fields');
+
                     select.addEventListener('change', function () {
                         if (this.value === 'fiat') {
                             targetSection.classList.add('d-none');
+                            if (fiatSection && this.id === 'fp-create-asset-type') {
+                                fiatSection.classList.remove('d-none');
+                            }
                         } else {
                             targetSection.classList.remove('d-none');
+                            if (fiatSection && this.id === 'fp-create-asset-type') {
+                                fiatSection.classList.add('d-none');
+                            }
                             if (this.value === 'crypto') {
                                 const codeInput = targetSection.querySelector('input[name="asset_code"]');
                                 if (codeInput && !codeInput.value) codeInput.value = 'BTC';

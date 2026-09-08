@@ -532,11 +532,14 @@
                                     $unitPrice = $movement['asset_unit_price'] ?? null;
                                     $resultingPm = $movement['asset_resulting_avg_price'] ?? null;
                                     $isInterest = ($movement['source'] ?? '') === \App\Models\FinancialProjectEntry::TYPE_INTEREST;
+                                    $isSaldoInicial = ($movement['kind'] ?? '') === 'saldo_inicial';
                                 @endphp
                                 <tr>
                                     <td class="text-nowrap">{{ optional($movement['date'])->format('d/m/Y') }}</td>
                                     <td>
-                                        @if(($movement['kind'] ?? '') === 'aporte')
+                                        @if(($movement['kind'] ?? '') === 'saldo_inicial')
+                                            <span class="badge rounded-pill text-bg-primary-subtle text-primary-emphasis border border-primary-subtle">Saldo Inicial</span>
+                                        @elseif(($movement['kind'] ?? '') === 'aporte')
                                             <span class="badge rounded-pill text-bg-success-subtle text-success-emphasis border border-success-subtle">Aporte</span>
                                         @elseif(($movement['kind'] ?? '') === 'retirada')
                                             <span class="badge rounded-pill text-bg-danger-subtle text-danger-emphasis border border-danger-subtle">Retirada</span>
@@ -583,13 +586,13 @@
                                         </span>
                                     </td>
                                     <td class="text-end text-nowrap pe-3">
-                                        @if($isInterest && !empty($movement['id']))
+                                        @if(($isInterest || $isSaldoInicial) && !empty($movement['id']))
                                             <form
                                                 action="{{ route('cofrinhos.interest.destroy', $movement['id']) }}"
                                                 method="POST"
                                                 class="d-inline"
-                                                data-confirm-title="Excluir rendimento"
-                                                data-confirm="Excluir este lançamento de juros/rendimento? O saldo do cofrinho será recalculado."
+                                                data-confirm-title="{{ $isSaldoInicial ? 'Excluir saldo inicial' : 'Excluir rendimento' }}"
+                                                data-confirm="{{ $isSaldoInicial ? 'Excluir este lançamento de saldo inicial? O saldo do cofrinho será recalculado.' : 'Excluir este lançamento de juros/rendimento? O saldo do cofrinho será recalculado.' }}"
                                                 data-confirm-accept="Sim, excluir"
                                                 data-confirm-cancel="Cancelar"
                                             >
@@ -600,8 +603,8 @@
                                                     class="btn btn-link text-danger btn-sm p-0"
                                                     data-bs-toggle="tooltip"
                                                     data-bs-placement="top"
-                                                    title="Excluir este rendimento"
-                                                    aria-label="Excluir rendimento"
+                                                    title="{{ $isSaldoInicial ? 'Excluir saldo inicial' : 'Excluir este rendimento' }}"
+                                                    aria-label="{{ $isSaldoInicial ? 'Excluir saldo inicial' : 'Excluir rendimento' }}"
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
                                                 </button>

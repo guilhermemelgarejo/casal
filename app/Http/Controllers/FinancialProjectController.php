@@ -94,6 +94,15 @@ class FinancialProjectController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $couple = Auth::user()->couple;
+        if ($request->filled('initial_balance')) {
+            $rawBal = trim((string) $request->input('initial_balance'));
+            if (str_contains($rawBal, ',')) {
+                $rawBal = str_replace('.', '', $rawBal);
+                $rawBal = str_replace(',', '.', $rawBal);
+            }
+            $request->merge(['initial_balance' => $rawBal]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'asset_type' => ['nullable', 'string', Rule::in([
@@ -108,6 +117,8 @@ class FinancialProjectController extends Controller
             'asset_quantity' => ['nullable', 'numeric', 'min:0'],
             'asset_avg_price' => ['nullable', 'numeric', 'min:0'],
             'target_amount' => ['nullable', 'numeric', 'min:0'],
+            'initial_balance' => ['nullable', 'numeric', 'min:0'],
+            'initial_balance_date' => ['nullable', 'date'],
             'color' => ['nullable', 'string', 'max:32'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -125,7 +136,7 @@ class FinancialProjectController extends Controller
             ? (float) str_replace(',', '.', (string) $validated['asset_avg_price'])
             : null;
 
-        FinancialProject::create([
+        $project = FinancialProject::create([
             'couple_id' => $couple->id,
             'name' => $validated['name'],
             'asset_type' => $assetType,
@@ -136,6 +147,25 @@ class FinancialProjectController extends Controller
             'color' => $validated['color'] ?? null,
             'is_active' => $request->boolean('is_active', true),
         ]);
+
+        $initialBalance = isset($validated['initial_balance']) && $validated['initial_balance'] !== ''
+            ? (float) $validated['initial_balance']
+            : 0.0;
+        $initialBalanceDate = ! empty($validated['initial_balance_date'])
+            ? $validated['initial_balance_date']
+            : now()->toDateString();
+
+        if ($initialBalance > 0.0001) {
+            FinancialProjectEntry::create([
+                'couple_id' => $couple->id,
+                'user_id' => Auth::id(),
+                'financial_project_id' => $project->id,
+                'type' => FinancialProjectEntry::TYPE_INTEREST,
+                'amount' => number_format($initialBalance, 2, '.', ''),
+                'date' => $initialBalanceDate,
+                'note' => 'Saldo inicial',
+            ]);
+        }
 
         return redirect()->route('cofrinhos.index')->with('success', 'Cofrinho criado com sucesso.');
     }
@@ -363,15 +393,26 @@ class FinancialProjectController extends Controller
             $isInterest = $entry->type === FinancialProjectEntry::TYPE_INTEREST;
             $isAporte = $entry->type === FinancialProjectEntry::TYPE_ASSET_APORTE;
             $isWithdrawal = $entry->type === FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL;
+            $noteNormalized = trim(mb_strtolower((string) ($entry->note ?? '')));
+            $isSaldoInicial = in_array($noteNormalized, ['ajuste', 'saldo inicial', 'saldo_inicial'], true);
 
-            $kind = $isInterest ? 'juros' : ($isWithdrawal ? 'retirada' : 'aporte');
-            $defaultDesc = $isInterest
-                ? 'Juros lançados no cofrinho'
-                : ($isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho');
+            if ($isSaldoInicial) {
+                $kind = 'saldo_inicial';
+                $defaultDesc = 'Saldo inicial do cofrinho';
+            } elseif ($isInterest) {
+                $kind = 'juros';
+                $defaultDesc = 'Juros lançados no cofrinho';
+            } elseif ($isWithdrawal) {
+                $kind = 'retirada';
+                $defaultDesc = 'Movimentação no cofrinho';
+            } else {
+                $kind = 'aporte';
+                $defaultDesc = $isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho';
+            }
 
             return [
                 'id' => (int) $entry->id,
-                'source' => $entry->type,
+                'source' => $isSaldoInicial ? 'saldo_inicial' : $entry->type,
                 'kind' => $kind,
                 'date' => $entry->date,
                 'description' => $defaultDesc,
@@ -405,7 +446,10 @@ class FinancialProjectController extends Controller
         if ($isAsset) {
             $currentBalance = (float) $cofrinho->currentEstimatedValue($quotePrice);
             $totalInvested = (float) $cofrinho->totalInvestedBrl();
-            $totalInterest = (float) $allEntries->where('type', FinancialProjectEntry::TYPE_INTEREST)->sum('amount');
+            $totalInterest = (float) $allEntries->where('type', FinancialProjectEntry::TYPE_INTEREST)->filter(function ($e) {
+                $noteNormalized = trim(mb_strtolower((string) ($e->note ?? '')));
+                return ! in_array($noteNormalized, ['ajuste', 'saldo inicial', 'saldo_inicial'], true);
+            })->sum('amount');
             $profit = $cofrinho->profitOrLoss($quotePrice);
             $profitPct = $cofrinho->profitOrLossPct($quotePrice);
         } else {
@@ -433,7 +477,7 @@ class FinancialProjectController extends Controller
             'currentQuote' => $currentQuote,
             'quotePrice' => $quotePrice,
             'totalAportes' => (float) $periodMovements
-                ->filter(fn ($m) => in_array(($m['kind'] ?? ''), ['aporte', 'juros'], true))
+                ->filter(fn ($m) => in_array(($m['kind'] ?? ''), ['aporte', 'juros', 'saldo_inicial'], true))
                 ->sum(fn ($m) => abs((float) ($m['amount'] ?? 0))),
             'totalRetiradas' => (float) $periodMovements
                 ->filter(fn ($m) => ($m['kind'] ?? '') === 'retirada')
@@ -510,9 +554,19 @@ class FinancialProjectController extends Controller
             $isInterest = $e->type === FinancialProjectEntry::TYPE_INTEREST;
             $isAporte = $e->type === FinancialProjectEntry::TYPE_ASSET_APORTE;
             $isWithdrawal = $e->type === FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL;
-            $isAjuste = trim(strtolower((string) ($e->note ?? ''))) === 'ajuste';
+            $noteNormalized = trim(mb_strtolower((string) ($e->note ?? '')));
+            $isAjuste = in_array($noteNormalized, ['ajuste', 'saldo inicial', 'saldo_inicial'], true);
 
-            $type = $isInterest ? 'juros' : ($isWithdrawal ? 'retirada' : ($isAjuste ? 'ajuste_saldo' : 'aporte'));
+            if ($isAjuste) {
+                $type = 'ajuste_saldo';
+            } elseif ($isInterest) {
+                $type = 'juros';
+            } elseif ($isWithdrawal) {
+                $type = 'retirada';
+            } else {
+                $type = 'aporte';
+            }
+
             $allMovements->push([
                 'date' => Carbon::parse($e->date)->format('Y-m-d'),
                 'month' => Carbon::parse($e->date)->format('Y-m'),
@@ -525,8 +579,14 @@ class FinancialProjectController extends Controller
 
         $sortedMovements = $allMovements->sortBy(fn ($m) => $m['date'] . '_' . sprintf('%08d', $m['id']))->values();
 
-        // 1. Gráfico de Juros (mensal e acumulado)
-        $interestEntries = $allEntries->where('type', FinancialProjectEntry::TYPE_INTEREST);
+        // 1. Gráfico de Juros (mensal e acumulado) - exclui saldos iniciais e ajustes
+        $interestEntries = $allEntries->filter(function (FinancialProjectEntry $e) {
+            if ($e->type !== FinancialProjectEntry::TYPE_INTEREST) {
+                return false;
+            }
+            $noteNormalized = trim(mb_strtolower((string) ($e->note ?? '')));
+            return ! in_array($noteNormalized, ['ajuste', 'saldo inicial', 'saldo_inicial'], true);
+        });
         $hasInterest = $interestEntries->isNotEmpty();
         $interestSeries = [];
         $cumulativeInterest = 0.0;

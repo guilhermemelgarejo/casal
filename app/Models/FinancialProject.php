@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class FinancialProject extends Model
 {
@@ -142,7 +143,8 @@ class FinancialProject extends Model
 
         foreach ($entries as $e) {
             $dateStr = $e->date instanceof \Carbon\Carbon ? $e->date->format('Y-m-d') : (string) $e->date;
-            $isAjuste = trim(strtolower((string) ($e->note ?? ''))) === 'ajuste';
+            $noteNormalized = trim(mb_strtolower((string) ($e->note ?? '')));
+            $isAjuste = in_array($noteNormalized, ['ajuste', 'saldo inicial', 'saldo_inicial'], true);
             $movements->push([
                 'date' => $dateStr,
                 'id' => (int) $e->id,
@@ -317,6 +319,10 @@ class FinancialProject extends Model
             ->where('couple_id', $this->couple_id)
             ->where('financial_project_id', $this->id)
             ->where('type', FinancialProjectEntry::TYPE_INTEREST)
+            ->where(function ($q) {
+                $q->whereNull('note')
+                    ->orWhereNotIn(DB::raw('LOWER(TRIM(note))'), ['ajuste', 'saldo inicial', 'saldo_inicial']);
+            })
             ->sum('amount');
     }
 
@@ -330,6 +336,10 @@ class FinancialProject extends Model
      */
     public function savedProgress(): float
     {
+        if (! $this->isCustomAsset()) {
+            return $this->fiatProfitMetrics()['saved'];
+        }
+
         return round($this->netDeposited() + $this->totalInterest(), 2);
     }
 

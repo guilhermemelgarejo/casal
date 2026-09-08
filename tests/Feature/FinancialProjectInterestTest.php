@@ -465,4 +465,89 @@ class FinancialProjectInterestTest extends TestCase
             ->assertSee('+R$ 109,13')
             ->assertSee('(+1,09%)');
     }
+
+    public function test_store_cofrinho_with_initial_balance_creates_entry_without_affecting_bank_accounts(): void
+    {
+        ['user' => $user, 'account' => $account] = $this->seedCofrinhoSetup();
+        $accountBalanceBefore = (float) $account->fresh()->balance;
+
+        $response = $this->actingAs($user)->post(route('cofrinhos.store'), [
+            'name' => 'Reserva Teste Inicial',
+            'asset_type' => 'fiat',
+            'initial_balance' => '3.924,34',
+            'initial_balance_date' => '2025-12-31',
+            'color' => '#0ea5e9',
+            'is_active' => '1',
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.index'));
+
+        $project = FinancialProject::where('name', 'Reserva Teste Inicial')->firstOrFail();
+
+        $this->assertDatabaseHas('financial_project_entries', [
+            'financial_project_id' => $project->id,
+            'couple_id' => $user->couple_id,
+            'type' => 'interest',
+            'amount' => 3924.34,
+            'date' => '2025-12-31 00:00:00',
+            'note' => 'Saldo inicial',
+        ]);
+
+        // Não gera nenhuma transação bancária e não altera saldo de contas
+        $this->assertSame(0, Transaction::where('financial_project_id', $project->id)->count());
+        $this->assertSame($accountBalanceBefore, (float) $account->fresh()->balance);
+
+        // O saldo inicial compõe o saldo e capital próprio, sem contar como juros/lucro
+        $metrics = $project->fiatProfitMetrics();
+        $this->assertSame(3924.34, $metrics['saved']);
+        $this->assertSame(3924.34, $metrics['principal']);
+        $this->assertSame(0.00, $metrics['profit']);
+        $this->assertSame(0.00, $metrics['profit_pct']);
+        $this->assertSame(0.00, $project->totalInterest());
+        $this->assertSame(3924.34, $project->savedProgress());
+    }
+
+    public function test_cofrinho_show_renders_initial_balance_with_correct_badge_and_excludes_from_interest_chart(): void
+    {
+        ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        // 1. Entrada de saldo inicial
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '3924.34',
+            'date' => '2025-12-31',
+            'note' => 'Saldo inicial',
+        ]);
+
+        // 2. Rendimento real posterior
+        FinancialProjectEntry::create([
+            'couple_id' => $user->couple_id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => 'interest',
+            'amount' => '12.91',
+            'date' => '2026-05-08',
+            'note' => 'Rendimento Maio',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cofrinhos.show', $project));
+        $response->assertOk();
+
+        // Deve exibir a badge Saldo Inicial e descrição adequada
+        $response->assertSee('Saldo Inicial');
+        $response->assertSee('Saldo inicial do cofrinho');
+
+        // Total de rendimentos exibido no show deve ser apenas o rendimento real (12.91)
+        $chartData = $response->viewData('chartData');
+        $this->assertSame(12.91, $response->viewData('totalInterest'));
+
+        // No gráfico de juros, o mês 2025-12 não deve somar o saldo inicial como juros
+        $decemberInterest = collect($chartData['interestSeries'])->firstWhere('month', '2025-12');
+        if ($decemberInterest !== null) {
+            $this->assertSame(0.0, (float) $decemberInterest['monthly']);
+        }
+    }
 }
