@@ -259,7 +259,7 @@ class FinancialProjectAssetTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('cofrinhos.movements', $project))
+            ->get(route('cofrinhos.show', $project))
             ->assertOk()
             ->assertSee('Bitcoin')
             ->assertSee('Compra DCA mensal')

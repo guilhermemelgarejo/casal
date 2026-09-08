@@ -15,12 +15,12 @@
     $cardAccent = $p->color ?: ($p->isBitcoin() ? '#f59e0b' : '#0d9488');
 @endphp
 <div class="col-md-6 col-xl-4">
-    <div class="card border-0 cofrinhos-project-card {{ ! $p->is_active ? 'cofrinhos-project-card--inactive' : '' }} d-flex flex-column h-100 shadow-sm" style="--cofrinho-accent: {{ e($cardAccent) }}; padding: 1.25rem;">
+    <div class="card border-0 cofrinhos-project-card {{ ! $p->is_active ? 'cofrinhos-project-card--inactive' : '' }} d-flex flex-column h-100 shadow-sm" data-cofrinho-url="{{ route('cofrinhos.show', $p) }}" style="--cofrinho-accent: {{ e($cardAccent) }}; padding: 1.25rem;">
         <div class="cofrinhos-project-card__accent" aria-hidden="true"></div>
         
         <!-- TOPO DO CARD: AVATAR, TÍTULO, BADGES E BOTÕES DE AÇÃO RÁPIDA -->
         <div class="cofrinhos-project-card__top d-flex align-items-start justify-content-between gap-2 mb-2">
-            <div class="d-flex align-items-start min-w-0 flex-grow-1" style="gap: 0.95rem;">
+            <a href="{{ route('cofrinhos.show', $p) }}" class="cofrinhos-project-card__header-link d-flex align-items-start min-w-0 flex-grow-1 text-decoration-none text-reset" style="gap: 0.95rem;" title="Ver visão geral de {{ $p->name }}">
                 <div class="cofrinhos-project-card__avatar flex-shrink-0" aria-hidden="true">
                     @if($p->isBitcoin())
                         <span class="fs-4 fw-bold">₿</span>
@@ -61,14 +61,14 @@
                         <p class="small text-secondary mb-0" style="font-size: 0.75rem;">Sem valor-alvo definido</p>
                     @endif
                 </div>
-            </div>
+            </a>
 
             <!-- Botões de Ação no Topo do Card (Histórico, Editar, Mais Opções) -->
             <div class="d-flex align-items-center gap-1 flex-shrink-0">
                 <a
-                    href="{{ route('cofrinhos.movements', $p) }}"
+                    href="{{ route('cofrinhos.show', $p) }}"
                     class="btn btn-sm btn-icon rounded-circle accounts-action-btn"
-                    title="Ver Histórico de Movimentações"
+                    title="Ver Detalhes e Evolução do Cofrinho"
                     style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;"
                 >
                     <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -135,7 +135,7 @@
         </div>
 
         <!-- CORPO PRINCIPAL DO CARD -->
-        <div class="d-flex flex-column flex-grow-1 justify-content-center py-2">
+        <a href="{{ route('cofrinhos.show', $p) }}" class="cofrinhos-project-card__body-link d-flex flex-column flex-grow-1 justify-content-center py-2 text-decoration-none text-reset" title="Ver visão geral de {{ $p->name }}">
             @if($isAsset)
                 {{-- Seção de Ativo / Cripto --}}
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
@@ -143,8 +143,9 @@
                     @if($quote && $p->is_active)
                         <div class="d-inline-flex align-items-center gap-2 px-2 py-0.5 rounded-pill" style="background: var(--dz-bg-card-subtle); border: 1px solid var(--dz-border); font-size: 0.7rem;">
                             <span>Cotação: <strong id="quote-price-{{ $p->id }}">{{ $quote->formattedPrice() }}</strong></span>
-                            <button
-                                type="button"
+                            <span
+                                role="button"
+                                tabindex="0"
                                 class="js-btn-refresh-quote btn btn-link p-0 text-decoration-none"
                                 data-asset-type="{{ $p->asset_type }}"
                                 data-asset-code="{{ $p->asset_code }}"
@@ -154,7 +155,7 @@
                                 data-cofrinho-id="{{ $p->id }}"
                                 title="Atualizar cotação agora"
                                 style="font-size: 0.85rem; color: var(--dz-primary); line-height: 1;"
-                            >⟳</button>
+                            >⟳</span>
                         </div>
                     @endif
                 </div>
@@ -218,7 +219,7 @@
                     </span>
                 </div>
             @endif
-        </div>
+        </a>
 
         <!-- RODAPÉ DO CARD: BOTÕES DE APORTE, RETIRADA E JUROS ALINHADOS NA MESMA LINHA -->
         <div class="d-flex align-items-center gap-2 pt-1 mt-auto">

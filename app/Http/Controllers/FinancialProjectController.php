@@ -283,10 +283,10 @@ class FinancialProjectController extends Controller
         $formattedPm = 'R$ ' . number_format((float) $cofrinho->asset_avg_price, 2, ',', '.');
         $msg = "Aporte de {$quantity} {$unitLabel} registrado. Novo preço médio: {$formattedPm}.";
 
-        return redirect()->route('cofrinhos.index')->with('success', $msg);
+        return redirect()->back(fallback: route('cofrinhos.index'))->with('success', $msg);
     }
 
-    public function movements(Request $request, FinancialProject $cofrinho): View
+    public function show(Request $request, FinancialProject $cofrinho): View
     {
         $this->authorizeCofrinho($cofrinho);
 
@@ -299,86 +299,100 @@ class FinancialProjectController extends Controller
             ? array_map('intval', explode('-', $period))
             : [null, null];
 
-        $transactionRows = $cofrinho->transactions()
+        $currentQuote = null;
+        if ($cofrinho->isCustomAsset() && ! empty($cofrinho->asset_code)) {
+            $currentQuote = $this->quoteService->getQuote($cofrinho->asset_type, $cofrinho->asset_code);
+        }
+        $quotePrice = $currentQuote?->price;
+
+        // Todas as transações e lançamentos para cálculo dos gráficos e métricas
+        $allTransactions = $cofrinho->transactions()
             ->with(['accountModel:id,name', 'user:id,name'])
-            ->when($period !== null, function ($query) use ($month, $year) {
-                $query
-                    ->where('reference_month', $month)
-                    ->where('reference_year', $year);
-            })
             ->orderByDesc('date')
             ->orderByDesc('id')
-            ->get()
-            ->map(function (Transaction $transaction): array {
-                $kind = $transaction->type === 'expense' ? 'aporte' : 'retirada';
-                $signedAmount = $transaction->type === 'expense'
-                    ? (float) $transaction->amount
-                    : (float) $transaction->amount * -1;
+            ->get();
 
-                return [
-                    'id' => (int) $transaction->id,
-                    'source' => 'transaction',
-                    'kind' => $kind,
-                    'date' => $transaction->date,
-                    'description' => $transaction->description,
-                    'note' => null,
-                    'account_name' => $transaction->accountModel?->name,
-                    'user_name' => $transaction->user?->name,
-                    'amount' => $signedAmount,
-                    'raw_amount' => (float) $transaction->amount,
-                    'asset_quantity' => null,
-                    'asset_unit_price' => null,
-                    'asset_resulting_avg_price' => null,
-                    'sort_key' => $this->buildMovementSortKey($transaction->date, $transaction->id, 2),
-                ];
-            });
-
-        $entryRows = FinancialProjectEntry::query()
+        $allEntries = FinancialProjectEntry::query()
             ->with('user:id,name')
             ->where('couple_id', Auth::user()->couple_id)
             ->where('financial_project_id', $cofrinho->id)
-            ->when($period !== null, function ($query) use ($month, $year) {
-                $query
-                    ->whereMonth('date', $month)
-                    ->whereYear('date', $year);
-            })
             ->orderByDesc('date')
             ->orderByDesc('id')
-            ->get()
-            ->map(function (FinancialProjectEntry $entry): array {
-                $isInterest = $entry->type === FinancialProjectEntry::TYPE_INTEREST;
-                $isAporte = $entry->type === FinancialProjectEntry::TYPE_ASSET_APORTE;
-                $isWithdrawal = $entry->type === FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL;
+            ->get();
 
-                $kind = $isInterest ? 'juros' : ($isWithdrawal ? 'retirada' : 'aporte');
-                $defaultDesc = $isInterest
-                    ? 'Juros lançados no cofrinho'
-                    : ($isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho');
+        // Dados para os gráficos de evolução
+        $chartData = $this->buildChartSeries($cofrinho, $allTransactions, $allEntries, $quotePrice);
 
-                return [
-                    'id' => (int) $entry->id,
-                    'source' => $entry->type,
-                    'kind' => $kind,
-                    'date' => $entry->date,
-                    'description' => $defaultDesc,
-                    'note' => $entry->note,
-                    'account_name' => null,
-                    'user_name' => $entry->user?->name,
-                    'amount' => (float) $entry->amount * ($isWithdrawal ? -1 : 1),
-                    'raw_amount' => (float) $entry->amount,
-                    'asset_quantity' => $entry->asset_quantity !== null ? (float) $entry->asset_quantity : null,
-                    'asset_unit_price' => $entry->asset_unit_price !== null ? (float) $entry->asset_unit_price : null,
-                    'asset_resulting_avg_price' => $entry->asset_resulting_avg_price !== null ? (float) $entry->asset_resulting_avg_price : null,
-                    'sort_key' => $this->buildMovementSortKey($entry->date, $entry->id, 1),
-                ];
-            });
+        // Movimentações filtradas para a tabela (se period estiver selecionado)
+        $filteredTransactions = $period !== null
+            ? $allTransactions->filter(fn (Transaction $t) => (int) $t->reference_month === $month && (int) $t->reference_year === $year)
+            : $allTransactions;
 
-        $allMovements = $this->sortMovements($transactionRows->concat($entryRows));
+        $transactionRows = $filteredTransactions->map(function (Transaction $transaction): array {
+            $kind = $transaction->type === 'expense' ? 'aporte' : 'retirada';
+            $signedAmount = $transaction->type === 'expense'
+                ? (float) $transaction->amount
+                : (float) $transaction->amount * -1;
+
+            return [
+                'id' => (int) $transaction->id,
+                'source' => 'transaction',
+                'kind' => $kind,
+                'date' => $transaction->date,
+                'description' => $transaction->description,
+                'note' => null,
+                'account_name' => $transaction->accountModel?->name,
+                'user_name' => $transaction->user?->name,
+                'amount' => $signedAmount,
+                'raw_amount' => (float) $transaction->amount,
+                'asset_quantity' => null,
+                'asset_unit_price' => null,
+                'asset_resulting_avg_price' => null,
+                'sort_key' => $this->buildMovementSortKey($transaction->date, $transaction->id, 2),
+            ];
+        });
+
+        $filteredEntries = $period !== null
+            ? $allEntries->filter(function (FinancialProjectEntry $e) use ($month, $year) {
+                $d = Carbon::parse($e->date);
+                return (int) $d->month === $month && (int) $d->year === $year;
+            })
+            : $allEntries;
+
+        $entryRows = $filteredEntries->map(function (FinancialProjectEntry $entry): array {
+            $isInterest = $entry->type === FinancialProjectEntry::TYPE_INTEREST;
+            $isAporte = $entry->type === FinancialProjectEntry::TYPE_ASSET_APORTE;
+            $isWithdrawal = $entry->type === FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL;
+
+            $kind = $isInterest ? 'juros' : ($isWithdrawal ? 'retirada' : 'aporte');
+            $defaultDesc = $isInterest
+                ? 'Juros lançados no cofrinho'
+                : ($isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho');
+
+            return [
+                'id' => (int) $entry->id,
+                'source' => $entry->type,
+                'kind' => $kind,
+                'date' => $entry->date,
+                'description' => $defaultDesc,
+                'note' => $entry->note,
+                'account_name' => null,
+                'user_name' => $entry->user?->name,
+                'amount' => (float) $entry->amount * ($isWithdrawal ? -1 : 1),
+                'raw_amount' => (float) $entry->amount,
+                'asset_quantity' => $entry->asset_quantity !== null ? (float) $entry->asset_quantity : null,
+                'asset_unit_price' => $entry->asset_unit_price !== null ? (float) $entry->asset_unit_price : null,
+                'asset_resulting_avg_price' => $entry->asset_resulting_avg_price !== null ? (float) $entry->asset_resulting_avg_price : null,
+                'sort_key' => $this->buildMovementSortKey($entry->date, $entry->id, 1),
+            ];
+        });
+
+        $periodMovements = $this->sortMovements($transactionRows->concat($entryRows));
         $page = max((int) $request->query('page', 1), 1);
         $perPage = 50;
         $movements = new LengthAwarePaginator(
-            $allMovements->forPage($page, $perPage)->values(),
-            $allMovements->count(),
+            $periodMovements->forPage($page, $perPage)->values(),
+            $periodMovements->count(),
             $perPage,
             $page,
             [
@@ -387,24 +401,212 @@ class FinancialProjectController extends Controller
             ]
         );
 
-        $currentQuote = null;
-        if ($cofrinho->isCustomAsset() && ! empty($cofrinho->asset_code)) {
-            $currentQuote = $this->quoteService->getQuote($cofrinho->asset_type, $cofrinho->asset_code);
+        $isAsset = $cofrinho->isCustomAsset();
+        if ($isAsset) {
+            $currentBalance = (float) $cofrinho->currentEstimatedValue($quotePrice);
+            $totalInvested = (float) $cofrinho->totalInvestedBrl();
+            $totalInterest = (float) $allEntries->where('type', FinancialProjectEntry::TYPE_INTEREST)->sum('amount');
+            $profit = $cofrinho->profitOrLoss($quotePrice);
+            $profitPct = $cofrinho->profitOrLossPct($quotePrice);
+        } else {
+            $metrics = $cofrinho->fiatProfitMetrics();
+            $currentBalance = (float) $metrics['saved'];
+            $totalInvested = (float) $metrics['principal'];
+            $totalInterest = (float) $metrics['profit'];
+            $profit = $totalInterest;
+            $profitPct = (float) $metrics['profit_pct'];
         }
 
-        return view('financial-projects.movements', [
+        $target = $cofrinho->target_amount !== null ? (float) $cofrinho->target_amount : null;
+        $targetPct = ($target !== null && $target > 0.00001) ? min(100.0, ($currentBalance / $target) * 100.0) : null;
+        $targetRemaining = $target !== null ? max(0.0, $target - $currentBalance) : null;
+
+        $regularAccounts = Auth::user()->couple->accounts()
+            ->where('kind', Account::KIND_REGULAR)
+            ->orderBy('name')
+            ->get();
+
+        return view('financial-projects.show', [
             'cofrinho' => $cofrinho,
             'period' => $period,
             'movements' => $movements,
             'currentQuote' => $currentQuote,
-            'totalAportes' => (float) $allMovements
-                ->filter(fn ($movement) => in_array(($movement['kind'] ?? ''), ['aporte', 'juros'], true))
-                ->sum(fn ($movement) => abs((float) ($movement['amount'] ?? 0))),
-            'totalRetiradas' => (float) $allMovements
-                ->filter(fn ($movement) => ($movement['kind'] ?? '') === 'retirada')
-                ->sum(fn ($movement) => abs((float) ($movement['amount'] ?? 0))),
-            'saldoPeriodo' => (float) $allMovements->sum(fn ($movement) => (float) ($movement['amount'] ?? 0)),
+            'quotePrice' => $quotePrice,
+            'totalAportes' => (float) $periodMovements
+                ->filter(fn ($m) => in_array(($m['kind'] ?? ''), ['aporte', 'juros'], true))
+                ->sum(fn ($m) => abs((float) ($m['amount'] ?? 0))),
+            'totalRetiradas' => (float) $periodMovements
+                ->filter(fn ($m) => ($m['kind'] ?? '') === 'retirada')
+                ->sum(fn ($m) => abs((float) ($m['amount'] ?? 0))),
+            'saldoPeriodo' => (float) $periodMovements->sum(fn ($m) => (float) ($m['amount'] ?? 0)),
+            'chartData' => $chartData,
+            'currentBalance' => $currentBalance,
+            'totalInvested' => $totalInvested,
+            'totalInterest' => $totalInterest,
+            'profit' => $profit,
+            'profitPct' => $profitPct,
+            'target' => $target,
+            'targetPct' => $targetPct,
+            'targetRemaining' => $targetRemaining,
+            'regularAccounts' => $regularAccounts,
         ]);
+    }
+
+    private function buildChartSeries(
+        FinancialProject $cofrinho,
+        Collection $allTransactions,
+        Collection $allEntries,
+        ?float $quotePrice
+    ): array {
+        $now = Carbon::now();
+
+        // Determina a data mais antiga para iniciar o eixo temporal
+        $earliestDate = $cofrinho->created_at ? Carbon::parse($cofrinho->created_at)->startOfMonth() : $now->copy()->subMonths(5)->startOfMonth();
+
+        foreach ($allTransactions as $t) {
+            $tDate = Carbon::parse($t->date)->startOfMonth();
+            if ($tDate->lt($earliestDate)) {
+                $earliestDate = $tDate;
+            }
+        }
+        foreach ($allEntries as $e) {
+            $eDate = Carbon::parse($e->date)->startOfMonth();
+            if ($eDate->lt($earliestDate)) {
+                $earliestDate = $eDate;
+            }
+        }
+
+        // Garante no mínimo 6 meses até o mês atual para ter curva representativa
+        $sixMonthsAgo = $now->copy()->subMonths(5)->startOfMonth();
+        if ($earliestDate->gt($sixMonthsAgo)) {
+            $earliestDate = $sixMonthsAgo;
+        }
+
+        // Limita a até 24 meses passados para não sobrecarregar
+        $maxPast = $now->copy()->subMonths(23)->startOfMonth();
+        if ($earliestDate->lt($maxPast)) {
+            $earliestDate = $maxPast;
+        }
+
+        $months = [];
+        $cursor = $earliestDate->copy();
+        while ($cursor->lte($now->copy()->startOfMonth())) {
+            $months[] = $cursor->format('Y-m');
+            $cursor->addMonth();
+        }
+
+        // Movimentos ordenados cronologicamente
+        $allMovements = collect();
+        foreach ($allTransactions as $t) {
+            $allMovements->push([
+                'date' => Carbon::parse($t->date)->format('Y-m-d'),
+                'month' => Carbon::parse($t->date)->format('Y-m'),
+                'type' => $t->type === 'expense' ? 'aporte' : 'retirada',
+                'amount' => (float) $t->amount,
+                'id' => (int) $t->id,
+            ]);
+        }
+        foreach ($allEntries as $e) {
+            $isInterest = $e->type === FinancialProjectEntry::TYPE_INTEREST;
+            $isAporte = $e->type === FinancialProjectEntry::TYPE_ASSET_APORTE;
+            $isWithdrawal = $e->type === FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL;
+            $isAjuste = trim(strtolower((string) ($e->note ?? ''))) === 'ajuste';
+
+            $type = $isInterest ? 'juros' : ($isWithdrawal ? 'retirada' : ($isAjuste ? 'ajuste_saldo' : 'aporte'));
+            $allMovements->push([
+                'date' => Carbon::parse($e->date)->format('Y-m-d'),
+                'month' => Carbon::parse($e->date)->format('Y-m'),
+                'type' => $type,
+                'amount' => (float) $e->amount,
+                'asset_quantity' => $e->asset_quantity !== null ? (float) $e->asset_quantity : null,
+                'id' => (int) $e->id,
+            ]);
+        }
+
+        $sortedMovements = $allMovements->sortBy(fn ($m) => $m['date'] . '_' . sprintf('%08d', $m['id']))->values();
+
+        // 1. Gráfico de Juros (mensal e acumulado)
+        $interestEntries = $allEntries->where('type', FinancialProjectEntry::TYPE_INTEREST);
+        $hasInterest = $interestEntries->isNotEmpty();
+        $interestSeries = [];
+        $cumulativeInterest = 0.0;
+
+        foreach ($months as $m) {
+            $monthlyInterest = (float) $interestEntries->filter(function ($e) use ($m) {
+                return Carbon::parse($e->date)->format('Y-m') === $m;
+            })->sum('amount');
+
+            $cumulativeInterest += $monthlyInterest;
+            $cDate = Carbon::createFromFormat('Y-m', $m);
+            $monthLabel = ucfirst($cDate->translatedFormat('M/y'));
+
+            $interestSeries[] = [
+                'month' => $m,
+                'label' => $monthLabel,
+                'monthly' => round($monthlyInterest, 2),
+                'cumulative' => round($cumulativeInterest, 2),
+            ];
+        }
+
+        // 2. Gráfico de Evolução Global
+        $balanceSeries = [];
+        $isAsset = $cofrinho->isCustomAsset();
+
+        foreach ($months as $m) {
+            $cDate = Carbon::createFromFormat('Y-m', $m);
+            $monthEnd = $cDate->copy()->endOfMonth()->format('Y-m-d');
+            $monthLabel = ucfirst($cDate->translatedFormat('M/y'));
+
+            $movementsUpToMonth = $sortedMovements->filter(fn ($mov) => $mov['date'] <= $monthEnd);
+
+            if ($isAsset) {
+                $qty = 0.0;
+                $invested = 0.0;
+                foreach ($movementsUpToMonth as $mov) {
+                    if ($mov['type'] === 'retirada') {
+                        $qty = max(0.0, $qty - ($mov['asset_quantity'] ?? 0));
+                        $invested = max(0.0, $invested - $mov['amount']);
+                    } else {
+                        $qty += ($mov['asset_quantity'] ?? 0);
+                        $invested += $mov['amount'];
+                    }
+                }
+                $balance = ($quotePrice !== null && $quotePrice > 0) ? ($qty * $quotePrice) : $invested;
+            } else {
+                $bal = 0.0;
+                foreach ($movementsUpToMonth as $mov) {
+                    if ($mov['type'] === 'aporte' || $mov['type'] === 'ajuste_saldo' || $mov['type'] === 'juros') {
+                        $bal += $mov['amount'];
+                    } elseif ($mov['type'] === 'retirada') {
+                        $bal = max(0.0, $bal - $mov['amount']);
+                    }
+                }
+                $balance = $bal;
+            }
+
+            $thisMonthMovs = $sortedMovements->filter(fn ($mov) => $mov['month'] === $m);
+            $monthlyAportes = (float) $thisMonthMovs->filter(fn ($mov) => in_array($mov['type'], ['aporte', 'ajuste_saldo']))->sum('amount');
+            $monthlyRetiradas = (float) $thisMonthMovs->filter(fn ($mov) => $mov['type'] === 'retirada')->sum('amount');
+            $monthlyJuros = (float) $thisMonthMovs->filter(fn ($mov) => $mov['type'] === 'juros')->sum('amount');
+            $monthlyNet = $monthlyAportes + $monthlyJuros - $monthlyRetiradas;
+
+            $balanceSeries[] = [
+                'month' => $m,
+                'label' => $monthLabel,
+                'balance' => round($balance, 2),
+                'net' => round($monthlyNet, 2),
+                'aportes' => round($monthlyAportes, 2),
+                'retiradas' => round($monthlyRetiradas, 2),
+                'juros' => round($monthlyJuros, 2),
+            ];
+        }
+
+        return [
+            'hasInterest' => $hasInterest,
+            'interestSeries' => $interestSeries,
+            'balanceSeries' => $balanceSeries,
+            'target' => $cofrinho->target_amount !== null ? (float) $cofrinho->target_amount : null,
+        ];
     }
 
     public function toggleActive(FinancialProject $cofrinho): RedirectResponse
@@ -449,15 +651,16 @@ class FinancialProjectController extends Controller
             'note' => $validated['note'] ?? null,
         ]);
 
-        return redirect()->route('cofrinhos.index')->with('success', 'Juros lançados no cofrinho.');
+        return redirect()->back(fallback: route('cofrinhos.show', $cofrinho))->with('success', 'Juros lançados no cofrinho.');
     }
 
     public function destroyInterest(FinancialProjectEntry $entry): RedirectResponse
     {
         abort_unless((int) $entry->couple_id === (int) Auth::user()->couple_id, 403);
+        $cofrinhoId = $entry->financial_project_id;
         $entry->delete();
 
-        return redirect()->back(fallback: route('cofrinhos.index'))->with('success', 'Juros removidos.');
+        return redirect()->back(fallback: route('cofrinhos.show', $cofrinhoId))->with('success', 'Juros removidos.');
     }
 
     private function authorizeCofrinho(FinancialProject $cofrinho): void

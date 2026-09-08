@@ -88,7 +88,7 @@ class FinancialProjectInterestTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('cofrinhos.movements', $project))
+            ->get(route('cofrinhos.show', $project))
             ->assertOk()
             ->assertSee('Todo o período')
             ->assertSee('Aporte de março')
@@ -127,7 +127,7 @@ class FinancialProjectInterestTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('cofrinhos.movements', ['cofrinho' => $project, 'period' => '2026-04']))
+            ->get(route('cofrinhos.show', ['cofrinho' => $project, 'period' => '2026-04']))
             ->assertOk()
             ->assertSee('Aporte de abril')
             ->assertDontSee('Aporte de março');
@@ -160,7 +160,7 @@ class FinancialProjectInterestTest extends TestCase
         }
 
         $this->actingAs($user)
-            ->get(route('cofrinhos.movements', $project))
+            ->get(route('cofrinhos.show', $project))
             ->assertOk()
             ->assertSee('51 registro(s)')
             ->assertSee('Registro visível 50')
@@ -185,16 +185,16 @@ class FinancialProjectInterestTest extends TestCase
 
         // Verifica que o botão de exclusão aparece na página de movimentações
         $this->actingAs($user)
-            ->get(route('cofrinhos.movements', $project))
+            ->get(route('cofrinhos.show', $project))
             ->assertOk()
             ->assertSee('Rendimento teste')
             ->assertSee(route('cofrinhos.interest.destroy', $entry));
 
         // Exclui os juros
         $this->actingAs($user)
-            ->from(route('cofrinhos.movements', $project))
+            ->from(route('cofrinhos.show', $project))
             ->delete(route('cofrinhos.interest.destroy', $entry))
-            ->assertRedirect(route('cofrinhos.movements', $project))
+            ->assertRedirect(route('cofrinhos.show', $project))
             ->assertSessionHas('success', 'Juros removidos.');
 
         $this->assertDatabaseMissing('financial_project_entries', [

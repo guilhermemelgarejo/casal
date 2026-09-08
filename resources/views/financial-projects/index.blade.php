@@ -685,6 +685,25 @@
                     });
                 });
 
+                // Navegacao ao clicar na regiao do card do cofrinho
+                document.addEventListener('click', function (e) {
+                    if (e.target.closest('button, input, select, textarea, form, .dropdown, [data-bs-toggle], [data-bs-target], .accounts-action-btn, .js-btn-refresh-quote')) {
+                        return;
+                    }
+
+                    const card = e.target.closest('.cofrinhos-project-card');
+                    if (!card) return;
+
+                    if (e.target.closest('a')) {
+                        return;
+                    }
+
+                    const url = card.getAttribute('data-cofrinho-url');
+                    if (url) {
+                        window.location.href = url;
+                    }
+                });
+
                 if (bs && bs.Modal) {
                     @if ($openCofrinhoCreate)
                         const m = createModal ? bs.Modal.getOrCreateInstance(createModal) : null;
