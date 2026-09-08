@@ -85,14 +85,16 @@
     });
 
     $totalSaved = (float) $cofrinhoRows->sum('saved');
-    $totalTarget = (float) $cofrinhoRows->sum(fn ($row) => (float) ($row['target'] ?? 0));
     $activeRows = $cofrinhoRows->where('is_active', true);
     $inactiveRows = $cofrinhoRows->where('is_active', false);
     $activeCount = $activeRows->count();
     $inactiveCount = $inactiveRows->count();
-    $projectsWithTarget = $cofrinhoRows->filter(fn ($row) => $row['target'] !== null)->count();
-    $completedProjects = $cofrinhoRows->filter(fn ($row) => $row['is_complete'])->count();
-    $totalPct = $totalTarget > 0.00001 ? min(100.0, ($totalSaved / $totalTarget) * 100.0) : null;
+
+    $activeTargetRows = $activeRows->filter(fn ($row) => $row['target'] !== null && (float) $row['target'] > 0);
+    $projectsWithTarget = $activeTargetRows->count();
+    $targetSaved = (float) $activeTargetRows->sum('saved');
+    $totalTarget = (float) $activeTargetRows->sum(fn ($row) => (float) ($row['target'] ?? 0));
+    $targetPct = $totalTarget > 0.00001 ? min(100.0, ($targetSaved / $totalTarget) * 100.0) : null;
 @endphp
 <x-app-layout>
     <x-slot name="header">
@@ -133,19 +135,9 @@
                     <div class="dz-kpi-card__value text-primary dz-privacy-blur">
                         R$ {{ number_format($totalSaved, 2, ',', '.') }}
                     </div>
-                    @if($totalPct !== null)
-                        <div class="dz-progress-bar">
-                            <div class="dz-progress-bar__fill dz-progress-bar__fill--primary" style="width: {{ $totalPct }}%;"></div>
-                        </div>
-                        <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
-                            <span>{{ number_format($totalPct, 1, ',', '.') }}% do total das metas</span>
-                            <span class="dz-privacy-blur">Meta: R$ {{ number_format($totalTarget, 2, ',', '.') }}</span>
-                        </div>
-                    @else
-                        <div class="dz-kpi-card__footer">
-                            <span>Soma de todos os cofrinhos</span>
-                        </div>
-                    @endif
+                    <div class="dz-kpi-card__footer">
+                        <span>Soma de todos os cofrinhos</span>
+                    </div>
                 </div>
             </div>
 
@@ -170,21 +162,31 @@
                 </div>
             </div>
 
-            <!-- Metas Concluídas -->
+            <!-- Patrimônio das Metas -->
             <div class="dz-card dz-kpi-card">
                 <div class="dz-kpi-card__head">
-                    <span class="dz-kpi-card__label">Metas Concluídas</span>
+                    <span class="dz-kpi-card__label">Patrimônio das Metas</span>
                     <div class="dz-kpi-card__icon-box" style="background: rgba(16, 185, 129, 0.15); color: #059669;">
                         🏆
                     </div>
                 </div>
                 <div>
-                    <div class="dz-kpi-card__value text-success">
-                        {{ $completedProjects }}
+                    <div class="dz-kpi-card__value text-success dz-privacy-blur">
+                        R$ {{ number_format($targetSaved, 2, ',', '.') }}
                     </div>
-                    <div class="dz-kpi-card__footer">
-                        <span>Objetivos atingidos com 100%</span>
-                    </div>
+                    @if($targetPct !== null)
+                        <div class="dz-progress-bar">
+                            <div class="dz-progress-bar__fill dz-progress-bar__fill--success" style="width: {{ $targetPct }}%;"></div>
+                        </div>
+                        <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
+                            <span>{{ number_format($targetPct, 1, ',', '.') }}% concluído</span>
+                            <span class="dz-privacy-blur">Meta: R$ {{ number_format($totalTarget, 2, ',', '.') }}</span>
+                        </div>
+                    @else
+                        <div class="dz-kpi-card__footer">
+                            <span>Nenhuma meta ativa definida</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 

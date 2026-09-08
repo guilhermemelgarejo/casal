@@ -360,4 +360,42 @@ class FinancialProjectDeactivationTest extends TestCase
         $response->assertSee('Cofrinhos desativados');
         $response->assertSee('cofrinhos-desativados-collapse');
     }
+
+    public function test_patrimonio_total_meta_does_not_count_deactivated_cofrinhos(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleWithUser();
+
+        $active = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Cofrinho Ativo com Meta',
+            'target_amount' => '5000.00',
+            'is_active' => true,
+        ]);
+
+        $inactive = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Cofrinho Desativado com Meta',
+            'target_amount' => '20000.00',
+            'is_active' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cofrinhos.index'));
+        $response->assertOk();
+
+        // Card de Patrimônio Total separado das metas
+        $response->assertSee('Patrimônio Total');
+        $response->assertSee('Soma de todos os cofrinhos');
+
+        // Card de Patrimônio das Metas
+        $response->assertSee('Patrimônio das Metas');
+        $response->assertSee('0,0% concluído');
+
+        // Meta deve somar apenas os ativos (R$ 5.000,00), e NÃO os desativados (R$ 25.000,00)
+        $response->assertSee('Meta: R$ 5.000,00', false);
+        $response->assertDontSee('Meta: R$ 25.000,00', false);
+
+        // Subtítulo do card de Cofrinhos Ativos deve contar apenas ativos com meta (1 com meta definida)
+        $response->assertSee('1 com meta definida', false);
+        $response->assertDontSee('2 com meta definida', false);
+    }
 }
