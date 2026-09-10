@@ -108,7 +108,11 @@
                                     + {{ $money($forecast['planned_income']) }}
                                 </div>
                                 <div style="font-size: 0.7rem; color: var(--dz-text-secondary); margin-top: 2px;">
-                                    {{ ucfirst($forecast['target_month_label']) }}
+                                    @if (! empty($forecast['recurring_incomes_count']))
+                                        Base + {{ $forecast['recurring_incomes_count'] }} recorrente(s)
+                                    @else
+                                        {{ ucfirst($forecast['target_month_label']) }}
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -163,10 +167,43 @@
                     </div>
 
                     <!-- Listagem Detalhada de Itens -->
+                    @php
+                        $hasRecIncomes = ! empty($forecast['recurring_incomes_items']);
+                        $detailColClass = $hasRecIncomes ? 'col-12 col-md-6 col-lg-3' : 'col-12 col-md-4';
+                    @endphp
                     <div class="p-3 rounded-3" style="background: var(--dz-bg-subtle, rgba(0,0,0,0.015)); border: 1px solid var(--dz-border);">
                         <div class="row g-3">
+                            @if ($hasRecIncomes)
+                                <!-- Receitas Recorrentes Detalhadas -->
+                                <div class="{{ $detailColClass }}">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="fw-bold small" style="color: var(--dz-text-title);">🟢 Receitas</span>
+                                        <a href="{{ route('recurring-transactions.index') }}" style="font-size: 0.7rem; color: var(--dz-primary); text-decoration: none;">Gerenciar ↗</a>
+                                    </div>
+                                    <ul class="list-unstyled mb-0" style="font-size: 0.75rem;">
+                                        @if ((float) ($forecast['base_planned_income'] ?? 0) > 0)
+                                            <li class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">
+                                                <span class="text-truncate me-2 text-secondary">Renda planejada</span>
+                                                <strong class="dz-privacy-blur text-success">{{ $money($forecast['base_planned_income']) }}</strong>
+                                            </li>
+                                        @endif
+                                        @foreach ($forecast['recurring_incomes_items'] as $recInc)
+                                            <li class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">
+                                                <span class="text-truncate me-2" title="{{ $recInc['description'] }}">
+                                                    {{ $recInc['description'] }}
+                                                    @if ($recInc['day_of_month'])
+                                                        <span class="text-secondary" style="font-size: 0.68rem;">(dia {{ $recInc['day_of_month'] }})</span>
+                                                    @endif
+                                                </span>
+                                                <strong class="dz-privacy-blur text-success">+ {{ $money($recInc['amount']) }}</strong>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
                             <!-- Faturas Detalhadas -->
-                            <div class="col-12 col-md-4">
+                            <div class="{{ $detailColClass }}">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold small" style="color: var(--dz-text-title);">💳 Faturas de Cartão</span>
                                     <a href="{{ route('credit-card-statements.index') }}" style="font-size: 0.7rem; color: var(--dz-primary); text-decoration: none;">Ver todas ↗</a>

@@ -25,6 +25,10 @@ final class DailyBudgetForecast
      *     target_year: int,
      *     target_month: int,
      *     target_month_label: string,
+     *     base_planned_income: float,
+     *     recurring_incomes_total: float,
+     *     recurring_incomes_count: int,
+     *     recurring_incomes_items: array<int, array{id: int, description: string, day_of_month: ?int, is_multiple: bool, amount: float}>,
      *     planned_income: float,
      *     has_planned_income_configured: bool,
      *     card_invoices_total: float,
@@ -65,27 +69,36 @@ final class DailyBudgetForecast
         $targetMonth = (int) $targetCarbon->month;
         $targetMonthLabel = $targetCarbon->locale(app()->getLocale())->translatedFormat('F \d\e Y');
 
-        // 1. Receita Prevista
-        $plannedIncome = (float) $couple->resolvePlannedMonthlyIncomeForMonth($targetYear, $targetMonth);
-        $hasPlannedConfigured = $plannedIncome > 0.005;
-
-        // Fallback se renda planejada estiver zerada: verifica renda do mês visto ou recorrentes de renda ativas
-        if (! $hasPlannedConfigured) {
-            $altIncome = (float) $couple->resolvePlannedMonthlyIncomeForMonth($viewYear, $viewMonth);
-            if ($altIncome > 0.005) {
-                $plannedIncome = $altIncome;
-                $hasPlannedConfigured = true;
-            } else {
-                $recurringIncome = (float) $couple->recurringTransactions()
-                    ->where('is_active', true)
-                    ->where('type', 'income')
-                    ->sum('amount');
-                if ($recurringIncome > 0.005) {
-                    $plannedIncome = $recurringIncome;
-                    $hasPlannedConfigured = true;
-                }
-            }
+        // 1. Receita Prevista (Renda Planejada + Receitas Recorrentes Ativas)
+        $basePlannedIncome = (float) $couple->resolvePlannedMonthlyIncomeForMonth($targetYear, $targetMonth);
+        if ($basePlannedIncome <= 0.005) {
+            $basePlannedIncome = (float) $couple->resolvePlannedMonthlyIncomeForMonth($viewYear, $viewMonth);
         }
+
+        $recurringIncomes = $couple->recurringTransactions()
+            ->where('is_active', true)
+            ->where('type', 'income')
+            ->with('account')
+            ->get();
+
+        $recurringIncomesTotal = 0.0;
+        $recurringIncomeItems = [];
+
+        foreach ($recurringIncomes as $rInc) {
+            $amt = (float) $rInc->amount;
+            $recurringIncomesTotal += $amt;
+            $recurringIncomeItems[] = [
+                'id' => (int) $rInc->id,
+                'description' => (string) $rInc->description,
+                'day_of_month' => $rInc->day_of_month !== null ? (int) $rInc->day_of_month : null,
+                'is_multiple' => (bool) $rInc->is_multiple,
+                'amount' => round($amt, 2),
+            ];
+        }
+
+        $recurringIncomesTotal = round($recurringIncomesTotal, 2);
+        $plannedIncome = round($basePlannedIncome + $recurringIncomesTotal, 2);
+        $hasPlannedConfigured = $plannedIncome > 0.005;
 
         // 2. Faturas de Cartão do Próximo Mês
         $cardAccounts = $couple->accounts()->where('kind', Account::KIND_CREDIT_CARD)->get();
@@ -210,6 +223,10 @@ final class DailyBudgetForecast
             'target_year' => $targetYear,
             'target_month' => $targetMonth,
             'target_month_label' => $targetMonthLabel,
+            'base_planned_income' => $basePlannedIncome,
+            'recurring_incomes_total' => $recurringIncomesTotal,
+            'recurring_incomes_count' => count($recurringIncomeItems),
+            'recurring_incomes_items' => $recurringIncomeItems,
             'planned_income' => $plannedIncome,
             'has_planned_income_configured' => $hasPlannedConfigured,
             'card_invoices_total' => $cardInvoicesTotal,

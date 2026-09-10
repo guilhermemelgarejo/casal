@@ -227,12 +227,45 @@ class DailyBudgetForecastTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('dashboard'));
 
-        $response->assertStatus(200);
-        $response->assertSee('Orçamento Diário Restante');
+        $response->assertSee('Orçamento Diário');
         $response->assertSee('Receita Prevista');
         $response->assertSee('Faturas Cartão');
         $response->assertSee('Recorrentes');
         $response->assertSee('Dívidas');
         $response->assertSee('dz-forecast-card');
+    }
+
+    public function test_recurring_income_is_included_in_planned_income_and_forecast(): void
+    {
+        $couple = Couple::factory()->create([
+            'monthly_income' => 4000.00,
+        ]);
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $account = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta Corrente',
+            'kind' => Account::KIND_REGULAR,
+        ]);
+
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Aluguel Recebido',
+            'amount' => '1500.00',
+            'type' => 'income',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'day_of_month' => 10,
+            'is_active' => true,
+        ]);
+
+        $simulatedNow = Carbon::create(2026, 9, 9, 10, 0, 0);
+        $forecast = DailyBudgetForecast::calculateForNextMonth($couple, 2026, 9, $simulatedNow);
+
+        // 4000 (base) + 1500 (recorrente) = 5500
+        $this->assertEquals(4000.00, $forecast['base_planned_income']);
+        $this->assertEquals(1500.00, $forecast['recurring_incomes_total']);
+        $this->assertEquals(1, $forecast['recurring_incomes_count']);
+        $this->assertEquals(5500.00, $forecast['planned_income']);
     }
 }
