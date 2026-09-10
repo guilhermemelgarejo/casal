@@ -377,27 +377,42 @@
                                         <span class="small text-secondary" style="font-size: 0.72rem;">Renda planejada mensal e receitas recorrentes ativas</span>
                                         <a href="{{ route('recurring-transactions.index') }}" style="font-size: 0.72rem; color: var(--dz-primary); text-decoration: none; font-weight: 700;">Gerenciar receitas ↗</a>
                                     </div>
+                                    @php
+                                        $allIncomeEntries = [];
+                                        if ((float) ($forecast['base_planned_income'] ?? 0) > 0) {
+                                            $allIncomeEntries[] = [
+                                                'icon' => '💼',
+                                                'title' => 'Renda Mensal Planejada',
+                                                'subtitle' => '(salário base do casal)',
+                                                'badge' => null,
+                                                'amount' => (float) $forecast['base_planned_income'],
+                                            ];
+                                        }
+                                        foreach ($forecast['recurring_incomes_items'] as $recInc) {
+                                            $allIncomeEntries[] = [
+                                                'icon' => '🟢',
+                                                'title' => $recInc['description'],
+                                                'subtitle' => null,
+                                                'badge' => $recInc['day_of_month'] ? 'dia ' . $recInc['day_of_month'] : null,
+                                                'amount' => (float) $recInc['amount'],
+                                            ];
+                                        }
+                                        usort($allIncomeEntries, fn ($a, $b) => $b['amount'] <=> $a['amount']);
+                                    @endphp
                                     <ul class="list-group list-group-flush mb-0">
-                                        @if ((float) ($forecast['base_planned_income'] ?? 0) > 0)
+                                        @foreach ($allIncomeEntries as $incItem)
                                             <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center border-bottom border-light-subtle" style="background: transparent;">
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <span style="font-size: 0.95rem;">💼</span>
-                                                    <span class="fw-semibold text-body">Renda Mensal Planejada</span>
-                                                    <span class="text-secondary small ms-1" style="font-size: 0.7rem;">(salário base do casal)</span>
-                                                </div>
-                                                <strong class="dz-privacy-blur text-success">+ {{ $money($forecast['base_planned_income']) }}</strong>
-                                            </li>
-                                        @endif
-                                        @foreach ($forecast['recurring_incomes_items'] as $recInc)
-                                            <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center border-bottom border-light-subtle" style="background: transparent;">
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <span style="font-size: 0.95rem;">🟢</span>
-                                                    <span class="fw-semibold text-body">{{ $recInc['description'] }}</span>
-                                                    @if ($recInc['day_of_month'])
-                                                        <span class="badge rounded-pill bg-light text-secondary border ms-1" style="font-size: 0.65rem;">dia {{ $recInc['day_of_month'] }}</span>
+                                                    <span style="font-size: 0.95rem;">{{ $incItem['icon'] }}</span>
+                                                    <span class="fw-semibold text-body">{{ $incItem['title'] }}</span>
+                                                    @if ($incItem['badge'])
+                                                        <span class="badge rounded-pill bg-light text-secondary border ms-1" style="font-size: 0.65rem;">{{ $incItem['badge'] }}</span>
+                                                    @endif
+                                                    @if ($incItem['subtitle'])
+                                                        <span class="text-secondary small ms-1" style="font-size: 0.7rem;">{{ $incItem['subtitle'] }}</span>
                                                     @endif
                                                 </div>
-                                                <strong class="dz-privacy-blur text-success">+ {{ $money($recInc['amount']) }}</strong>
+                                                <strong class="dz-privacy-blur text-success">+ {{ $money($incItem['amount']) }}</strong>
                                             </li>
                                         @endforeach
                                     </ul>

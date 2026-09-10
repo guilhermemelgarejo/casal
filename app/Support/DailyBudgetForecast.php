@@ -98,6 +98,7 @@ final class DailyBudgetForecast
         }
 
         $recurringIncomesTotal = round($recurringIncomesTotal, 2);
+        usort($recurringIncomeItems, fn (array $a, array $b): int => $b['amount'] <=> $a['amount']);
         $plannedIncome = round($basePlannedIncome + $recurringIncomesTotal, 2);
         $hasPlannedConfigured = $plannedIncome > 0.005;
 
@@ -136,6 +137,8 @@ final class DailyBudgetForecast
             }
         }
 
+        usort($cardInvoiceItems, fn (array $a, array $b): int => $b['amount'] <=> $a['amount']);
+
         // 3. Despesas Recorrentes do Próximo Mês
         $recurringExpenses = $couple->recurringTransactions()
             ->where('is_active', true)
@@ -166,6 +169,8 @@ final class DailyBudgetForecast
             ];
         }
 
+        usort($recurringItems, fn (array $a, array $b): int => $b['amount'] <=> $a['amount']);
+
         // 4. Parcelas de Dívidas do Próximo Mês
         $debtInstallments = DebtInstallment::query()
                 ->where('couple_id', $couple->id)
@@ -191,6 +196,8 @@ final class DailyBudgetForecast
                 'amount' => round($instAmount, 2),
             ];
         }
+
+        usort($debtItems, fn (array $a, array $b): int => $b['amount'] <=> $a['amount']);
 
         // 5. Consolidação
         $cardInvoicesTotal = round($cardInvoicesTotal, 2);

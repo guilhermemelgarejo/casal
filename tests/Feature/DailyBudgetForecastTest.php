@@ -330,4 +330,148 @@ class DailyBudgetForecastTest extends TestCase
         $this->assertEquals(0.00, $forecast['recurring_incomes_total']);
         $this->assertEquals(3000.00, $forecast['planned_income']);
     }
+
+    public function test_forecast_items_are_sorted_by_amount_descending(): void
+    {
+        $couple = Couple::factory()->create(['monthly_income' => 5000.00]);
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $account = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta Corrente',
+            'kind' => Account::KIND_REGULAR,
+        ]);
+
+        $card1 = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Cartão Menor',
+            'kind' => Account::KIND_CREDIT_CARD,
+        ]);
+
+        $card2 = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Cartão Maior',
+            'kind' => Account::KIND_CREDIT_CARD,
+        ]);
+
+        $cat = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Geral',
+            'type' => 'expense',
+        ]);
+
+        // Cartão Menor: 200, Cartão Maior: 800
+        Transaction::create([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card1->id,
+            'category_id' => $cat->id,
+            'type' => 'expense',
+            'amount' => '200.00',
+            'date' => '2026-09-01',
+            'reference_month' => 10,
+            'reference_year' => 2026,
+            'description' => 'Gasto menor',
+        ]);
+        Transaction::create([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card2->id,
+            'category_id' => $cat->id,
+            'type' => 'expense',
+            'amount' => '800.00',
+            'date' => '2026-09-01',
+            'reference_month' => 10,
+            'reference_year' => 2026,
+            'description' => 'Gasto maior',
+        ]);
+
+        // Recorrentes: 50.00 e 350.00
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Assinatura Pequena',
+            'amount' => '50.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'is_active' => true,
+        ]);
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Assinatura Grande',
+            'amount' => '350.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'is_active' => true,
+        ]);
+
+        // Dívidas: 150.00 e 900.00
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'name' => 'Dívidas',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => '1050.00',
+            'installment_amount' => '150.00',
+            'total_installments' => 2,
+            'is_active' => true,
+        ]);
+        DebtInstallment::create([
+            'couple_id' => $couple->id,
+            'debt_id' => $debt->id,
+            'installment_number' => 1,
+            'due_date' => '2026-10-10',
+            'original_amount' => '150.00',
+            'amount' => '150.00',
+            'status' => DebtInstallment::STATUS_PENDING,
+        ]);
+        DebtInstallment::create([
+            'couple_id' => $couple->id,
+            'debt_id' => $debt->id,
+            'installment_number' => 2,
+            'due_date' => '2026-10-20',
+            'original_amount' => '900.00',
+            'amount' => '900.00',
+            'status' => DebtInstallment::STATUS_PENDING,
+        ]);
+
+        // Receitas recorrentes: 300.00 e 1200.00
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Rendimento Menor',
+            'amount' => '300.00',
+            'type' => 'income',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'is_active' => true,
+        ]);
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Rendimento Maior',
+            'amount' => '1200.00',
+            'type' => 'income',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'is_active' => true,
+        ]);
+
+        $forecast = DailyBudgetForecast::calculateForNextMonth($couple, 2026, 9, Carbon::create(2026, 9, 9));
+
+        // Verificando ordenação decrescente de faturas
+        $this->assertEquals(800.00, $forecast['card_invoices_items'][0]['amount']);
+        $this->assertEquals(200.00, $forecast['card_invoices_items'][1]['amount']);
+
+        // Verificando ordenação decrescente de despesas recorrentes
+        $this->assertEquals(350.00, $forecast['recurring_expenses_items'][0]['amount']);
+        $this->assertEquals(50.00, $forecast['recurring_expenses_items'][1]['amount']);
+
+        // Verificando ordenação decrescente de dívidas
+        $this->assertEquals(900.00, $forecast['debt_installments_items'][0]['amount']);
+        $this->assertEquals(150.00, $forecast['debt_installments_items'][1]['amount']);
+
+        // Verificando ordenação decrescente de receitas recorrentes
+        $this->assertEquals(1200.00, $forecast['recurring_incomes_items'][0]['amount']);
+        $this->assertEquals(300.00, $forecast['recurring_incomes_items'][1]['amount']);
+    }
 }
