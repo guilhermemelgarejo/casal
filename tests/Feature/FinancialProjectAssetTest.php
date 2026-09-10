@@ -267,4 +267,65 @@ class FinancialProjectAssetTest extends TestCase
             ->assertSee('R$ 500.000,00')
             ->assertSee('R$ 311.320,75');
     }
+
+    public function test_can_store_asset_aporte_with_any_custom_or_formatted_price(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'BTC Carteira Fria',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0',
+            'asset_avg_price' => '0',
+        ]);
+
+        // Aporte informando cotação formatada com pontos e vírgulas e qualquer valor
+        $response = $this->actingAs($user)->post(route('cofrinhos.asset-aporte.store', $project), [
+            'amount' => '1.500,00',
+            'asset_unit_price' => '394.500,50',
+            'date' => '2026-09-10',
+            'note' => 'Compra livre sem restrição de cotação',
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.index'));
+
+        $entry = FinancialProjectEntry::where('financial_project_id', $project->id)->first();
+        $this->assertNotNull($entry);
+        $this->assertEquals(1500.00, (float) $entry->amount);
+        $this->assertEquals(394500.50, (float) $entry->asset_unit_price);
+        $this->assertGreaterThan(0, (float) $entry->asset_quantity);
+    }
+
+    public function test_auto_calculates_price_when_amount_and_quantity_are_provided(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'BTC Carteira Fria 2',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0',
+            'asset_avg_price' => '0',
+        ]);
+
+        // Informa valor e quantidade sem cotação
+        $response = $this->actingAs($user)->post(route('cofrinhos.asset-aporte.store', $project), [
+            'amount' => '1000.00',
+            'asset_quantity' => '0.00250000',
+            'date' => '2026-09-10',
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.index'));
+
+        $entry = FinancialProjectEntry::where('financial_project_id', $project->id)->first();
+        $this->assertNotNull($entry);
+        $this->assertEquals(1000.00, (float) $entry->amount);
+        $this->assertEquals(0.0025, (float) $entry->asset_quantity);
+        $this->assertEquals(400000.00, (float) $entry->asset_unit_price);
+    }
 }
+
+

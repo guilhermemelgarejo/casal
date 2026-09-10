@@ -321,9 +321,8 @@
                             <x-text-input
                                 id="asset_amount_{{ $p->id }}"
                                 name="amount"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
+                                type="text"
+                                inputmode="decimal"
                                 class="mt-1 rounded-3 js-aporte-amount"
                                 placeholder="0,00"
                                 required
@@ -336,12 +335,11 @@
                                 <x-text-input
                                     id="asset_price_{{ $p->id }}"
                                     name="asset_unit_price"
-                                    type="number"
-                                    step="0.01"
-                                    min="0.0001"
+                                    type="text"
+                                    inputmode="decimal"
                                     class="mt-1 rounded-3 js-aporte-price"
                                     value="{{ $quotePrice !== null ? number_format($quotePrice, 2, '.', '') : '' }}"
-                                    placeholder="Cotação no momento"
+                                    placeholder="Qualquer valor de cotação"
                                 />
                             </div>
                             <div class="col-6">
@@ -349,9 +347,8 @@
                                 <x-text-input
                                     id="asset_quantity_{{ $p->id }}"
                                     name="asset_quantity"
-                                    type="number"
-                                    step="0.00000001"
-                                    min="0.00000001"
+                                    type="text"
+                                    inputmode="decimal"
                                     class="mt-1 rounded-3 js-aporte-quantity"
                                     placeholder="0.00000000"
                                     required

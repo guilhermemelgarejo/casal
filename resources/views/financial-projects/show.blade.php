@@ -771,18 +771,18 @@
                             <div class="row g-2">
                                 <div class="col-6">
                                     <x-input-label for="modal-aporte-amount" value="Valor total (R$)" />
-                                    <x-text-input id="modal-aporte-amount" name="amount" type="number" step="0.01" min="0.01" class="mt-1 rounded-3" placeholder="0,00" required />
+                                    <x-text-input id="modal-aporte-amount" name="amount" type="text" inputmode="decimal" class="mt-1 rounded-3 js-show-aporte-amount" placeholder="0,00" required />
                                 </div>
                                 <div class="col-6">
-                                    <x-input-label for="modal-aporte-price" value="Preço unitário pago (R$)" />
-                                    <x-text-input id="modal-aporte-price" name="price" type="number" step="0.01" min="0.01" class="mt-1 rounded-3" value="{{ $quotePrice !== null ? number_format((float) $quotePrice, 2, '.', '') : '' }}" placeholder="0,00" />
+                                    <x-input-label for="modal-aporte-price" value="Cotação / Preço unitário (R$)" />
+                                    <x-text-input id="modal-aporte-price" name="asset_unit_price" type="text" inputmode="decimal" class="mt-1 rounded-3 js-show-aporte-price" value="{{ $quotePrice !== null ? number_format((float) $quotePrice, 2, '.', '') : '' }}" placeholder="Qualquer valor de cotação" />
                                 </div>
                             </div>
 
                             <div class="row g-2">
                                 <div class="col-6">
                                     <x-input-label for="modal-aporte-quantity" value="Quantidade ({{ $cofrinho->assetUnitLabel() }})" />
-                                    <x-text-input id="modal-aporte-quantity" name="quantity" type="number" step="0.00000001" min="0.00000001" class="mt-1 rounded-3" placeholder="0.00000000" />
+                                    <x-text-input id="modal-aporte-quantity" name="asset_quantity" type="text" inputmode="decimal" class="mt-1 rounded-3 js-show-aporte-quantity" placeholder="0.00000000" />
                                 </div>
                                 <div class="col-6">
                                     <x-input-label for="modal-aporte-date" value="Data do aporte" />
@@ -819,18 +819,105 @@
 
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const bs = typeof bootstrap !== 'undefined' ? bootstrap : window.bootstrap;
-                if (bs?.Tooltip) {
-                    document.querySelectorAll('.cofrinhos-chart-svg [data-bs-toggle="tooltip"]').forEach(function (el) {
-                        bs.Tooltip.getOrCreateInstance(el, {
-                            container: 'body',
-                            html: true,
-                            trigger: 'hover focus'
-                        });
-                    });
+            (function () {
+                function initShowPage() {
+                    const bs = typeof bootstrap !== 'undefined' ? bootstrap : window.bootstrap;
+                    if (bs?.Tooltip) {
+                        try {
+                            document.querySelectorAll('.cofrinhos-chart-svg [data-bs-toggle="tooltip"]').forEach(function (el) {
+                                bs.Tooltip.getOrCreateInstance(el, {
+                                    container: 'body',
+                                    html: true,
+                                    trigger: 'hover focus'
+                                });
+                            });
+                        } catch (e) {
+                            console.debug('Tooltip init error:', e);
+                        }
+                    }
+
+                    // Sincronizador de campos no modal de aporte de ativos
+                    const showAmt = document.getElementById('modal-aporte-amount');
+                    const showPrc = document.getElementById('modal-aporte-price');
+                    const showQty = document.getElementById('modal-aporte-quantity');
+
+                    function parseInputNumber(val) {
+                        if (val === null || val === undefined) return 0;
+                        let s = String(val).trim().replace(/[^\d.,]/g, '');
+                        if (!s) return 0;
+                        if (s.includes(',') && s.includes('.')) {
+                            if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+                                s = s.replace(/\./g, '').replace(',', '.');
+                            } else {
+                                s = s.replace(/,/g, '');
+                            }
+                        } else if (s.includes(',')) {
+                            s = s.replace(',', '.');
+                        } else if (s.includes('.')) {
+                            const parts = s.split('.');
+                            if (parts.length > 2) {
+                                s = s.replace(/\./g, '');
+                            } else if (parts[0] !== '0' && parts[1].length === 3) {
+                                s = s.replace('.', '');
+                            }
+                        }
+                        const n = parseFloat(s);
+                        return isNaN(n) ? 0 : n;
+                    }
+
+                    function updateQuotePrice() {
+                        if (!showAmt || !showQty || !showPrc) return;
+                        const amt = parseInputNumber(showAmt.value);
+                        const qty = parseInputNumber(showQty.value);
+                        if (amt > 0 && qty > 0) {
+                            const newPrc = amt / qty;
+                            showPrc.value = newPrc >= 1 ? newPrc.toFixed(2) : newPrc.toFixed(4);
+                        }
+                    }
+
+                    if (showAmt && showPrc && showQty) {
+                        // Ao alterar valor investido: se quantidade já informada, recalcula cotação; senão calcula quantidade pela cotação
+                        const onShowAmountChange = function () {
+                            const qty = parseInputNumber(showQty.value);
+                            if (qty > 0) {
+                                updateQuotePrice();
+                            } else {
+                                const amt = parseInputNumber(showAmt.value);
+                                const prc = parseInputNumber(showPrc.value);
+                                if (amt > 0 && prc > 0) {
+                                    showQty.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                                }
+                            }
+                        };
+                        showAmt.addEventListener('input', onShowAmountChange);
+                        showAmt.addEventListener('change', onShowAmountChange);
+
+                        // Ao alterar quantidade comprada: NUNCA altera valor investido, SEMPRE recalcula cotação!
+                        const onShowQuantityChange = function () {
+                            updateQuotePrice();
+                        };
+                        showQty.addEventListener('input', onShowQuantityChange);
+                        showQty.addEventListener('change', onShowQuantityChange);
+
+                        // Ao alterar cotação diretamente: calcula quantidade a partir do valor investido
+                        const onShowPriceChange = function () {
+                            const prc = parseInputNumber(showPrc.value);
+                            const amt = parseInputNumber(showAmt.value);
+                            if (amt > 0 && prc > 0) {
+                                showQty.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                            }
+                        };
+                        showPrc.addEventListener('input', onShowPriceChange);
+                        showPrc.addEventListener('change', onShowPriceChange);
+                    }
                 }
-            });
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initShowPage);
+                } else {
+                    initShowPage();
+                }
+            })();
         </script>
     @endpush
 </x-app-layout>

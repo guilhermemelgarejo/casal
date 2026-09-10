@@ -223,10 +223,53 @@ class FinancialProjectController extends Controller
     {
         $this->authorizeCofrinho($cofrinho);
 
+        // Suporte a nomes alternativos de campos
+        if (! $request->filled('asset_unit_price') && $request->filled('price')) {
+            $request->merge(['asset_unit_price' => $request->input('price')]);
+        }
+        if (! $request->filled('asset_quantity') && $request->filled('quantity')) {
+            $request->merge(['asset_quantity' => $request->input('quantity')]);
+        }
+
+        // Sanitiza valores em formato pt-BR ou texto livre (ex: "394.000,00", "R$ 394000,50")
+        foreach (['amount', 'asset_quantity', 'asset_unit_price'] as $field) {
+            if ($request->filled($field)) {
+                $raw = trim((string) $request->input($field));
+                $raw = (string) preg_replace('/[^\d.,]/', '', $raw);
+                if (str_contains($raw, ',') && str_contains($raw, '.')) {
+                    $raw = str_replace('.', '', $raw);
+                    $raw = str_replace(',', '.', $raw);
+                } elseif (str_contains($raw, ',')) {
+                    $raw = str_replace(',', '.', $raw);
+                }
+                $request->merge([$field => $raw]);
+            }
+        }
+
+        // Se quantidade não foi preenchida diretamente mas temos valor e cotação, calcula automaticamente
+        if ((! $request->filled('asset_quantity') || (float) $request->input('asset_quantity') <= 0)
+            && $request->filled('amount')
+            && $request->filled('asset_unit_price')
+            && (float) $request->input('asset_unit_price') > 0
+        ) {
+            $calcQty = (float) $request->input('amount') / (float) $request->input('asset_unit_price');
+            $request->merge(['asset_quantity' => number_format($calcQty, 8, '.', '')]);
+        }
+
+        // Se cotação não foi preenchida diretamente mas temos valor e quantidade, calcula automaticamente
+        if ((! $request->filled('asset_unit_price') || (float) $request->input('asset_unit_price') <= 0)
+            && $request->filled('amount')
+            && $request->filled('asset_quantity')
+            && (float) $request->input('asset_quantity') > 0
+        ) {
+            $calcPrc = (float) $request->input('amount') / (float) $request->input('asset_quantity');
+            $request->merge(['asset_unit_price' => number_format($calcPrc, 4, '.', '')]);
+        }
+
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
             'asset_quantity' => ['required', 'numeric', 'min:0.00000001'],
-            'asset_unit_price' => ['nullable', 'numeric', 'min:0.0001'],
+            'asset_unit_price' => ['nullable', 'numeric', 'gt:0'],
             'date' => ['required', 'date'],
             'note' => ['nullable', 'string', 'max:255'],
             'account_id' => ['nullable', 'exists:accounts,id'],

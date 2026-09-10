@@ -608,9 +608,44 @@
                         pm0 = parseFloat(txt) || 0;
                     }
 
+                    function parseInputNumber(val) {
+                        if (val === null || val === undefined) return 0;
+                        let s = String(val).trim().replace(/[^\d.,]/g, '');
+                        if (!s) return 0;
+                        if (s.includes(',') && s.includes('.')) {
+                            if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+                                s = s.replace(/\./g, '').replace(',', '.');
+                            } else {
+                                s = s.replace(/,/g, '');
+                            }
+                        } else if (s.includes(',')) {
+                            s = s.replace(',', '.');
+                        } else if (s.includes('.')) {
+                            const parts = s.split('.');
+                            if (parts.length > 2) {
+                                s = s.replace(/\./g, '');
+                            } else if (parts[0] !== '0' && parts[1].length === 3) {
+                                s = s.replace('.', '');
+                            }
+                        }
+                        const n = parseFloat(s);
+                        return isNaN(n) ? 0 : n;
+                    }
+
+                    function updateQuotePrice() {
+                        const amt = parseInputNumber(amountInput.value);
+                        const qty = parseInputNumber(quantityInput.value);
+                        if (amt > 0 && qty > 0) {
+                            const newPrc = amt / qty;
+                            priceInput.value = newPrc >= 1 ? newPrc.toFixed(2) : newPrc.toFixed(4);
+                            return true;
+                        }
+                        return false;
+                    }
+
                     function recomputeSim() {
-                        const amt = parseFloat(amountInput.value) || 0;
-                        const qty = parseFloat(quantityInput.value) || 0;
+                        const amt = parseInputNumber(amountInput.value);
+                        const qty = parseInputNumber(quantityInput.value);
 
                         if (amt > 0 && qty > 0) {
                             let newQty = q0 + qty;
@@ -626,32 +661,42 @@
                     }
 
                     if (amountInput && priceInput && quantityInput) {
-                        amountInput.addEventListener('input', function () {
-                            const amt = parseFloat(this.value) || 0;
-                            const prc = parseFloat(priceInput.value) || 0;
+                        // Ao alterar valor investido: se quantidade já informada, recalcula cotação; senão, calcula quantidade pela cotação
+                        const onAmountChange = function () {
+                            const qty = parseInputNumber(quantityInput.value);
+                            if (qty > 0) {
+                                updateQuotePrice();
+                            } else {
+                                const amt = parseInputNumber(amountInput.value);
+                                const prc = parseInputNumber(priceInput.value);
+                                if (amt > 0 && prc > 0) {
+                                    quantityInput.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                                }
+                            }
+                            recomputeSim();
+                        };
+                        amountInput.addEventListener('input', onAmountChange);
+                        amountInput.addEventListener('change', onAmountChange);
+
+                        // Ao alterar quantidade comprada: NUNCA altera valor investido, SEMPRE recalcula cotação!
+                        const onQuantityChange = function () {
+                            updateQuotePrice();
+                            recomputeSim();
+                        };
+                        quantityInput.addEventListener('input', onQuantityChange);
+                        quantityInput.addEventListener('change', onQuantityChange);
+
+                        // Ao alterar cotação diretamente: calcula quantidade a partir do valor investido
+                        const onPriceChange = function () {
+                            const prc = parseInputNumber(priceInput.value);
+                            const amt = parseInputNumber(amountInput.value);
                             if (amt > 0 && prc > 0) {
                                 quantityInput.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
                             }
                             recomputeSim();
-                        });
-
-                        priceInput.addEventListener('input', function () {
-                            const prc = parseFloat(this.value) || 0;
-                            const amt = parseFloat(amountInput.value) || 0;
-                            if (amt > 0 && prc > 0) {
-                                quantityInput.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
-                            }
-                            recomputeSim();
-                        });
-
-                        quantityInput.addEventListener('input', function () {
-                            const qty = parseFloat(this.value) || 0;
-                            const prc = parseFloat(priceInput.value) || 0;
-                            if (qty > 0 && prc > 0) {
-                                amountInput.value = (qty * prc).toFixed(2);
-                            }
-                            recomputeSim();
-                        });
+                        };
+                        priceInput.addEventListener('input', onPriceChange);
+                        priceInput.addEventListener('change', onPriceChange);
                     }
                 });
 
