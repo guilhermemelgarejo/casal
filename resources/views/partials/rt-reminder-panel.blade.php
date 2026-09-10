@@ -87,15 +87,7 @@
                                 {{ $manageLabel }} ↗
                             </a>
                         @endif
-                        @if($hasRecurring && $hasInvoices)
-                            <span style="color: var(--dz-border); font-size: 0.75rem;">•</span>
-                        @endif
-                        @if($hasInvoices && $invoiceManageUrl)
-                            <a href="{{ $invoiceManageUrl }}" class="rt-reminder-btn--header" style="font-size: 0.75rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
-                                {{ $invoiceManageLabel }} ↗
-                            </a>
-                        @endif
-                        @if(($hasRecurring || $hasInvoices) && $hasDebts)
+                        @if($hasRecurring && $hasDebts)
                             <span style="color: var(--dz-border); font-size: 0.75rem;">•</span>
                         @endif
                         @if($hasDebts && $debtManageUrl)
@@ -103,12 +95,114 @@
                                 {{ $debtManageLabel }} ↗
                             </a>
                         @endif
+                        @if(($hasRecurring || $hasDebts) && $hasInvoices)
+                            <span style="color: var(--dz-border); font-size: 0.75rem;">•</span>
+                        @endif
+                        @if($hasInvoices && $invoiceManageUrl)
+                            <a href="{{ $invoiceManageUrl }}" class="rt-reminder-btn--header" style="font-size: 0.75rem; font-weight: 700; color: var(--dz-primary); text-decoration: none;">
+                                {{ $invoiceManageLabel }} ↗
+                            </a>
+                        @endif
                     </div>
                 </div>
 
                 <!-- Linhas de Lembretes por Tipo -->
                 <div class="dz-reminder-groups d-flex flex-column gap-2 pt-2">
-                    <!-- 1. Faturas de Cartão -->
+                    <!-- 1. Recorrentes Mensais -->
+                    @if($hasMonthly)
+                        <div class="dz-reminder-type-block">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="dz-reminder-type-title dz-reminder-type-title--recurring">
+                                        <span style="font-size: 0.85rem;">🔁</span> Recorrentes Mensais
+                                    </span>
+                                    <span class="badge rounded-pill dz-reminder-type-badge--recurring" style="font-size: 0.65rem; font-weight: 700;">
+                                        {{ count($monthlyReminders) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="dz-reminder-track">
+                                @foreach($monthlyReminders as $rec)
+                                    @php
+                                        $predDay = $rec->effectiveDayInMonth($reminderCivilYear, $reminderCivilMonth);
+                                    @endphp
+                                    <div class="dz-reminder-chip dz-reminder-chip--recurring">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.85rem;">🔁</span>
+                                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;"><span class="d-none">Recorrentes</span>Mensal</span>
+                                            </div>
+                                            <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
+                                                <span class="d-none">Dia previsto: {{ sprintf('%02d/%02d/%04d', $predDay, $reminderCivilMonth, $reminderCivilYear) }}</span>
+                                                Dia {{ sprintf('%02d', $predDay) }}
+                                            </span>
+                                        </div>
+                                        <div class="dz-reminder-chip__body">
+                                            <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
+                                            <div class="fw-bolder dz-privacy-blur text-success" style="font-size: 1.05rem; margin-top: 0.15rem;">
+                                                R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
+                                            </div>
+                                        </div>
+                                        <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-success rounded-pill w-100 py-1 text-white fw-bold" style="font-size: 0.72rem; text-align: center;" title="Lançar este modelo no painel">
+                                            + Lançar Mensal
+                                        </a>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- 2. Parcelas de Dívidas & Boletos a Vencer -->
+                    @if($hasDebts)
+                        <div class="dz-reminder-type-block">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="dz-reminder-type-title dz-reminder-type-title--debt">
+                                        <span style="font-size: 0.85rem;">📄</span> Boletos & Contas a Vencer
+                                    </span>
+                                    <span class="badge rounded-pill dz-reminder-type-badge--debt" style="font-size: 0.65rem; font-weight: 700;">
+                                        {{ count($debtReminders) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="dz-reminder-track">
+                                @foreach($debtReminders as $dInst)
+                                    @php
+                                        $isOverdue = $dInst->isOverdue($nowForReminderOverdue);
+                                        $due = $dInst->due_date ? \Carbon\Carbon::parse($dInst->due_date) : null;
+                                    @endphp
+                                    <div class="dz-reminder-chip dz-reminder-chip--debt {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}">
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(245, 158, 11, 0.15); font-size: 0.85rem;">📄</span>
+                                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">Boleto / Conta</span>
+                                            </div>
+                                            @if($isOverdue)
+                                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: var(--dz-danger);">🔴 Vencido</span>
+                                            @elseif($due && $due->isToday())
+                                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">🟡 Hoje</span>
+                                            @elseif($due)
+                                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
+                                                    Dia {{ $due->format('d') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <div class="dz-reminder-chip__body">
+                                            <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $dInst->debt->name }}">{{ $dInst->debt->name }}</div>
+                                            <div class="fw-bolder dz-privacy-blur {{ $isOverdue ? 'text-danger' : '' }}" style="font-size: 1.05rem; color: var(--dz-text-title); margin-top: 0.15rem;">
+                                                R$ {{ number_format((float) $dInst->amount, 2, ',', '.') }}
+                                            </div>
+                                        </div>
+                                        <a href="{{ route('debts.index', ['tab' => 'agenda', 'month' => $due?->month ?? $month, 'year' => $due?->year ?? $year]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Pagar na agenda">
+                                            Pagar na Agenda ↗
+                                        </a>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- 3. Faturas de Cartão -->
                     @if($hasInvoices)
                         <div class="dz-reminder-type-block">
                             <div class="d-flex align-items-center justify-content-between mb-1">
@@ -155,51 +249,7 @@
                         </div>
                     @endif
 
-                    <!-- 2. Recorrentes Mensais -->
-                    @if($hasMonthly)
-                        <div class="dz-reminder-type-block">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="dz-reminder-type-title dz-reminder-type-title--recurring">
-                                        <span style="font-size: 0.85rem;">🔁</span> Recorrentes Mensais
-                                    </span>
-                                    <span class="badge rounded-pill dz-reminder-type-badge--recurring" style="font-size: 0.65rem; font-weight: 700;">
-                                        {{ count($monthlyReminders) }}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="dz-reminder-track">
-                                @foreach($monthlyReminders as $rec)
-                                    @php
-                                        $predDay = $rec->effectiveDayInMonth($reminderCivilYear, $reminderCivilMonth);
-                                    @endphp
-                                    <div class="dz-reminder-chip dz-reminder-chip--recurring">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.85rem;">🔁</span>
-                                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;"><span class="d-none">Recorrentes</span>Mensal</span>
-                                            </div>
-                                            <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
-                                                <span class="d-none">Dia previsto: {{ sprintf('%02d/%02d/%04d', $predDay, $reminderCivilMonth, $reminderCivilYear) }}</span>
-                                                Dia {{ sprintf('%02d', $predDay) }}
-                                            </span>
-                                        </div>
-                                        <div class="dz-reminder-chip__body">
-                                            <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
-                                            <div class="fw-bolder dz-privacy-blur text-success" style="font-size: 1.05rem; margin-top: 0.15rem;">
-                                                R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
-                                            </div>
-                                        </div>
-                                        <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-success rounded-pill w-100 py-1 text-white fw-bold" style="font-size: 0.72rem; text-align: center;" title="Lançar este modelo no painel">
-                                            + Lançar Mensal
-                                        </a>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <!-- 3. Recorrentes Múltiplos / Atalhos -->
+                    <!-- 4. Recorrentes Múltiplos / Atalhos -->
                     @if($hasMultiple)
                         <div class="dz-reminder-type-block">
                             <div class="d-flex align-items-center justify-content-between mb-1">
@@ -232,56 +282,6 @@
                                         </div>
                                         <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Lançar este atalho no painel">
                                             + Lançar Rápido
-                                        </a>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <!-- 4. Parcelas de Dívidas & Boletos a Vencer -->
-                    @if($hasDebts)
-                        <div class="dz-reminder-type-block">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="dz-reminder-type-title dz-reminder-type-title--debt">
-                                        <span style="font-size: 0.85rem;">📄</span> Boletos & Contas a Vencer
-                                    </span>
-                                    <span class="badge rounded-pill dz-reminder-type-badge--debt" style="font-size: 0.65rem; font-weight: 700;">
-                                        {{ count($debtReminders) }}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="dz-reminder-track">
-                                @foreach($debtReminders as $dInst)
-                                    @php
-                                        $isOverdue = $dInst->isOverdue($nowForReminderOverdue);
-                                        $due = $dInst->due_date ? \Carbon\Carbon::parse($dInst->due_date) : null;
-                                    @endphp
-                                    <div class="dz-reminder-chip dz-reminder-chip--debt {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(245, 158, 11, 0.15); font-size: 0.85rem;">📄</span>
-                                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">Boleto / Conta</span>
-                                            </div>
-                                            @if($isOverdue)
-                                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: var(--dz-danger);">🔴 Vencido</span>
-                                            @elseif($due && $due->isToday())
-                                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">🟡 Hoje</span>
-                                            @elseif($due)
-                                                <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
-                                                    Dia {{ $due->format('d') }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <div class="dz-reminder-chip__body">
-                                            <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $dInst->debt->name }}">{{ $dInst->debt->name }}</div>
-                                            <div class="fw-bolder dz-privacy-blur {{ $isOverdue ? 'text-danger' : '' }}" style="font-size: 1.05rem; color: var(--dz-text-title); margin-top: 0.15rem;">
-                                                R$ {{ number_format((float) $dInst->amount, 2, ',', '.') }}
-                                            </div>
-                                        </div>
-                                        <a href="{{ route('debts.index', ['tab' => 'agenda', 'month' => $due?->month ?? $month, 'year' => $due?->year ?? $year]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Pagar na agenda">
-                                            Pagar na Agenda ↗
                                         </a>
                                     </div>
                                 @endforeach
