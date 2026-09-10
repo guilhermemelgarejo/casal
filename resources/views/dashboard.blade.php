@@ -183,7 +183,19 @@
         </div>
     </section>
 
-    <!-- 2. CONTAS BANCÁRIAS E SALDOS -->
+    <!-- 2. LEMBRETES & PRÓXIMOS VENCIMENTOS -->
+    <div class="mb-4">
+        @include('partials.rt-reminder-panel', [
+            'reminders' => $recurringReminders ?? collect(),
+            'invoiceReminders' => $creditCardInvoiceReminders ?? collect(),
+            'debtReminders' => $debtReminders ?? collect(),
+            'month' => $month,
+            'year' => $year,
+            'embedded' => true,
+        ])
+    </div>
+
+    <!-- 3. CONTAS BANCÁRIAS E SALDOS -->
     @php
         $regAccountsList = ($regularAccounts ?? collect(($dashboardAccounts ?? $couple->accounts()->get()))->filter(fn($a) => !$a->isCreditCard()))->sortByDesc(fn($a) => (float) $a->balance)->values();
         $ccAccountsList = $creditCardAccounts ?? collect(($dashboardAccounts ?? $couple->accounts()->get()))->filter(fn($a) => $a->isCreditCard());
@@ -245,7 +257,7 @@
         </div>
     @endif
 
-    <!-- 3. CARTÕES DE CRÉDITO -->
+    <!-- 4. CARTÕES DE CRÉDITO -->
     @if($ccAccountsList->isNotEmpty())
         <div class="dz-section-head">
             <h3 class="dz-section-title">
@@ -342,7 +354,7 @@
         </div>
     @endif
 
-    <!-- 4. COFRINHOS & METAS FINANCEIRAS -->
+    <!-- 5. COFRINHOS & METAS FINANCEIRAS -->
     @if(count($cofrinhoRows ?? []) > 0)
         <div class="dz-section-head">
             <h3 class="dz-section-title">
@@ -427,18 +439,6 @@
             @endforeach
         </div>
     @endif
-
-    <!-- 5. LEMBRETES & PRÓXIMOS VENCIMENTOS -->
-    <div class="mb-4">
-        @include('partials.rt-reminder-panel', [
-            'reminders' => $recurringReminders ?? collect(),
-            'invoiceReminders' => $creditCardInvoiceReminders ?? collect(),
-            'debtReminders' => $debtReminders ?? collect(),
-            'month' => $month,
-            'year' => $year,
-            'embedded' => true,
-        ])
-    </div>
 
     <!-- 6. ÚLTIMOS LANÇAMENTOS (ATÉ 20 REGISTROS) -->
     @php
