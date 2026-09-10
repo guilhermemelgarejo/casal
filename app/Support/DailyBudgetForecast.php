@@ -78,6 +78,7 @@ final class DailyBudgetForecast
         $recurringIncomes = $couple->recurringTransactions()
             ->where('is_active', true)
             ->where('type', 'income')
+            ->where(fn ($q) => $q->where('is_multiple', false)->orWhereNull('is_multiple'))
             ->with('account')
             ->get();
 
@@ -139,6 +140,7 @@ final class DailyBudgetForecast
         $recurringExpenses = $couple->recurringTransactions()
             ->where('is_active', true)
             ->where('type', 'expense')
+            ->where(fn ($q) => $q->where('is_multiple', false)->orWhereNull('is_multiple'))
             ->with('account')
             ->get();
 

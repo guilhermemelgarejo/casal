@@ -268,4 +268,66 @@ class DailyBudgetForecastTest extends TestCase
         $this->assertEquals(1, $forecast['recurring_incomes_count']);
         $this->assertEquals(5500.00, $forecast['planned_income']);
     }
+
+    public function test_multiple_recurring_transactions_are_excluded_from_forecast(): void
+    {
+        $couple = Couple::factory()->create([
+            'monthly_income' => 3000.00,
+        ]);
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $account = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Conta Corrente',
+            'kind' => Account::KIND_REGULAR,
+        ]);
+
+        // Despesa recorrente mensal normal (deve entrar)
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Academia',
+            'amount' => '100.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'day_of_month' => 5,
+            'is_multiple' => false,
+            'is_active' => true,
+        ]);
+
+        // Despesa recorrente múltipla / atalho variável (NÃO deve entrar)
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Almoço Trabalho',
+            'amount' => '40.00',
+            'type' => 'expense',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'is_multiple' => true,
+            'is_active' => true,
+        ]);
+
+        // Receita recorrente múltipla (NÃO deve entrar)
+        RecurringTransaction::create([
+            'couple_id' => $couple->id,
+            'account_id' => $account->id,
+            'description' => 'Venda Esporádica',
+            'amount' => '200.00',
+            'type' => 'income',
+            'funding' => RecurringTransaction::FUNDING_ACCOUNT,
+            'is_multiple' => true,
+            'is_active' => true,
+        ]);
+
+        $simulatedNow = Carbon::create(2026, 9, 9, 10, 0, 0);
+        $forecast = DailyBudgetForecast::calculateForNextMonth($couple, 2026, 9, $simulatedNow);
+
+        // Apenas a mensal de 100.00 entra em despesas
+        $this->assertEquals(100.00, $forecast['recurring_expenses_total']);
+        $this->assertEquals(1, $forecast['recurring_expenses_count']);
+
+        // Receita múltipla não entra (fica apenas a renda base de 3000.00)
+        $this->assertEquals(0.00, $forecast['recurring_incomes_total']);
+        $this->assertEquals(3000.00, $forecast['planned_income']);
+    }
 }
