@@ -10,6 +10,7 @@ use App\Models\FinancialProject;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Support\CreditCardInvoiceReminders;
+use App\Support\DailyBudgetForecast;
 use App\Support\PaymentMethods;
 use App\Support\TransactionListingPresentation;
 use Carbon\Carbon;
@@ -171,6 +172,8 @@ class DashboardController extends Controller
             ->with('debt')
             ->orderBy('due_date')
             ->get();
+
+        $dailyBudgetForecast = DailyBudgetForecast::calculateForNextMonth($couple, $year, $month, $now);
 
         $modalPayload = $this->transactionModalPayload();
         /** @var Collection<int, Account> $regularAccounts */
@@ -381,6 +384,7 @@ class DashboardController extends Controller
                 'canCreateAccountTransfer',
                 'transferPaymentMethods',
                 'plannedIncomeResolved',
+                'dailyBudgetForecast',
             ),
             $modalPayload
         ));

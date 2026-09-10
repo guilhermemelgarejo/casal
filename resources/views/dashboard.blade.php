@@ -181,6 +181,61 @@
                 </div>
             </div>
         </div>
+
+        <!-- KPI 5: Orçamento Diário Restante -->
+        @if ($dailyBudgetForecast)
+            @php
+                $dbfStatus = $dailyBudgetForecast['status'];
+                $dbfAccentColor = match($dbfStatus) {
+                    'healthy' => 'var(--dz-success)',
+                    'warning' => 'var(--dz-warning)',
+                    'deficit' => 'var(--dz-danger)',
+                    default => 'var(--dz-primary)',
+                };
+                $dbfValueClass = match($dbfStatus) {
+                    'healthy' => 'text-success',
+                    'warning' => 'text-warning',
+                    'deficit' => 'text-danger',
+                    default => 'text-primary',
+                };
+            @endphp
+            <div class="dz-card dz-kpi-card dz-forecast-card">
+                <div class="dz-kpi-card__head">
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="dz-kpi-card__label">Orçamento Diário</span>
+                        <span class="badge rounded-pill bg-light text-secondary border" style="font-size: 0.65rem; padding: 0.15rem 0.4rem;" title="{{ $dailyBudgetForecast['days_remaining_current_month'] }} dias restantes em {{ ucfirst($dailyBudgetForecast['current_month_label']) }} (contando hoje)">
+                            {{ $dailyBudgetForecast['days_remaining_current_month'] }}d rest.
+                        </span>
+                    </div>
+                    <div class="dz-kpi-card__icon-box" style="background: rgba(124, 58, 237, 0.12); color: var(--dz-primary);">
+                        🎯
+                    </div>
+                </div>
+                <div>
+                    <div class="d-flex align-items-baseline gap-1">
+                        <div class="dz-kpi-card__value {{ $dbfValueClass }} dz-privacy-blur">
+                            {{ $money($dailyBudgetForecast['daily_budget']) }}
+                        </div>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--dz-text-secondary);">/ dia</span>
+                    </div>
+                    <div class="dz-progress-bar" style="margin-top: 0.45rem;">
+                        <div class="dz-progress-bar__fill" style="background: {{ $dbfAccentColor }}; width: {{ min(100, $dailyBudgetForecast['committed_pct']) }}%;"></div>
+                    </div>
+                    <div class="dz-kpi-card__footer" style="margin-top: 0.5rem;">
+                        <span>
+                            @if ($dbfStatus === 'deficit')
+                                <span class="text-danger fw-bold">Déficit previsto</span>
+                            @else
+                                <strong class="dz-privacy-blur">{{ $money($dailyBudgetForecast['free_amount']) }}</strong> livre
+                            @endif
+                        </span>
+                        <button type="button" class="btn btn-link p-0 text-decoration-none" style="color: var(--dz-primary); font-weight: 700; font-size: 0.78rem;" data-bs-toggle="modal" data-bs-target="#modalDailyBudgetForecast">
+                            Ver composição ↗
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
     </section>
 
     <!-- 2. LEMBRETES & PRÓXIMOS VENCIMENTOS -->
@@ -495,4 +550,5 @@
             </script>
         @endpush
     @endif
+    @include('partials.daily-budget-forecast-modal')
 </x-app-layout>
