@@ -13,11 +13,9 @@
     $isAsset = $cofrinho->isCustomAsset();
     $cardAccent = $cofrinho->color ?: ($cofrinho->isBitcoin() ? '#f59e0b' : '#0d9488');
 
-    // Preparação dos dados para o Gráfico 1 (Evolução Global)
+    // Preparação dos dados para o Gráfico 1 (Evolução)
     $balSeries = $chartData['balanceSeries'] ?? [];
     $balCount = count($balSeries);
-    $balMax = max(1.0, (float) collect($balSeries)->max('balance'), (float) ($target ?? 0.0));
-    $balMin = 0.0;
 
     $svgW = 620;
     $svgH = 210;
@@ -26,6 +24,14 @@
     $innerW = $svgW - ($padX * 2);
     $innerH = $svgH - ($padY * 2);
     $balStepX = $balCount > 1 ? ($innerW / ($balCount - 1)) : $innerW;
+    $balBottomY = round($padY + $innerH, 2);
+
+    if ($isAsset) {
+        $balMax = max(1.0, (float) collect($balSeries)->max('balance'), (float) collect($balSeries)->max('invested'), (float) ($target ?? 0.0));
+    } else {
+        $balMax = max(1.0, (float) collect($balSeries)->max('balance'), (float) ($target ?? 0.0));
+    }
+    $balMin = 0.0;
 
     $toBalY = function (float $val) use ($balMin, $balMax, $padY, $innerH) {
         $range = max(1.0, $balMax - $balMin);
@@ -36,45 +42,83 @@
     foreach ($balSeries as $i => $item) {
         $x = round($padX + ($balStepX * $i), 2);
         $y = round($toBalY((float) $item['balance']), 2);
-        $balPoints[] = array_merge($item, ['x' => $x, 'y' => $y]);
+        $yInvested = round($toBalY((float) ($item['invested'] ?? $item['balance'])), 2);
+        $balPoints[] = array_merge($item, [
+            'x' => $x,
+            'y' => $y,
+            'y_invested' => $yInvested,
+        ]);
     }
 
     $balPolyline = implode(' ', array_map(fn ($p) => "{$p['x']},{$p['y']}", $balPoints));
-    $balBottomY = round($padY + $innerH, 2);
+    $investedPolyline = implode(' ', array_map(fn ($p) => "{$p['x']},{$p['y_invested']}", $balPoints));
     $balArea = count($balPoints) > 0
         ? "{$balPoints[0]['x']},{$balBottomY} {$balPolyline} {$balPoints[$balCount - 1]['x']},{$balBottomY}"
         : '';
 
     $targetY = ($target !== null && $target > 0) ? round($toBalY((float) $target), 2) : null;
 
-    // Preparação dos dados para o Gráfico 2 (Evolução dos Juros)
-    $hasInterest = !empty($chartData['hasInterest']);
-    $intSeries = $chartData['interestSeries'] ?? [];
-    $intCount = count($intSeries);
-    $intMax = 1.0;
-    if ($hasInterest) {
-        $intMax = max(1.0, (float) collect($intSeries)->max('cumulative'), (float) collect($intSeries)->max('monthly'));
-    }
-    $intStepX = $intCount > 1 ? ($innerW / ($intCount - 1)) : $innerW;
-    $toIntY = function (float $val) use ($intMax, $padY, $innerH) {
-        return $padY + (($intMax - $val) / max(1.0, $intMax)) * $innerH;
-    };
+    // Preparação dos dados para o Gráfico 2
+    if ($isAsset) {
+        // Gráfico 2: Acumulação do Ativo (Quantidade)
+        $totalAssetQty = (float) ($cofrinho->asset_quantity ?? 0);
+        $hasAssetData = $totalAssetQty > 0.00000001 || (float) collect($balSeries)->max('qty_cumulative') > 0.00000001;
+        $qtyMax = max(0.00000001, (float) collect($balSeries)->max('qty_cumulative'));
+        $qtyCeil = $qtyMax * 1.15;
+        $toQtyY = function (float $val) use ($qtyCeil, $padY, $innerH) {
+            return $padY + (($qtyCeil - $val) / max(0.00000001, $qtyCeil)) * $innerH;
+        };
 
-    $intPoints = [];
-    $barW = max(12, min(36, $intCount > 0 ? ($innerW / $intCount) * 0.45 : 20));
-    foreach ($intSeries as $i => $item) {
-        $x = round($padX + ($intStepX * $i), 2);
-        $yCum = round($toIntY((float) $item['cumulative']), 2);
-        $yMonth = round($toIntY((float) $item['monthly']), 2);
-        $barH = max(0.0, $balBottomY - $yMonth);
-        $intPoints[] = array_merge($item, [
-            'x' => $x,
-            'y_cum' => $yCum,
-            'y_month' => $yMonth,
-            'bar_h' => $barH,
-        ]);
+        $qtyMonthMax = max(0.00000001, (float) collect($balSeries)->max('qty_monthly'));
+        $barW = max(12, min(36, $balCount > 0 ? ($innerW / $balCount) * 0.45 : 20));
+
+        $assetPoints = [];
+        foreach ($balSeries as $i => $item) {
+            $x = round($padX + ($balStepX * $i), 2);
+            $yCum = round($toQtyY((float) ($item['qty_cumulative'] ?? 0)), 2);
+            $qMonth = (float) ($item['qty_monthly'] ?? 0);
+            $barH = ($qtyMonthMax > 0.00000001 && $qMonth > 0)
+                ? max(3.0, round(($qMonth / $qtyMonthMax) * ($innerH * 0.55), 2))
+                : 0.0;
+            $yBar = round($balBottomY - $barH, 2);
+            $assetPoints[] = array_merge($item, [
+                'x' => $x,
+                'y_cum' => $yCum,
+                'y_bar' => $yBar,
+                'bar_h' => $barH,
+            ]);
+        }
+        $assetPolyline = implode(' ', array_map(fn ($p) => "{$p['x']},{$p['y_cum']}", $assetPoints));
+    } else {
+        // Gráfico 2: Evolução dos Juros (Fiat)
+        $hasInterest = !empty($chartData['hasInterest']);
+        $intSeries = $chartData['interestSeries'] ?? [];
+        $intCount = count($intSeries);
+        $intMax = 1.0;
+        if ($hasInterest) {
+            $intMax = max(1.0, (float) collect($intSeries)->max('cumulative'), (float) collect($intSeries)->max('monthly'));
+        }
+        $intStepX = $intCount > 1 ? ($innerW / ($intCount - 1)) : $innerW;
+        $toIntY = function (float $val) use ($intMax, $padY, $innerH) {
+            return $padY + (($intMax - $val) / max(1.0, $intMax)) * $innerH;
+        };
+
+        $intPoints = [];
+        $barW = max(12, min(36, $intCount > 0 ? ($innerW / $intCount) * 0.45 : 20));
+        foreach ($intSeries as $i => $item) {
+            $x = round($padX + ($intStepX * $i), 2);
+            $yCum = round($toIntY((float) $item['cumulative']), 2);
+            $yMonth = round($toIntY((float) $item['monthly']), 2);
+            $barH = max(0.0, $balBottomY - $yMonth);
+            $intPoints[] = array_merge($item, [
+                'x' => $x,
+                'y_cum' => $yCum,
+                'y_month' => $yMonth,
+                'bar_h' => $barH,
+            ]);
+        }
+        $intPolyline = implode(' ', array_map(fn ($p) => "{$p['x']},{$p['y_cum']}", $intPoints));
     }
-    $intPolyline = implode(' ', array_map(fn ($p) => "{$p['x']},{$p['y_cum']}", $intPoints));
 @endphp
 
 <x-app-layout>
@@ -109,9 +153,11 @@
                         + Aporte no Ativo
                     </button>
                 @endif
-                <button type="button" class="btn btn-outline-success rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalCofrinhoInterest">
-                    💰 Lançar Juros
-                </button>
+                @if(! $isAsset)
+                    <button type="button" class="btn btn-outline-success rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalCofrinhoInterest">
+                        💰 Lançar Juros
+                    </button>
+                @endif
                 <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalCofrinhoEdit">
                     ✏️ Editar
                 </button>
@@ -173,22 +219,42 @@
                 </div>
             </div>
 
-            <!-- Rendimentos / Juros -->
+            <!-- Rendimentos / Juros OU Lucro / Valorização -->
             <div class="dz-card dz-kpi-card">
                 <div class="dz-kpi-card__head">
-                    <span class="dz-kpi-card__label">Rendimentos / Juros</span>
-                    <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
-                        📈
-                    </div>
+                    <span class="dz-kpi-card__label">{{ $isAsset ? 'Lucro / Valorização' : 'Rendimentos / Juros' }}</span>
+                    @if($isAsset)
+                        <div class="dz-kpi-card__icon-box {{ $profit >= 0 ? 'dz-kpi-card__icon-box--success' : 'dz-kpi-card__icon-box--danger' }}" style="{{ $profit < 0 ? 'background: rgba(239, 68, 68, 0.15); color: #dc2626;' : '' }}">
+                            {{ $profit >= 0 ? '🚀' : '📉' }}
+                        </div>
+                    @else
+                        <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--success">
+                            📈
+                        </div>
+                    @endif
                 </div>
                 <div>
-                    <div class="dz-kpi-card__value text-success dz-privacy-blur">
-                        +R$ {{ number_format($totalInterest, 2, ',', '.') }}
-                    </div>
-                    <div class="dz-kpi-card__footer">
-                        <span class="text-success fw-semibold">{{ number_format($profitPct, 2, ',', '.') }}%</span>
-                        <span>de rentabilidade</span>
-                    </div>
+                    @if($isAsset)
+                        @php
+                            $profitFormatted = ($profit >= 0 ? '+' : '-') . 'R$ ' . number_format(abs($profit), 2, ',', '.');
+                            $profitPctFormatted = ($profitPct !== null ? (($profitPct >= 0 ? '+' : '') . number_format($profitPct, 2, ',', '.') . '%') : '—');
+                        @endphp
+                        <div class="dz-kpi-card__value {{ $profit >= 0 ? 'text-success' : 'text-danger' }} dz-privacy-blur">
+                            {{ $profitFormatted }}
+                        </div>
+                        <div class="dz-kpi-card__footer">
+                            <span class="{{ $profit >= 0 ? 'text-success' : 'text-danger' }} fw-semibold">{{ $profitPctFormatted }}</span>
+                            <span>de rentabilidade</span>
+                        </div>
+                    @else
+                        <div class="dz-kpi-card__value text-success dz-privacy-blur">
+                            +R$ {{ number_format($totalInterest, 2, ',', '.') }}
+                        </div>
+                        <div class="dz-kpi-card__footer">
+                            <span class="text-success fw-semibold">{{ number_format($profitPct, 2, ',', '.') }}%</span>
+                            <span>de rentabilidade</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -230,7 +296,7 @@
 
         <!-- SEÇÃO DE GRÁFICOS DE EVOLUÇÃO -->
         <section class="row g-4 mb-4">
-            <!-- GRÁFICO 1: EVOLUÇÃO GLOBAL DO COFRINHO -->
+            <!-- GRÁFICO 1: EVOLUÇÃO (PATRIMONIAL / GLOBAL) -->
             <div class="col-lg-6">
                 <div class="card border-0 shadow-sm cofrinhos-chart-card">
                     <div class="cofrinhos-chart-head">
@@ -239,18 +305,41 @@
                                 📊
                             </div>
                             <div>
-                                <h2 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Evolução Global do Cofrinho</h2>
-                                <p class="small text-secondary mb-0">Crescimento do saldo acumulado ao longo do tempo</p>
+                                <h2 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">{{ $isAsset ? 'Evolução Patrimonial' : 'Evolução Global do Cofrinho' }}</h2>
+                                <p class="small text-secondary mb-0">{{ $isAsset ? 'Patrimônio atual vs Capital aportado ao longo do tempo' : 'Crescimento do saldo acumulado ao longo do tempo' }}</p>
                             </div>
                         </div>
                         <div class="text-end">
-                            <span class="small text-secondary d-block">Saldo atual</span>
+                            <span class="small text-secondary d-block">{{ $isAsset ? 'Patrimônio atual' : 'Saldo atual' }}</span>
                             <strong class="text-primary dz-privacy-blur" style="font-size: 0.95rem;">R$ {{ number_format($currentBalance, 2, ',', '.') }}</strong>
+                            @if($isAsset)
+                                <span class="small text-secondary d-block" style="font-size: 0.72rem;">Aportado: R$ {{ number_format($totalInvested, 2, ',', '.') }}</span>
+                            @endif
                         </div>
                     </div>
 
+                    @if($isAsset)
+                        <!-- Legenda do Gráfico Patrimonial -->
+                        <div class="d-flex align-items-center gap-3 px-4 pt-2 pb-1 small text-secondary flex-wrap">
+                            <div class="d-flex align-items-center gap-1">
+                                <span style="display:inline-block; width:12px; height:3px; background:{{ $cardAccent }}; border-radius:2px;"></span>
+                                <span style="font-size:0.75rem;">Patrimônio (Mercado)</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span style="display:inline-block; width:12px; height:2px; background:#64748b; border-radius:2px; border-top: 2px dashed #94a3b8;"></span>
+                                <span style="font-size:0.75rem;">Total Aportado</span>
+                            </div>
+                            @if($target !== null && $target > 0 && $targetY !== null)
+                                <div class="d-flex align-items-center gap-1">
+                                    <span style="display:inline-block; width:12px; height:2px; background:#10b981; border-radius:2px; border-top: 1px dashed #10b981;"></span>
+                                    <span style="font-size:0.75rem;">Meta</span>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
                     <div class="cofrinhos-chart-body">
-                        <svg class="cofrinhos-chart-svg" viewBox="0 0 {{ $svgW }} {{ $svgH }}" role="img" aria-label="Gráfico de evolução global do cofrinho">
+                        <svg class="cofrinhos-chart-svg" viewBox="0 0 {{ $svgW }} {{ $svgH }}" role="img" aria-label="{{ $isAsset ? 'Gráfico de evolução patrimonial' : 'Gráfico de evolução global do cofrinho' }}">
                             <defs>
                                 <linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stop-color="{{ $cardAccent }}" stop-opacity="0.32" />
@@ -269,25 +358,46 @@
                                 <text x="{{ $svgW - $padX - 4 }}" y="{{ $targetY - 5 }}" text-anchor="end" fill="#10b981" font-size="10.5" font-weight="700">Meta: R$ {{ number_format($target, 2, ',', '.') }}</text>
                             @endif
 
+                            <!-- Linha do Capital Aportado (para ativos) -->
+                            @if($isAsset && !empty($investedPolyline))
+                                <polyline class="cofrinhos-chart-line" points="{{ $investedPolyline }}" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 3" opacity="0.85" />
+                            @endif
+
                             <!-- Área Gradiente -->
                             @if(!empty($balArea))
                                 <polygon points="{{ $balArea }}" fill="url(#balGrad)" />
                             @endif
 
-                            <!-- Linha Principal -->
+                            <!-- Linha Principal (Patrimônio / Saldo) -->
                             @if(!empty($balPolyline))
-                                <polyline class="cofrinhos-chart-line" points="{{ $balPolyline }}" stroke="{{ $cardAccent }}" />
+                                <polyline class="cofrinhos-chart-line" points="{{ $balPolyline }}" stroke="{{ $cardAccent }}" stroke-width="2.5" />
                             @endif
 
                             <!-- Pontos Interativos com Tooltip formatado e Hitbox expandida -->
                             @foreach($balPoints as $pt)
                                 @php
-                                    $balTooltip = "<div class='text-start p-1'>"
-                                        . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
-                                        . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Saldo:</span><strong style='color: #38bdf8;'>R$ " . number_format((float) $pt['balance'], 2, ',', '.') . "</strong></div>"
-                                        . ($target !== null && $target > 0 ? "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.72rem; color: #94a3b8;'><span>Meta:</span><span style='color: #10b981;'>R$ " . number_format((float) $target, 2, ',', '.') . " (" . number_format(min(100.0, ((float) $pt['balance'] / $target) * 100), 1, ',', '.') . "%)</span></div>" : '')
-                                        . "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Fluxo mês:</span><span style='color: " . ($pt['net'] >= 0 ? '#10b981' : '#f87171') . "; font-weight: 600;'>" . ($pt['net'] >= 0 ? '+' : '') . "R$ " . number_format((float) $pt['net'], 2, ',', '.') . "</span></div>"
-                                        . "</div>";
+                                    if ($isAsset) {
+                                        $ptProfit = (float) ($pt['profit'] ?? ($pt['balance'] - ($pt['invested'] ?? 0)));
+                                        $ptProfitPct = (float) ($pt['profit_pct'] ?? 0);
+                                        $ptAporteMes = (float) ($pt['aportes'] ?? 0);
+
+                                        $balTooltip = "<div class='text-start p-1'>"
+                                            . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
+                                            . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Patrimônio:</span><strong style='color: #38bdf8;'>R$ " . number_format((float) $pt['balance'], 2, ',', '.') . "</strong></div>"
+                                            . "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.72rem; color: #94a3b8;'><span>Total Aportado:</span><span>R$ " . number_format((float) ($pt['invested'] ?? 0), 2, ',', '.') . "</span></div>"
+                                            . "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.72rem;'><span>Resultado:</span><span style='color: " . ($ptProfit >= 0 ? '#10b981' : '#f87171') . "; font-weight: 600;'>" . ($ptProfit >= 0 ? '+' : '') . "R$ " . number_format($ptProfit, 2, ',', '.') . " (" . ($ptProfitPct >= 0 ? '+' : '') . number_format($ptProfitPct, 1, ',', '.') . "%)</span></div>"
+                                            . (!empty($pt['quote_price']) ? "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.70rem; color: #94a3b8;'><span>Cotação ref.:</span><span>R$ " . number_format((float) $pt['quote_price'], 2, ',', '.') . "</span></div>" : '')
+                                            . ($ptAporteMes > 0 ? "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Aportado no mês:</span><span style='color: #10b981;'>+R$ " . number_format($ptAporteMes, 2, ',', '.') . "</span></div>" : '')
+                                            . "</div>";
+
+                                    } else {
+                                        $balTooltip = "<div class='text-start p-1'>"
+                                            . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
+                                            . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Saldo:</span><strong style='color: #38bdf8;'>R$ " . number_format((float) $pt['balance'], 2, ',', '.') . "</strong></div>"
+                                            . ($target !== null && $target > 0 ? "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.72rem; color: #94a3b8;'><span>Meta:</span><span style='color: #10b981;'>R$ " . number_format((float) $target, 2, ',', '.') . " (" . number_format(min(100.0, ((float) $pt['balance'] / $target) * 100), 1, ',', '.') . "%)</span></div>" : '')
+                                            . "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Fluxo mês:</span><span style='color: " . ($pt['net'] >= 0 ? '#10b981' : '#f87171') . "; font-weight: 600;'>" . ($pt['net'] >= 0 ? '+' : '') . "R$ " . number_format((float) $pt['net'], 2, ',', '.') . "</span></div>"
+                                            . "</div>";
+                                    }
                                 @endphp
                                 <circle
                                     cx="{{ $pt['x'] }}"
@@ -326,128 +436,269 @@
                 </div>
             </div>
 
-            <!-- GRÁFICO 2: EVOLUÇÃO DOS JUROS -->
+            <!-- GRÁFICO 2: ACUMULAÇÃO DE ATIVO (SE ASSET) OU EVOLUÇÃO DOS JUROS (SE FIAT) -->
             <div class="col-lg-6">
                 <div class="card border-0 shadow-sm cofrinhos-chart-card">
-                    <div class="cofrinhos-chart-head">
-                        <div class="cofrinhos-chart-title-wrap">
-                            <div class="cofrinhos-chart-icon" style="background: rgba(16, 185, 129, 0.15); color: #059669;">
-                                💰
+                    @if($isAsset)
+                        <!-- CABEÇALHO ATIVO -->
+                        <div class="cofrinhos-chart-head">
+                            <div class="cofrinhos-chart-title-wrap">
+                                <div class="cofrinhos-chart-icon" style="background: rgba(245, 158, 11, 0.15); color: #d97706;">
+                                    {{ $cofrinho->isBitcoin() ? '₿' : '🪙' }}
+                                </div>
+                                <div>
+                                    <h2 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Acumulação de {{ $cofrinho->assetUnitLabel() }}</h2>
+                                    <p class="small text-secondary mb-0">Compras no mês e quantidade acumulada</p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Evolução dos Juros e Rendimentos</h2>
-                                <p class="small text-secondary mb-0">Rendimentos creditados mês a mês e acumulado</p>
+                            <div class="text-end">
+                                <span class="small text-secondary d-block">Total acumulado</span>
+                                <strong class="text-warning dz-privacy-blur" style="font-size: 0.95rem;">
+                                    {{ rtrim(rtrim(number_format((float) $cofrinho->asset_quantity, 8, ',', '.'), '0'), ',') }} {{ $cofrinho->assetUnitLabel() }}
+                                </strong>
                             </div>
                         </div>
-                        <div class="text-end">
-                            <span class="small text-secondary d-block">Total de juros</span>
-                            <strong class="text-success dz-privacy-blur" style="font-size: 0.95rem;">+R$ {{ number_format($totalInterest, 2, ',', '.') }}</strong>
+
+                        <!-- Legenda do Gráfico de Acumulação -->
+                        <div class="d-flex align-items-center gap-3 px-4 pt-2 pb-1 small text-secondary flex-wrap">
+                            <div class="d-flex align-items-center gap-1">
+                                <span style="display:inline-block; width:10px; height:10px; background:rgba(245, 158, 11, 0.75); border-radius:2px;"></span>
+                                <span style="font-size:0.75rem;">Comprado no mês</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span style="display:inline-block; width:12px; height:3px; background:{{ $cardAccent }}; border-radius:2px;"></span>
+                                <span style="font-size:0.75rem;">Total Acumulado ({{ $cofrinho->assetUnitLabel() }})</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="cofrinhos-chart-body">
-                        @if($hasInterest && $totalInterest > 0.0001)
-                            <svg class="cofrinhos-chart-svg" viewBox="0 0 {{ $svgW }} {{ $svgH }}" role="img" aria-label="Gráfico de evolução dos juros">
-                                <defs>
-                                    <linearGradient id="intBarGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.9" />
-                                        <stop offset="100%" stop-color="#059669" stop-opacity="0.6" />
-                                    </linearGradient>
-                                </defs>
+                        <div class="cofrinhos-chart-body">
+                            @if($hasAssetData)
+                                <svg class="cofrinhos-chart-svg" viewBox="0 0 {{ $svgW }} {{ $svgH }}" role="img" aria-label="Gráfico de acumulação do ativo">
+                                    <defs>
+                                        <linearGradient id="assetBarGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.9" />
+                                            <stop offset="100%" stop-color="#d97706" stop-opacity="0.5" />
+                                        </linearGradient>
+                                    </defs>
 
-                                <!-- Linhas de grade sutis -->
-                                <line x1="{{ $padX }}" y1="{{ $padY }}" x2="{{ $svgW - $padX }}" y2="{{ $padY }}" class="cofrinhos-chart-grid-line" />
-                                <line x1="{{ $padX }}" y1="{{ round($padY + ($innerH * 0.5), 2) }}" x2="{{ $svgW - $padX }}" y2="{{ round($padY + ($innerH * 0.5), 2) }}" class="cofrinhos-chart-grid-line" />
-                                <line x1="{{ $padX }}" y1="{{ $balBottomY }}" x2="{{ $svgW - $padX }}" y2="{{ $balBottomY }}" class="cofrinhos-chart-grid-line" />
+                                    <!-- Linhas de grade sutis -->
+                                    <line x1="{{ $padX }}" y1="{{ $padY }}" x2="{{ $svgW - $padX }}" y2="{{ $padY }}" class="cofrinhos-chart-grid-line" />
+                                    <line x1="{{ $padX }}" y1="{{ round($padY + ($innerH * 0.5), 2) }}" x2="{{ $svgW - $padX }}" y2="{{ round($padY + ($innerH * 0.5), 2) }}" class="cofrinhos-chart-grid-line" />
+                                    <line x1="{{ $padX }}" y1="{{ $balBottomY }}" x2="{{ $svgW - $padX }}" y2="{{ $balBottomY }}" class="cofrinhos-chart-grid-line" />
 
-                                <!-- Barras Mensais com Tooltip formatado -->
-                                @foreach($intPoints as $pt)
-                                    @if($pt['bar_h'] > 0.5)
+                                    <!-- Barras Mensais de Compras do Ativo -->
+                                    @foreach($assetPoints as $pt)
+                                        @if($pt['bar_h'] > 0.5)
+                                            @php
+                                                $qMesFormatted = rtrim(rtrim(number_format((float) ($pt['qty_monthly'] ?? 0), 8, ',', '.'), '0'), ',');
+                                                $barTooltip = "<div class='text-start p-1'>"
+                                                    . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
+                                                    . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Comprado no mês:</span><strong style='color: #f59e0b;'>+" . $qMesFormatted . " " . e($cofrinho->assetUnitLabel()) . "</strong></div>"
+                                                    . (!empty($pt['aportes']) ? "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.72rem; color: #94a3b8;'><span>Valor investido:</span><span>R$ " . number_format((float) $pt['aportes'], 2, ',', '.') . "</span></div>" : '')
+                                                    . "</div>";
+                                            @endphp
+                                            <rect
+                                                x="{{ $pt['x'] - ($barW / 2) }}"
+                                                y="{{ $pt['y_bar'] }}"
+                                                width="{{ $barW }}"
+                                                height="{{ $pt['bar_h'] }}"
+                                                rx="3"
+                                                ry="3"
+                                                fill="url(#assetBarGrad)"
+                                                class="cofrinhos-chart-bar"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-html="true"
+                                                data-bs-placement="top"
+                                                data-bs-custom-class="dz-chart-tooltip"
+                                                data-bs-title="{{ $barTooltip }}"
+                                                tabindex="0"
+                                                aria-label="{{ $pt['label'] }}: Comprado {{ $qMesFormatted }} {{ $cofrinho->assetUnitLabel() }}"
+                                            ></rect>
+                                        @endif
+                                    @endforeach
+
+                                    <!-- Linha de Quantidade Acumulada -->
+                                    @if(!empty($assetPolyline))
+                                        <polyline class="cofrinhos-chart-line" points="{{ $assetPolyline }}" stroke="{{ $cardAccent }}" stroke-width="2.5" />
+                                    @endif
+
+                                    <!-- Pontos de Quantidade Acumulada com Tooltip e Hitbox -->
+                                    @foreach($assetPoints as $pt)
                                         @php
-                                            $intBarTooltip = "<div class='text-start p-1'>"
+                                            $qCumFormatted = rtrim(rtrim(number_format((float) ($pt['qty_cumulative'] ?? 0), 8, ',', '.'), '0'), ',');
+                                            $cumTooltip = "<div class='text-start p-1'>"
                                                 . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
-                                                . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Juros no mês:</span><strong style='color: #10b981;'>" . ($pt['monthly'] > 0 ? '+R$ ' . number_format((float) $pt['monthly'], 2, ',', '.') : 'R$ 0,00') . "</strong></div>"
-                                                . "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Total acumulado:</span><span style='color: #38bdf8; font-weight: 600;'>+R$ " . number_format((float) $pt['cumulative'], 2, ',', '.') . "</span></div>"
+                                                . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Total acumulado:</span><strong style='color: #f59e0b;'>" . $qCumFormatted . " " . e($cofrinho->assetUnitLabel()) . "</strong></div>"
+                                                . "<div class='d-flex justify-content-between gap-3 mb-1' style='font-size: 0.72rem; color: #94a3b8;'><span>Patrimônio est.:</span><span style='color: #38bdf8;'>R$ " . number_format((float) $pt['balance'], 2, ',', '.') . "</span></div>"
+                                                . (!empty($pt['invested']) ? "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Total aportado:</span><span>R$ " . number_format((float) $pt['invested'], 2, ',', '.') . "</span></div>" : '')
                                                 . "</div>";
                                         @endphp
-                                        <rect
-                                            x="{{ $pt['x'] - ($barW / 2) }}"
-                                            y="{{ $pt['y_month'] }}"
-                                            width="{{ $barW }}"
-                                            height="{{ $pt['bar_h'] }}"
-                                            rx="3"
-                                            ry="3"
-                                            fill="url(#intBarGrad)"
-                                            class="cofrinhos-chart-bar"
+                                        <circle
+                                            cx="{{ $pt['x'] }}"
+                                            cy="{{ $pt['y_cum'] }}"
+                                            r="16"
+                                            fill="transparent"
+                                            class="cofrinhos-chart-hitbox"
                                             data-bs-toggle="tooltip"
                                             data-bs-html="true"
                                             data-bs-placement="top"
                                             data-bs-custom-class="dz-chart-tooltip"
-                                            data-bs-title="{{ $intBarTooltip }}"
+                                            data-bs-title="{{ $cumTooltip }}"
                                             tabindex="0"
-                                            aria-label="{{ $pt['label'] }}: Juros no mês R$ {{ number_format((float) $pt['monthly'], 2, ',', '.') }}"
-                                        ></rect>
+                                            aria-label="{{ $pt['label'] }}: Acumulado {{ $qCumFormatted }} {{ $cofrinho->assetUnitLabel() }}"
+                                        ></circle>
+                                        <circle
+                                            cx="{{ $pt['x'] }}"
+                                            cy="{{ $pt['y_cum'] }}"
+                                            r="4"
+                                            fill="{{ $cardAccent }}"
+                                            stroke="#ffffff"
+                                            stroke-width="2"
+                                            class="cofrinhos-chart-dot"
+                                            style="pointer-events: none;"
+                                        ></circle>
+                                    @endforeach
+                                </svg>
+
+                                <!-- Eixo X dos Meses -->
+                                <div class="cofrinhos-chart-labels">
+                                    @foreach($assetPoints as $pt)
+                                        <span style="flex: 1; text-align: center;">{{ $pt['label'] }}</span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="d-flex flex-column align-items-center justify-content-center text-center p-4 my-auto" style="min-height: 180px;">
+                                    <div class="fs-2 mb-2 opacity-50">🪙</div>
+                                    <h3 class="h6 fw-bold mb-1" style="color: var(--dz-text-title);">Nenhum aporte registrado ainda</h3>
+                                    <p class="small text-secondary mb-3" style="max-width: 320px;">Faça seu primeiro aporte para acompanhar a curva de acumulação deste ativo ao longo do tempo.</p>
+                                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalAssetAporte">
+                                        + Aporte no Ativo
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        <!-- CABEÇALHO FIAT (JUROS) -->
+                        <div class="cofrinhos-chart-head">
+                            <div class="cofrinhos-chart-title-wrap">
+                                <div class="cofrinhos-chart-icon" style="background: rgba(16, 185, 129, 0.15); color: #059669;">
+                                    💰
+                                </div>
+                                <div>
+                                    <h2 class="h6 mb-0 fw-bold" style="color: var(--dz-text-title);">Evolução dos Juros e Rendimentos</h2>
+                                    <p class="small text-secondary mb-0">Rendimentos creditados mês a mês e acumulado</p>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="small text-secondary d-block">Total de juros</span>
+                                <strong class="text-success dz-privacy-blur" style="font-size: 0.95rem;">+R$ {{ number_format($totalInterest, 2, ',', '.') }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="cofrinhos-chart-body">
+                            @if($hasInterest && $totalInterest > 0.0001)
+                                <svg class="cofrinhos-chart-svg" viewBox="0 0 {{ $svgW }} {{ $svgH }}" role="img" aria-label="Gráfico de evolução dos juros">
+                                    <defs>
+                                        <linearGradient id="intBarGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.9" />
+                                            <stop offset="100%" stop-color="#059669" stop-opacity="0.6" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    <!-- Linhas de grade sutis -->
+                                    <line x1="{{ $padX }}" y1="{{ $padY }}" x2="{{ $svgW - $padX }}" y2="{{ $padY }}" class="cofrinhos-chart-grid-line" />
+                                    <line x1="{{ $padX }}" y1="{{ round($padY + ($innerH * 0.5), 2) }}" x2="{{ $svgW - $padX }}" y2="{{ round($padY + ($innerH * 0.5), 2) }}" class="cofrinhos-chart-grid-line" />
+                                    <line x1="{{ $padX }}" y1="{{ $balBottomY }}" x2="{{ $svgW - $padX }}" y2="{{ $balBottomY }}" class="cofrinhos-chart-grid-line" />
+
+                                    <!-- Barras Mensais com Tooltip formatado -->
+                                    @foreach($intPoints as $pt)
+                                        @if($pt['bar_h'] > 0.5)
+                                            @php
+                                                $intBarTooltip = "<div class='text-start p-1'>"
+                                                    . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
+                                                    . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Juros no mês:</span><strong style='color: #10b981;'>" . ($pt['monthly'] > 0 ? '+R$ ' . number_format((float) $pt['monthly'], 2, ',', '.') : 'R$ 0,00') . "</strong></div>"
+                                                    . "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Total acumulado:</span><span style='color: #38bdf8; font-weight: 600;'>+R$ " . number_format((float) $pt['cumulative'], 2, ',', '.') . "</span></div>"
+                                                    . "</div>";
+                                            @endphp
+                                            <rect
+                                                x="{{ $pt['x'] - ($barW / 2) }}"
+                                                y="{{ $pt['y_month'] }}"
+                                                width="{{ $barW }}"
+                                                height="{{ $pt['bar_h'] }}"
+                                                rx="3"
+                                                ry="3"
+                                                fill="url(#intBarGrad)"
+                                                class="cofrinhos-chart-bar"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-html="true"
+                                                data-bs-placement="top"
+                                                data-bs-custom-class="dz-chart-tooltip"
+                                                data-bs-title="{{ $intBarTooltip }}"
+                                                tabindex="0"
+                                                aria-label="{{ $pt['label'] }}: Juros no mês R$ {{ number_format((float) $pt['monthly'], 2, ',', '.') }}"
+                                            ></rect>
+                                        @endif
+                                    @endforeach
+
+                                    <!-- Linha de Juros Acumulados -->
+                                    @if(!empty($intPolyline))
+                                        <polyline class="cofrinhos-chart-line" points="{{ $intPolyline }}" stroke="#059669" stroke-width="2.5" />
                                     @endif
-                                @endforeach
 
-                                <!-- Linha de Juros Acumulados -->
-                                @if(!empty($intPolyline))
-                                    <polyline class="cofrinhos-chart-line" points="{{ $intPolyline }}" stroke="#059669" stroke-width="2.5" />
-                                @endif
+                                    <!-- Pontos de Juros Acumulados com Tooltip e Hitbox expandida -->
+                                    @foreach($intPoints as $pt)
+                                        @php
+                                            $intCumTooltip = "<div class='text-start p-1'>"
+                                                . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
+                                                . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Total acumulado:</span><strong style='color: #38bdf8;'>+R$ " . number_format((float) $pt['cumulative'], 2, ',', '.') . "</strong></div>"
+                                                . "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Juros no mês:</span><span style='color: #10b981; font-weight: 600;'>" . ($pt['monthly'] > 0 ? '+R$ ' . number_format((float) $pt['monthly'], 2, ',', '.') : 'R$ 0,00') . "</span></div>"
+                                                . "</div>";
+                                        @endphp
+                                        <circle
+                                            cx="{{ $pt['x'] }}"
+                                            cy="{{ $pt['y_cum'] }}"
+                                            r="16"
+                                            fill="transparent"
+                                            class="cofrinhos-chart-hitbox"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-html="true"
+                                            data-bs-placement="top"
+                                            data-bs-custom-class="dz-chart-tooltip"
+                                            data-bs-title="{{ $intCumTooltip }}"
+                                            tabindex="0"
+                                            aria-label="{{ $pt['label'] }}: Acumulado R$ {{ number_format((float) $pt['cumulative'], 2, ',', '.') }}"
+                                        ></circle>
+                                        <circle
+                                            cx="{{ $pt['x'] }}"
+                                            cy="{{ $pt['y_cum'] }}"
+                                            r="4"
+                                            fill="#059669"
+                                            stroke="#ffffff"
+                                            stroke-width="2"
+                                            class="cofrinhos-chart-dot"
+                                            style="pointer-events: none;"
+                                        ></circle>
+                                    @endforeach
+                                </svg>
 
-                                <!-- Pontos de Juros Acumulados com Tooltip e Hitbox expandida -->
-                                @foreach($intPoints as $pt)
-                                    @php
-                                        $intCumTooltip = "<div class='text-start p-1'>"
-                                            . "<div class='fw-bold mb-1' style='font-size: 0.85rem; color: #f8fafc; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 3px;'>" . e($pt['label']) . "</div>"
-                                            . "<div class='d-flex justify-content-between gap-3 mb-1'><span>Total acumulado:</span><strong style='color: #38bdf8;'>+R$ " . number_format((float) $pt['cumulative'], 2, ',', '.') . "</strong></div>"
-                                            . "<div class='d-flex justify-content-between gap-3' style='font-size: 0.72rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 3px;'><span>Juros no mês:</span><span style='color: #10b981; font-weight: 600;'>" . ($pt['monthly'] > 0 ? '+R$ ' . number_format((float) $pt['monthly'], 2, ',', '.') : 'R$ 0,00') . "</span></div>"
-                                            . "</div>";
-                                    @endphp
-                                    <circle
-                                        cx="{{ $pt['x'] }}"
-                                        cy="{{ $pt['y_cum'] }}"
-                                        r="16"
-                                        fill="transparent"
-                                        class="cofrinhos-chart-hitbox"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-html="true"
-                                        data-bs-placement="top"
-                                        data-bs-custom-class="dz-chart-tooltip"
-                                        data-bs-title="{{ $intCumTooltip }}"
-                                        tabindex="0"
-                                        aria-label="{{ $pt['label'] }}: Acumulado R$ {{ number_format((float) $pt['cumulative'], 2, ',', '.') }}"
-                                    ></circle>
-                                    <circle
-                                        cx="{{ $pt['x'] }}"
-                                        cy="{{ $pt['y_cum'] }}"
-                                        r="4"
-                                        fill="#059669"
-                                        stroke="#ffffff"
-                                        stroke-width="2"
-                                        class="cofrinhos-chart-dot"
-                                        style="pointer-events: none;"
-                                    ></circle>
-                                @endforeach
-                            </svg>
-
-                            <!-- Eixo X dos Meses -->
-                            <div class="cofrinhos-chart-labels">
-                                @foreach($intPoints as $pt)
-                                    <span style="flex: 1; text-align: center;">{{ $pt['label'] }}</span>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="d-flex flex-column align-items-center justify-content-center text-center p-4 my-auto" style="min-height: 180px;">
-                                <div class="fs-2 mb-2 opacity-50">✨</div>
-                                <h3 class="h6 fw-bold mb-1" style="color: var(--dz-text-title);">Nenhum rendimento registrado ainda</h3>
-                                <p class="small text-secondary mb-3" style="max-width: 320px;">Lance os juros da poupança, CDI ou dividendos para acompanhar a curva de rentabilidade deste cofrinho.</p>
-                                <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalCofrinhoInterest">
-                                    + Lançar primeiro rendimento
-                                </button>
-                            </div>
-                        @endif
-                    </div>
+                                <!-- Eixo X dos Meses -->
+                                <div class="cofrinhos-chart-labels">
+                                    @foreach($intPoints as $pt)
+                                        <span style="flex: 1; text-align: center;">{{ $pt['label'] }}</span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="d-flex flex-column align-items-center justify-content-center text-center p-4 my-auto" style="min-height: 180px;">
+                                    <div class="fs-2 mb-2 opacity-50">✨</div>
+                                    <h3 class="h6 fw-bold mb-1" style="color: var(--dz-text-title);">Nenhum rendimento registrado ainda</h3>
+                                    <p class="small text-secondary mb-3" style="max-width: 320px;">Lance os juros da poupança, CDI ou dividendos para acompanhar a curva de rentabilidade deste cofrinho.</p>
+                                    <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalCofrinhoInterest">
+                                        + Lançar primeiro rendimento
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
                 </div>
             </div>
         </section>

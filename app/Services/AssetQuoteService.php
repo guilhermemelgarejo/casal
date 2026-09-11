@@ -57,4 +57,40 @@ class AssetQuoteService
             return null;
         });
     }
+
+    /**
+     * Obtém o mapa de preços históricos mensais de fechamento ('YYYY-MM' => float).
+     * Cache de 6 horas para poupar requisições e garantir respostas instantâneas.
+     *
+     * @return array<string, float>
+     */
+    public function getMonthlyHistoricalPrices(string $assetType, string $assetCode, bool $fresh = false): array
+    {
+        $cleanType = strtolower(trim($assetType));
+        $cleanCode = strtoupper(trim($assetCode));
+
+        if ($cleanType === 'fiat' || empty($cleanCode)) {
+            return [];
+        }
+
+        $cacheKey = "asset_monthly_prices_{$cleanType}_{$cleanCode}";
+
+        if ($fresh) {
+            Cache::forget($cacheKey);
+        }
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () use ($cleanType, $cleanCode) {
+            foreach ($this->providers as $provider) {
+                if ($provider->supports($cleanType, $cleanCode)) {
+                    $prices = $provider->fetchMonthlyHistoricalPrices($cleanType, $cleanCode);
+                    if (! empty($prices)) {
+                        return $prices;
+                    }
+                }
+            }
+
+            return [];
+        });
+    }
 }
+

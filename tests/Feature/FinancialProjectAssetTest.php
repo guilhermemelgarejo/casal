@@ -382,6 +382,128 @@ class FinancialProjectAssetTest extends TestCase
         $this->assertNotNull($septemberSeries);
         $this->assertEquals(300.00, $septemberSeries['aportes']);
     }
+
+    public function test_asset_cofrinho_renders_asset_specific_kpis_and_charts_instead_of_interest(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.00100000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        FinancialProjectEntry::create([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => FinancialProjectEntry::TYPE_ASSET_APORTE,
+            'amount' => '300.00',
+            'asset_quantity' => '0.00100000',
+            'asset_unit_price' => '300000.00',
+            'asset_resulting_avg_price' => '300000.00',
+            'date' => '2026-09-10',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cofrinhos.show', $project));
+        $response->assertOk();
+
+        // Cards e Gráficos de Ativos
+        $response->assertSee('Lucro / Valorização');
+        $response->assertSee('Evolução Patrimonial');
+        $response->assertSee('Acumulação de BTC');
+        $response->assertSee('Total acumulado');
+
+        // Não deve exibir "Lançar Juros" no header de ativos
+        $response->assertDontSee('💰 Lançar Juros');
+
+        // Estrutura das séries de gráficos
+        $chartData = $response->viewData('chartData');
+        $this->assertTrue($chartData['isAsset']);
+        $this->assertSame('BTC', $chartData['assetUnitLabel']);
+
+        $september = collect($chartData['balanceSeries'])->firstWhere('month', '2026-09');
+        $this->assertNotNull($september);
+        $this->assertArrayHasKey('invested', $september);
+        $this->assertArrayHasKey('qty_cumulative', $september);
+        $this->assertArrayHasKey('qty_monthly', $september);
+        $this->assertEquals(300.00, $september['invested']);
+        $this->assertEquals(0.001, $september['qty_cumulative']);
+    }
+
+    public function test_asset_quote_service_fetches_and_caches_monthly_historical_prices(): void
+    {
+        Http::fake([
+            'https://api.binance.com/api/v3/klines*' => Http::response([
+                [1767225600000, '400000', '490000', '390000', '480000.00', '100'], // 2026-01
+                [1769904000000, '480000', '510000', '450000', '500000.00', '120'], // 2026-02
+            ], 200),
+        ]);
+
+        /** @var \App\Services\AssetQuoteService $quoteService */
+        $quoteService = app(\App\Services\AssetQuoteService::class);
+        $history = $quoteService->getMonthlyHistoricalPrices('crypto', 'BTC', fresh: true);
+
+        $this->assertIsArray($history);
+        $this->assertArrayHasKey('2026-01', $history);
+        $this->assertEquals(480000.00, $history['2026-01']);
+        $this->assertArrayHasKey('2026-02', $history);
+        $this->assertEquals(500000.00, $history['2026-02']);
+    }
+
+    public function test_asset_chart_uses_historical_monthly_prices_for_past_months(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        Http::fake([
+            'https://api.binance.com/api/v3/ticker/24hr*' => Http::response([
+                'lastPrice' => '400000.00',
+                'priceChangePercent' => '5.00',
+                'highPrice' => '410000.00',
+                'lowPrice' => '390000.00',
+            ], 200),
+            'https://api.binance.com/api/v3/klines*' => Http::response([
+                [1767225600000, '300000', '320000', '290000', '300000.00', '50'], // 2026-01
+            ], 200),
+        ]);
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'BTC Carteira Histórica',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.01000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        // Aporte no passado (2026-01)
+        FinancialProjectEntry::create([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'financial_project_id' => $project->id,
+            'type' => FinancialProjectEntry::TYPE_ASSET_APORTE,
+            'amount' => '3000.00',
+            'asset_quantity' => '0.01000000',
+            'asset_unit_price' => '300000.00',
+            'asset_resulting_avg_price' => '300000.00',
+            'date' => '2026-01-15',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cofrinhos.show', $project));
+        $response->assertOk();
+
+        $chartData = $response->viewData('chartData');
+        $janSeries = collect($chartData['balanceSeries'])->firstWhere('month', '2026-01');
+
+        $this->assertNotNull($janSeries);
+        $this->assertEquals(300000.00, $janSeries['quote_price']);
+        // 0.01 BTC * R$ 300.000,00 = R$ 3.000,00
+        $this->assertEquals(3000.00, $janSeries['balance']);
+    }
 }
+
 
 

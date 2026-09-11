@@ -382,8 +382,10 @@ class FinancialProjectController extends Controller
             : [null, null];
 
         $currentQuote = null;
+        $historicalPrices = [];
         if ($cofrinho->isCustomAsset() && ! empty($cofrinho->asset_code)) {
             $currentQuote = $this->quoteService->getQuote($cofrinho->asset_type, $cofrinho->asset_code);
+            $historicalPrices = $this->quoteService->getMonthlyHistoricalPrices($cofrinho->asset_type, $cofrinho->asset_code);
         }
         $quotePrice = $currentQuote?->price;
 
@@ -441,7 +443,8 @@ class FinancialProjectController extends Controller
         $chartTransactions = $allTransactions->reject(fn (Transaction $t) => in_array((int) $t->id, $usedTxIds, true));
 
         // Dados para os gráficos de evolução
-        $chartData = $this->buildChartSeries($cofrinho, $chartTransactions, $allEntries, $quotePrice);
+        $chartData = $this->buildChartSeries($cofrinho, $chartTransactions, $allEntries, $quotePrice, $historicalPrices);
+
 
         // Movimentações filtradas para a tabela (se period estiver selecionado)
         $filteredTransactions = ($period !== null
@@ -603,8 +606,10 @@ class FinancialProjectController extends Controller
         FinancialProject $cofrinho,
         Collection $allTransactions,
         Collection $allEntries,
-        ?float $quotePrice
+        ?float $quotePrice,
+        array $historicalPrices = []
     ): array {
+
         $now = Carbon::now();
 
         // Determina a data mais antiga para iniciar o eixo temporal
@@ -650,6 +655,7 @@ class FinancialProjectController extends Controller
                 'month' => Carbon::parse($t->date)->format('Y-m'),
                 'type' => $t->type === 'expense' ? 'aporte' : 'retirada',
                 'amount' => (float) $t->amount,
+                'asset_quantity' => null,
                 'id' => (int) $t->id,
             ]);
         }
@@ -711,9 +717,20 @@ class FinancialProjectController extends Controller
             ];
         }
 
-        // 2. Gráfico de Evolução Global
+        // 2. Gráfico de Evolução (Patrimonial / Saldo)
         $balanceSeries = [];
         $isAsset = $cofrinho->isCustomAsset();
+
+        // Para ativos, distribui a quantidade legada/base que não possui asset_quantity gravado diretamente
+        $legacyQty = 0.0;
+        $legacyInvestedSum = 0.0;
+        if ($isAsset) {
+            $explicitQtySum = (float) $allEntries->where('type', FinancialProjectEntry::TYPE_ASSET_APORTE)->sum('asset_quantity')
+                - (float) $allEntries->where('type', FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL)->sum('asset_quantity');
+            $currentTotalQty = (float) ($cofrinho->asset_quantity ?? 0);
+            $legacyQty = max(0.0, $currentTotalQty - $explicitQtySum);
+            $legacyInvestedSum = (float) $allMovements->filter(fn ($m) => empty($m['asset_quantity']) && in_array($m['type'], ['aporte', 'ajuste_saldo']))->sum('amount');
+        }
 
         foreach ($months as $m) {
             $cDate = Carbon::createFromFormat('Y-m', $m);
@@ -721,20 +738,46 @@ class FinancialProjectController extends Controller
             $monthLabel = ucfirst($cDate->translatedFormat('M/y'));
 
             $movementsUpToMonth = $sortedMovements->filter(fn ($mov) => $mov['date'] <= $monthEnd);
+            $thisMonthMovs = $sortedMovements->filter(fn ($mov) => $mov['month'] === $m);
 
             if ($isAsset) {
                 $qty = 0.0;
                 $invested = 0.0;
+
                 foreach ($movementsUpToMonth as $mov) {
+                    $movQty = $mov['asset_quantity'] !== null ? (float) $mov['asset_quantity'] : null;
+                    if ($movQty === null && $legacyInvestedSum > 0.0001 && $legacyQty > 0) {
+                        $movQty = ($mov['amount'] / $legacyInvestedSum) * $legacyQty;
+                    }
+
                     if ($mov['type'] === 'retirada') {
-                        $qty = max(0.0, $qty - ($mov['asset_quantity'] ?? 0));
+                        $qty = max(0.0, $qty - ($movQty ?? 0));
                         $invested = max(0.0, $invested - $mov['amount']);
                     } else {
-                        $qty += ($mov['asset_quantity'] ?? 0);
+                        $qty += ($movQty ?? 0);
                         $invested += $mov['amount'];
                     }
                 }
-                $balance = ($quotePrice !== null && $quotePrice > 0) ? ($qty * $quotePrice) : $invested;
+
+                $monthlyQty = 0.0;
+                foreach ($thisMonthMovs as $mov) {
+                    if ($mov['type'] === 'aporte' || $mov['type'] === 'ajuste_saldo') {
+                        $movQty = $mov['asset_quantity'] !== null ? (float) $mov['asset_quantity'] : null;
+                        if ($movQty === null && $legacyInvestedSum > 0.0001 && $legacyQty > 0) {
+                            $movQty = ($mov['amount'] / $legacyInvestedSum) * $legacyQty;
+                        }
+                        $monthlyQty += ($movQty ?? 0);
+                    }
+                }
+
+                $currentMonthKey = Carbon::now()->format('Y-m');
+                $priceForMonth = ($m === $currentMonthKey)
+                    ? ($quotePrice ?? ($historicalPrices[$m] ?? null))
+                    : ($historicalPrices[$m] ?? $quotePrice);
+
+                $balance = ($priceForMonth !== null && $priceForMonth > 0) ? ($qty * $priceForMonth) : $invested;
+                $profit = $balance - $invested;
+                $profitPct = $invested > 0.0001 ? (($balance / $invested) - 1.0) * 100.0 : 0.0;
             } else {
                 $bal = 0.0;
                 foreach ($movementsUpToMonth as $mov) {
@@ -745,9 +788,14 @@ class FinancialProjectController extends Controller
                     }
                 }
                 $balance = $bal;
+                $invested = $bal;
+                $profit = 0.0;
+                $profitPct = 0.0;
+                $qty = 0.0;
+                $monthlyQty = 0.0;
+                $priceForMonth = null;
             }
 
-            $thisMonthMovs = $sortedMovements->filter(fn ($mov) => $mov['month'] === $m);
             $monthlyAportes = (float) $thisMonthMovs->filter(fn ($mov) => in_array($mov['type'], ['aporte', 'ajuste_saldo']))->sum('amount');
             $monthlyRetiradas = (float) $thisMonthMovs->filter(fn ($mov) => $mov['type'] === 'retirada')->sum('amount');
             $monthlyJuros = (float) $thisMonthMovs->filter(fn ($mov) => $mov['type'] === 'juros')->sum('amount');
@@ -757,11 +805,18 @@ class FinancialProjectController extends Controller
                 'month' => $m,
                 'label' => $monthLabel,
                 'balance' => round($balance, 2),
+                'invested' => round($invested, 2),
+                'profit' => round($profit, 2),
+                'profit_pct' => round($profitPct, 2),
+                'quote_price' => $priceForMonth !== null ? round($priceForMonth, 2) : null,
+                'qty_cumulative' => (float) number_format($qty, 8, '.', ''),
+                'qty_monthly' => (float) number_format($monthlyQty, 8, '.', ''),
                 'net' => round($monthlyNet, 2),
                 'aportes' => round($monthlyAportes, 2),
                 'retiradas' => round($monthlyRetiradas, 2),
                 'juros' => round($monthlyJuros, 2),
             ];
+
         }
 
         return [
@@ -769,6 +824,9 @@ class FinancialProjectController extends Controller
             'interestSeries' => $interestSeries,
             'balanceSeries' => $balanceSeries,
             'target' => $cofrinho->target_amount !== null ? (float) $cofrinho->target_amount : null,
+            'isAsset' => $isAsset,
+            'assetUnitLabel' => $cofrinho->assetUnitLabel(),
+            'totalAssetQuantity' => (float) ($cofrinho->asset_quantity ?? 0),
         ];
     }
 

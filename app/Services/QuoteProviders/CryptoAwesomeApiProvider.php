@@ -4,9 +4,11 @@ namespace App\Services\QuoteProviders;
 
 use App\Contracts\AssetQuoteProviderInterface;
 use App\DTO\AssetQuoteData;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+
 
 class CryptoAwesomeApiProvider implements AssetQuoteProviderInterface
 {
@@ -150,4 +152,45 @@ class CryptoAwesomeApiProvider implements AssetQuoteProviderInterface
 
         return null;
     }
+
+    /**
+     * Obtém o histórico de fechamento mensal via Binance Klines API (1M candlesticks).
+     *
+     * @return array<string, float>
+     */
+    public function fetchMonthlyHistoricalPrices(string $assetType, string $assetCode, int $monthsLimit = 24): array
+    {
+        $normalizedCode = strtoupper(trim($assetCode));
+        if ($normalizedCode === 'BITCOIN') {
+            $normalizedCode = 'BTC';
+        }
+
+        try {
+            $symbol = $normalizedCode . 'BRL';
+            $response = Http::timeout(4)->get('https://api.binance.com/api/v3/klines', [
+                'symbol' => $symbol,
+                'interval' => '1M',
+                'limit' => $monthsLimit,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (is_array($data)) {
+                    $history = [];
+                    foreach ($data as $kline) {
+                        if (isset($kline[0], $kline[4])) {
+                            $monthKey = Carbon::createFromTimestampMs((int) $kline[0])->format('Y-m');
+                            $history[$monthKey] = (float) $kline[4];
+                        }
+                    }
+                    return $history;
+                }
+            }
+        } catch (Throwable $e) {
+            Log::debug("CryptoAwesomeApiProvider: Falha ao consultar klines da Binance para {$normalizedCode}: " . $e->getMessage());
+        }
+
+        return [];
+    }
 }
+
