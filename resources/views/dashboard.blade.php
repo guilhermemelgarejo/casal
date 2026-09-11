@@ -38,7 +38,23 @@
 <x-app-layout :installment-groups-modal-payload="$installmentGroupsModalPayload ?? []" :tx-cofrinho-prefill="$txCofrinhoPrefill ?? null" :tx-recurring-prefill="$txRecurringPrefill ?? null">
     <x-slot name="header">
         <div>
-            <h1 class="dz-page-title dashboard-title">Painel Financeiro</h1>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h1 class="dz-page-title dashboard-title mb-0">Painel Financeiro</h1>
+                @if ($showAlert)
+                    <button type="button" id="dashboard-spending-alert-badge" class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center gap-1.5 text-decoration-none shadow-none" style="font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.6rem; cursor: pointer; display: none;" title="Atenção aos gastos: {{ number_format($thresholdPercentage, 0) }}% da renda atingida. Clique para ver detalhes.">
+                        <span style="font-size: 0.78rem;">⚠️</span>
+                        <span>Alerta de gastos</span>
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="opacity: 0.7;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <script>
+                        try {
+                            if (localStorage.getItem('duozen_spending_alert_collapsed') === 'true') {
+                                document.getElementById('dashboard-spending-alert-badge').style.display = 'inline-flex';
+                            }
+                        } catch (e) {}
+                    </script>
+                @endif
+            </div>
             <div style="font-size: 0.85rem; color: var(--dz-text-secondary); margin-top: 0.15rem;">
                 Visão geral para <span class="fw-semibold text-body">{{ $couple->name ?? 'o casal' }}</span>
             </div>
@@ -98,78 +114,52 @@
             <button type="button" class="btn-close flex-shrink-0 ms-auto mt-1" id="btn-collapse-spending-alert" aria-label="Minimizar aviso" title="Minimizar aviso"></button>
         </div>
 
-        <!-- Alerta de Limite de Gastos: Versão Compacta -->
-        <div id="dashboard-spending-alert-compact" class="alert alert-danger border-0 shadow-sm mb-3 py-1.5 px-3 rounded-3 align-items-center justify-content-between gap-2" role="alert" style="display: none; cursor: pointer;">
-            <div class="d-flex align-items-center gap-2 small text-danger min-w-0">
-                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="flex-shrink-0 text-danger">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-                <div class="text-truncate">
-                    <strong class="text-danger-emphasis">Atenção aos gastos:</strong>
-                    <span>Vocês atingiram <strong>{{ number_format($thresholdPercentage, 0) }}%</strong> da renda planejada (Gastos: <strong class="duozen-privacy-blur">R$ {{ number_format($totalExpense, 2, ',', '.') }}</strong>)</span>
-                </div>
-            </div>
-            <button type="button" class="btn btn-link text-danger-emphasis p-0 text-decoration-none small flex-shrink-0 d-inline-flex align-items-center gap-1 fw-semibold" id="btn-expand-spending-alert" title="Expandir aviso" style="font-size: 0.8rem; white-space: nowrap;">
-                <span>Expandir</span>
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-            </button>
-        </div>
-
         <script>
             (function() {
                 var fullAlert = document.getElementById('dashboard-spending-alert-full');
-                var compactAlert = document.getElementById('dashboard-spending-alert-compact');
+                var badgeAlert = document.getElementById('dashboard-spending-alert-badge');
                 var btnCollapse = document.getElementById('btn-collapse-spending-alert');
-                var btnExpand = document.getElementById('btn-expand-spending-alert');
 
                 // Aplicar estado salvo no navegador imediatamente para evitar flickering
                 try {
                     if (localStorage.getItem('duozen_spending_alert_collapsed') === 'true') {
-                        if (fullAlert && compactAlert) {
+                        if (fullAlert) {
                             fullAlert.style.display = 'none';
                             fullAlert.classList.remove('d-flex');
-                            compactAlert.style.display = 'flex';
+                        }
+                        if (badgeAlert) {
+                            badgeAlert.style.display = 'inline-flex';
                         }
                     }
                 } catch (e) {}
 
-                // Minimizar para versão compacta ao clicar no 'X'
-                if (btnCollapse && fullAlert && compactAlert) {
+                // Minimizar para badge no topo ao clicar no 'X'
+                if (btnCollapse && fullAlert) {
                     btnCollapse.addEventListener('click', function (e) {
                         e.preventDefault();
                         e.stopPropagation();
                         fullAlert.style.display = 'none';
                         fullAlert.classList.remove('d-flex');
-                        compactAlert.style.display = 'flex';
+                        if (badgeAlert) {
+                            badgeAlert.style.display = 'inline-flex';
+                        }
                         try {
                             localStorage.setItem('duozen_spending_alert_collapsed', 'true');
                         } catch (err) {}
                     });
                 }
 
-                // Expandir para versão completa
-                function expandAlert(e) {
-                    if (e) {
+                // Expandir para versão completa ao clicar no badge do título
+                if (badgeAlert && fullAlert) {
+                    badgeAlert.addEventListener('click', function (e) {
                         e.preventDefault();
                         e.stopPropagation();
-                    }
-                    if (compactAlert && fullAlert) {
-                        compactAlert.style.display = 'none';
+                        badgeAlert.style.display = 'none';
                         fullAlert.style.display = 'flex';
                         fullAlert.classList.add('d-flex');
                         try {
                             localStorage.removeItem('duozen_spending_alert_collapsed');
                         } catch (err) {}
-                    }
-                }
-
-                if (btnExpand) {
-                    btnExpand.addEventListener('click', expandAlert);
-                }
-
-                if (compactAlert) {
-                    compactAlert.addEventListener('click', function(e) {
-                        expandAlert(e);
                     });
                 }
             })();
