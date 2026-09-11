@@ -659,6 +659,138 @@ class FinancialProjectAssetTest extends TestCase
         $this->assertEquals(-4000.00, (float) $mov['amount']);
         $this->assertEquals($account->name, $mov['account_name']);
     }
+
+    public function test_asset_aporte_and_sale_respect_with_account_tx_toggle(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.05000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        // Aporte com switch desligado (with_account_tx = 0)
+        $this->actingAs($user)->post(route('cofrinhos.asset-aporte.store', $project), [
+            'amount' => '2000.00',
+            'asset_quantity' => '0.00500000',
+            'asset_unit_price' => '400000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+            'with_account_tx' => '0',
+        ])->assertRedirect();
+
+        // Nenhuma transação bancária de despesa deve ter sido criada
+        $this->assertDatabaseMissing('transactions', [
+            'financial_project_id' => $project->id,
+            'type' => 'expense',
+        ]);
+
+        // Venda com switch desligado (with_account_tx = 0)
+        $this->actingAs($user)->post(route('cofrinhos.asset-sale.store', $project), [
+            'amount' => '4000.00',
+            'asset_quantity' => '0.01000000',
+            'asset_unit_price' => '400000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+            'with_account_tx' => '0',
+        ])->assertRedirect();
+
+        // Nenhuma transação bancária de receita deve ter sido criada
+        $this->assertDatabaseMissing('transactions', [
+            'financial_project_id' => $project->id,
+            'type' => 'income',
+        ]);
+    }
+
+    public function test_modals_are_rendered_identically_on_index_and_show(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.05000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        // Tela de listagem (index)
+        $indexResponse = $this->actingAs($user)->get(route('cofrinhos.index'));
+        $indexResponse->assertOk();
+        $indexResponse->assertSee("modalCofrinhoAssetAporte{$project->id}");
+        $indexResponse->assertSee("modalCofrinhoAssetVenda{$project->id}");
+        $indexResponse->assertSee('js-asset-aporte-form');
+        $indexResponse->assertSee('js-asset-venda-form');
+        $indexResponse->assertSee('Simulação do Novo Preço Médio');
+        $indexResponse->assertSee('Saldo após a venda');
+        $indexResponse->assertSee('Deduzir valor de uma conta corrente');
+        $indexResponse->assertSee('Creditar valor em uma conta corrente');
+
+        // Tela de detalhes (show)
+        $showResponse = $this->actingAs($user)->get(route('cofrinhos.show', $project));
+        $showResponse->assertOk();
+        $showResponse->assertSee('id="modalAssetAporte"', false);
+        $showResponse->assertSee('id="modalAssetVenda"', false);
+        $showResponse->assertSee('js-asset-aporte-form');
+        $showResponse->assertSee('js-asset-venda-form');
+        $showResponse->assertSee('Simulação do Novo Preço Médio');
+        $showResponse->assertSee('Deduzir valor de uma conta corrente');
+        $showResponse->assertSee('Creditar valor em uma conta corrente');
+        $showResponse->assertSee('Forma de pagamento');
+    }
+
+    public function test_asset_aporte_and_sale_can_choose_custom_payment_method(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.05000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        // 1. Aporte escolhendo 'Pix'
+        $this->actingAs($user)->post(route('cofrinhos.asset-aporte.store', $project), [
+            'amount' => '3000.00',
+            'asset_quantity' => '0.01000000',
+            'asset_unit_price' => '300000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+            'payment_method' => 'Pix',
+            'with_account_tx' => '1',
+        ])->assertRedirect();
+
+        $aporteTx = Transaction::where('financial_project_id', $project->id)
+            ->where('type', 'expense')
+            ->first();
+        $this->assertNotNull($aporteTx);
+        $this->assertEquals('Pix', $aporteTx->payment_method);
+
+        // 2. Venda escolhendo 'Boleto' (ou 'Cartão de Débito')
+        $this->actingAs($user)->post(route('cofrinhos.asset-sale.store', $project), [
+            'amount' => '1500.00',
+            'asset_quantity' => '0.00500000',
+            'asset_unit_price' => '300000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+            'payment_method' => 'Cartão de Débito',
+            'with_account_tx' => '1',
+        ])->assertRedirect();
+
+        $saleTx = Transaction::where('financial_project_id', $project->id)
+            ->where('type', 'income')
+            ->first();
+        $this->assertNotNull($saleTx);
+        $this->assertEquals('Cartão de Débito', $saleTx->payment_method);
+    }
 }
 
 

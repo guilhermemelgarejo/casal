@@ -588,6 +588,23 @@
                     });
                 }
 
+                // Toggle conta bancaria nos modais de aporte/venda de ativos
+                document.querySelectorAll('.js-toggle-account-tx').forEach(function (toggle) {
+                    toggle.addEventListener('change', function () {
+                        const container = this.closest('.modal-body') || this.closest('form');
+                        const fields = container ? container.querySelector('.js-account-tx-fields') : null;
+                        const select = container ? container.querySelector('select[name="account_id"]') : null;
+                        if (fields) {
+                            if (this.checked) {
+                                fields.classList.remove('d-none');
+                            } else {
+                                fields.classList.add('d-none');
+                                if (select) select.value = '';
+                            }
+                        }
+                    });
+                });
+
                 // Sincronizador de Aportes em Ativos e Simulador de Preço Médio
                 document.querySelectorAll('.js-asset-aporte-form').forEach(function (form) {
                     const cofrinhoId = form.getAttribute('data-cofrinho-id');
@@ -600,13 +617,14 @@
                     const newQtyEl = document.getElementById('sim-new-qty-' + cofrinhoId);
                     const newPmEl = document.getElementById('sim-new-pm-' + cofrinhoId);
 
-                    let q0 = 0;
-                    let pm0 = 0;
-                    if (curQtyEl) {
+                    let q0 = parseFloat(form.getAttribute('data-cur-quantity')) || 0;
+                    let pm0 = parseFloat(form.getAttribute('data-cur-pm')) || 0;
+
+                    if (!q0 && curQtyEl) {
                         const txt = curQtyEl.textContent.trim().split(' ')[0].replace(/\./g, '').replace(',', '.');
                         q0 = parseFloat(txt) || 0;
                     }
-                    if (curPmEl) {
+                    if (!pm0 && curPmEl) {
                         const txt = curPmEl.textContent.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
                         pm0 = parseFloat(txt) || 0;
                     }
@@ -664,7 +682,6 @@
                     }
 
                     if (amountInput && priceInput && quantityInput) {
-                        // Ao alterar valor investido: se quantidade já informada, recalcula cotação; senão, calcula quantidade pela cotação
                         const onAmountChange = function () {
                             const qty = parseInputNumber(quantityInput.value);
                             if (qty > 0) {
@@ -681,7 +698,6 @@
                         amountInput.addEventListener('input', onAmountChange);
                         amountInput.addEventListener('change', onAmountChange);
 
-                        // Ao alterar quantidade comprada: NUNCA altera valor investido, SEMPRE recalcula cotação!
                         const onQuantityChange = function () {
                             updateQuotePrice();
                             recomputeSim();
@@ -689,7 +705,6 @@
                         quantityInput.addEventListener('input', onQuantityChange);
                         quantityInput.addEventListener('change', onQuantityChange);
 
-                        // Ao alterar cotação diretamente: calcula quantidade a partir do valor investido
                         const onPriceChange = function () {
                             const prc = parseInputNumber(priceInput.value);
                             const amt = parseInputNumber(amountInput.value);
@@ -713,8 +728,8 @@
                     const curQtyEl = document.getElementById('sim-venda-cur-qty-' + cofrinhoId);
                     const newQtyEl = document.getElementById('sim-venda-new-qty-' + cofrinhoId);
 
-                    let q0 = 0;
-                    if (curQtyEl) {
+                    let q0 = parseFloat(form.getAttribute('data-cur-quantity')) || 0;
+                    if (!q0 && curQtyEl) {
                         const txt = curQtyEl.textContent.trim().split(' ')[0].replace(/\./g, '').replace(',', '.');
                         q0 = parseFloat(txt) || 0;
                     }
@@ -733,10 +748,23 @@
                     function recomputeSim() {
                         const qty = parseInputNumber(quantityInput.value);
                         if (qty > 0) {
-                            let newQty = Math.max(0, q0 - qty);
-                            if (newQtyEl) newQtyEl.textContent = newQty.toLocaleString('pt-BR', { maximumFractionDigits: 8 });
+                            if (qty > q0 + 0.00000001) {
+                                if (newQtyEl) {
+                                    newQtyEl.textContent = 'Saldo insuficiente';
+                                    newQtyEl.className = 'fs-6 text-danger fw-bold';
+                                }
+                            } else {
+                                let newQty = Math.max(0, q0 - qty);
+                                if (newQtyEl) {
+                                    newQtyEl.textContent = newQty.toLocaleString('pt-BR', { maximumFractionDigits: 8 });
+                                    newQtyEl.className = 'fs-6 text-danger';
+                                }
+                            }
                         } else {
-                            if (newQtyEl) newQtyEl.textContent = '—';
+                            if (newQtyEl) {
+                                newQtyEl.textContent = '—';
+                                newQtyEl.className = 'fs-6 text-danger';
+                            }
                         }
                     }
 
@@ -825,10 +853,12 @@
                                     const modalPriceInput = document.getElementById('asset_price_' + cofrinhoId);
                                     if (modalPriceInput) {
                                         modalPriceInput.value = newPrice.toFixed(2);
+                                        modalPriceInput.dispatchEvent(new Event('input'));
                                     }
                                     const modalVendaPriceInput = document.getElementById('asset_venda_price_' + cofrinhoId);
                                     if (modalVendaPriceInput) {
                                         modalVendaPriceInput.value = newPrice.toFixed(2);
+                                        modalVendaPriceInput.dispatchEvent(new Event('input'));
                                     }
                                 }
                             })

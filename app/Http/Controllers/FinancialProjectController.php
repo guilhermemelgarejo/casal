@@ -8,6 +8,7 @@ use App\Models\FinancialProject;
 use App\Models\FinancialProjectEntry;
 use App\Models\Transaction;
 use App\Services\AssetQuoteService;
+use App\Support\PaymentMethods;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -387,6 +388,7 @@ class FinancialProjectController extends Controller
             'date' => ['required', 'date'],
             'note' => ['nullable', 'string', 'max:255'],
             'account_id' => ['nullable', 'exists:accounts,id'],
+            'payment_method' => ['nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
         ]);
 
         $amount = (float) str_replace(',', '.', (string) $validated['amount']);
@@ -396,9 +398,11 @@ class FinancialProjectController extends Controller
             : ($quantity > 0 ? ($amount / $quantity) : null);
         $date = $validated['date'];
         $note = $validated['note'] ?? null;
-        $accountId = ! empty($validated['account_id']) ? (int) $validated['account_id'] : null;
+        $withAccount = $request->exists('with_account_tx') ? $request->boolean('with_account_tx') : true;
+        $accountId = ($withAccount && ! empty($validated['account_id'])) ? (int) $validated['account_id'] : null;
+        $paymentMethod = $validated['payment_method'] ?? null;
 
-        DB::transaction(function () use ($cofrinho, $amount, $quantity, $unitPrice, $date, $note, $accountId) {
+        DB::transaction(function () use ($cofrinho, $amount, $quantity, $unitPrice, $date, $note, $accountId, $paymentMethod) {
             // 1. Recalcula Preço Médio ponderado e atualiza quantidade total do ativo
             $recalc = $cofrinho->recalculateAveragePriceOnAporte($amount, $quantity, $unitPrice);
 
@@ -427,6 +431,9 @@ class FinancialProjectController extends Controller
 
                     $dateObj = Carbon::parse($date);
                     $desc = "Aporte {$cofrinho->name} (+{$quantity} {$cofrinho->assetUnitLabel()})";
+                    $effectivePm = (! empty($paymentMethod) && $account->allowsPaymentMethod($paymentMethod))
+                        ? $paymentMethod
+                        : ($account->getEffectivePaymentMethods()[0] ?? 'Pix');
 
                     $tx = Transaction::create([
                         'couple_id' => Auth::user()->couple_id,
@@ -434,7 +441,7 @@ class FinancialProjectController extends Controller
                         'account_id' => $account->id,
                         'description' => $desc,
                         'amount' => number_format($amount, 2, '.', ''),
-                        'payment_method' => $account->getEffectivePaymentMethods()[0] ?? 'Pix',
+                        'payment_method' => $effectivePm,
                         'type' => 'expense',
                         'date' => $date,
                         'reference_month' => (int) $dateObj->month,
@@ -531,6 +538,7 @@ class FinancialProjectController extends Controller
             'date' => ['required', 'date'],
             'note' => ['nullable', 'string', 'max:255'],
             'account_id' => ['nullable', 'exists:accounts,id'],
+            'payment_method' => ['nullable', 'string', 'max:100', Rule::in(PaymentMethods::forRegularAccounts())],
         ]);
 
         $amount = (float) str_replace(',', '.', (string) $validated['amount']);
@@ -540,7 +548,9 @@ class FinancialProjectController extends Controller
             : ($quantity > 0 ? ($amount / $quantity) : null);
         $date = $validated['date'];
         $note = $validated['note'] ?? null;
-        $accountId = ! empty($validated['account_id']) ? (int) $validated['account_id'] : null;
+        $withAccount = $request->exists('with_account_tx') ? $request->boolean('with_account_tx') : true;
+        $accountId = ($withAccount && ! empty($validated['account_id'])) ? (int) $validated['account_id'] : null;
+        $paymentMethod = $validated['payment_method'] ?? null;
 
         $currentQty = (float) ($cofrinho->asset_quantity ?? 0);
         if ($quantity > $currentQty + 0.00000001) {
@@ -550,7 +560,7 @@ class FinancialProjectController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($cofrinho, $amount, $quantity, $unitPrice, $date, $note, $accountId) {
+        DB::transaction(function () use ($cofrinho, $amount, $quantity, $unitPrice, $date, $note, $accountId, $paymentMethod) {
             // 1. Deduz a quantidade do ativo mantendo o Preço Médio inalterado
             $cofrinho->registerWithdrawal($quantity);
 
@@ -579,6 +589,9 @@ class FinancialProjectController extends Controller
 
                     $dateObj = Carbon::parse($date);
                     $desc = "Venda {$cofrinho->name} (-{$quantity} {$cofrinho->assetUnitLabel()})";
+                    $effectivePm = (! empty($paymentMethod) && $account->allowsPaymentMethod($paymentMethod))
+                        ? $paymentMethod
+                        : ($account->getEffectivePaymentMethods()[0] ?? 'Pix');
 
                     $tx = Transaction::create([
                         'couple_id' => Auth::user()->couple_id,
@@ -586,7 +599,7 @@ class FinancialProjectController extends Controller
                         'account_id' => $account->id,
                         'description' => $desc,
                         'amount' => number_format($amount, 2, '.', ''),
-                        'payment_method' => $account->getEffectivePaymentMethods()[0] ?? 'Pix',
+                        'payment_method' => $effectivePm,
                         'type' => 'income',
                         'date' => $date,
                         'reference_month' => (int) $dateObj->month,
