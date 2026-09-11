@@ -288,21 +288,9 @@ class FinancialProjectController extends Controller
             // 1. Recalcula Preço Médio ponderado e atualiza quantidade total do ativo
             $recalc = $cofrinho->recalculateAveragePriceOnAporte($amount, $quantity, $unitPrice);
 
-            // 2. Grava a entrada histórica
-            FinancialProjectEntry::create([
-                'couple_id' => Auth::user()->couple_id,
-                'user_id' => Auth::id(),
-                'financial_project_id' => $cofrinho->id,
-                'type' => FinancialProjectEntry::TYPE_ASSET_APORTE,
-                'amount' => number_format($amount, 2, '.', ''),
-                'asset_quantity' => number_format($quantity, 8, '.', ''),
-                'asset_unit_price' => number_format($unitPrice ?? ($amount / $quantity), 4, '.', ''),
-                'asset_resulting_avg_price' => number_format($recalc['new_avg_price'], 4, '.', ''),
-                'date' => $date,
-                'note' => $note,
-            ]);
+            $linkedTxId = null;
 
-            // 3. Se selecionou conta bancária de origem, gera a transação de despesa em Investimentos
+            // 2. Se selecionou conta bancária de origem, gera a transação de despesa em Investimentos
             if ($accountId !== null) {
                 $account = Account::query()
                     ->where('couple_id', Auth::user()->couple_id)
@@ -348,8 +336,29 @@ class FinancialProjectController extends Controller
                             ],
                         ]);
                     }
+
+                    $linkedTxId = $tx->id;
                 }
             }
+
+            // 3. Grava a entrada histórica vinculando o ID da transação
+            $entryNote = $note;
+            if ($linkedTxId !== null) {
+                $entryNote = trim(($entryNote ?? '') . " [tx:{$linkedTxId}]");
+            }
+
+            FinancialProjectEntry::create([
+                'couple_id' => Auth::user()->couple_id,
+                'user_id' => Auth::id(),
+                'financial_project_id' => $cofrinho->id,
+                'type' => FinancialProjectEntry::TYPE_ASSET_APORTE,
+                'amount' => number_format($amount, 2, '.', ''),
+                'asset_quantity' => number_format($quantity, 8, '.', ''),
+                'asset_unit_price' => number_format($unitPrice ?? ($amount / $quantity), 4, '.', ''),
+                'asset_resulting_avg_price' => number_format($recalc['new_avg_price'], 4, '.', ''),
+                'date' => $date,
+                'note' => $entryNote !== '' ? $entryNote : null,
+            ]);
         });
 
         $unitLabel = $cofrinho->assetUnitLabel();
@@ -393,13 +402,52 @@ class FinancialProjectController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        // Mapeia lançamentos de aporte no ativo com suas transações bancárias correspondentes
+        $usedTxIds = [];
+        $entryTxMap = [];
+        foreach ($allEntries as $entry) {
+            if ($entry->type !== FinancialProjectEntry::TYPE_ASSET_APORTE) {
+                continue;
+            }
+
+            $matchedTx = null;
+            if (preg_match('/\[tx:(\d+)\]/', (string) $entry->note, $matches)) {
+                $matchedTx = $allTransactions->firstWhere('id', (int) $matches[1]);
+            }
+
+            if (! $matchedTx) {
+                $entryDate = Carbon::parse($entry->date)->format('Y-m-d');
+                $matchedTx = $allTransactions->first(function (Transaction $t) use ($entry, $entryDate, $usedTxIds) {
+                    if (in_array((int) $t->id, $usedTxIds, true)) {
+                        return false;
+                    }
+                    if ($t->type !== 'expense') {
+                        return false;
+                    }
+                    if (Carbon::parse($t->date)->format('Y-m-d') !== $entryDate) {
+                        return false;
+                    }
+                    return abs((float) $t->amount - (float) $entry->amount) < 0.009;
+                });
+            }
+
+            if ($matchedTx) {
+                $usedTxIds[] = (int) $matchedTx->id;
+                $entryTxMap[$entry->id] = $matchedTx;
+            }
+        }
+
+        // Transações dedupicadas para não duplicar os aportes em ativos nos gráficos e na listagem
+        $chartTransactions = $allTransactions->reject(fn (Transaction $t) => in_array((int) $t->id, $usedTxIds, true));
+
         // Dados para os gráficos de evolução
-        $chartData = $this->buildChartSeries($cofrinho, $allTransactions, $allEntries, $quotePrice);
+        $chartData = $this->buildChartSeries($cofrinho, $chartTransactions, $allEntries, $quotePrice);
 
         // Movimentações filtradas para a tabela (se period estiver selecionado)
-        $filteredTransactions = $period !== null
-            ? $allTransactions->filter(fn (Transaction $t) => (int) $t->reference_month === $month && (int) $t->reference_year === $year)
-            : $allTransactions;
+        $filteredTransactions = ($period !== null
+            ? $chartTransactions->filter(fn (Transaction $t) => (int) $t->reference_month === $month && (int) $t->reference_year === $year)
+            : $chartTransactions
+        );
 
         $transactionRows = $filteredTransactions->map(function (Transaction $transaction): array {
             $kind = $transaction->type === 'expense' ? 'aporte' : 'retirada';
@@ -432,12 +480,17 @@ class FinancialProjectController extends Controller
             })
             : $allEntries;
 
-        $entryRows = $filteredEntries->map(function (FinancialProjectEntry $entry): array {
+        $entryRows = $filteredEntries->map(function (FinancialProjectEntry $entry) use ($entryTxMap, $cofrinho): array {
             $isInterest = $entry->type === FinancialProjectEntry::TYPE_INTEREST;
             $isAporte = $entry->type === FinancialProjectEntry::TYPE_ASSET_APORTE;
             $isWithdrawal = $entry->type === FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL;
-            $noteNormalized = trim(mb_strtolower((string) ($entry->note ?? '')));
+            $noteRaw = (string) ($entry->note ?? '');
+            $cleanNote = trim(preg_replace('/\[tx:\d+\]/', '', $noteRaw));
+            $cleanNote = $cleanNote !== '' ? $cleanNote : null;
+            $noteNormalized = trim(mb_strtolower($cleanNote ?? ''));
             $isSaldoInicial = in_array($noteNormalized, ['ajuste', 'saldo inicial', 'saldo_inicial'], true);
+
+            $matchedTx = $entryTxMap[$entry->id] ?? null;
 
             if ($isSaldoInicial) {
                 $kind = 'saldo_inicial';
@@ -450,7 +503,14 @@ class FinancialProjectController extends Controller
                 $defaultDesc = 'Movimentação no cofrinho';
             } else {
                 $kind = 'aporte';
-                $defaultDesc = $isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho';
+                if ($isAporte && $matchedTx && ! empty($matchedTx->description)) {
+                    $defaultDesc = $matchedTx->description;
+                } elseif ($isAporte && $entry->asset_quantity) {
+                    $qtyLabel = rtrim(rtrim(number_format((float) $entry->asset_quantity, 8, ',', '.'), '0'), ',');
+                    $defaultDesc = "Aporte {$cofrinho->name} (+{$qtyLabel} {$cofrinho->assetUnitLabel()})";
+                } else {
+                    $defaultDesc = $isAporte ? 'Aporte no ativo' : 'Movimentação no cofrinho';
+                }
             }
 
             return [
@@ -459,9 +519,9 @@ class FinancialProjectController extends Controller
                 'kind' => $kind,
                 'date' => $entry->date,
                 'description' => $defaultDesc,
-                'note' => $entry->note,
-                'account_name' => null,
-                'user_name' => $entry->user?->name,
+                'note' => $cleanNote,
+                'account_name' => $matchedTx?->accountModel?->name,
+                'user_name' => $entry->user?->name ?? $matchedTx?->user?->name,
                 'amount' => (float) $entry->amount * ($isWithdrawal ? -1 : 1),
                 'raw_amount' => (float) $entry->amount,
                 'asset_quantity' => $entry->asset_quantity !== null ? (float) $entry->asset_quantity : null,

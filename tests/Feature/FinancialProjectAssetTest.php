@@ -326,6 +326,62 @@ class FinancialProjectAssetTest extends TestCase
         $this->assertEquals(0.0025, (float) $entry->asset_quantity);
         $this->assertEquals(400000.00, (float) $entry->asset_unit_price);
     }
+
+    public function test_asset_aporte_with_account_does_not_duplicate_rows_or_chart_values(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0',
+            'asset_avg_price' => '0',
+        ]);
+
+        // Faz aporte com conta bancária vinculada
+        $response = $this->actingAs($user)->post(route('cofrinhos.asset-aporte.store', $project), [
+            'amount' => '300.00',
+            'asset_quantity' => '0.00100000',
+            'asset_unit_price' => '300000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.index'));
+
+        // Verifica que criou a transação e a entrada
+        $this->assertDatabaseHas('transactions', [
+            'financial_project_id' => $project->id,
+            'account_id' => $account->id,
+            'amount' => 300.00,
+        ]);
+        $this->assertDatabaseHas('financial_project_entries', [
+            'financial_project_id' => $project->id,
+            'amount' => 300.00,
+        ]);
+
+        // Acessa a tela do cofrinho
+        $showResponse = $this->actingAs($user)->get(route('cofrinhos.show', $project));
+        $showResponse->assertOk();
+
+        // O histórico de movimentações deve conter APENAS 1 linha unificada
+        $movements = $showResponse->viewData('movements');
+        $this->assertCount(1, $movements);
+
+        $row = $movements->first();
+        $this->assertSame('asset_aporte', $row['source']);
+        $this->assertSame('Nubank Conta', $row['account_name']);
+        $this->assertEquals(300.00, $row['amount']);
+        $this->assertEquals(0.001, $row['asset_quantity']);
+
+        // O gráfico não deve duplicar o aporte
+        $chartData = $showResponse->viewData('chartData');
+        $septemberSeries = collect($chartData['balanceSeries'])->firstWhere('month', '2026-09');
+        $this->assertNotNull($septemberSeries);
+        $this->assertEquals(300.00, $septemberSeries['aportes']);
+    }
 }
 
 
