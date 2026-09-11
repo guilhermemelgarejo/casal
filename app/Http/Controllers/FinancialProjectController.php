@@ -91,16 +91,86 @@ class FinancialProjectController extends Controller
         ]);
     }
 
+    private function normalizeMoneyString(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $str = trim($value);
+        if ($str === '') {
+            return null;
+        }
+
+        // Remove prefixos como R$, espaços não separadores, etc.
+        $str = preg_replace('/[^\d.,]/', '', $str) ?? '';
+        if ($str === '') {
+            return null;
+        }
+
+        $lastComma = strrpos($str, ',');
+        $lastDot = strrpos($str, '.');
+
+        if ($lastComma !== false && $lastDot !== false) {
+            if ($lastComma > $lastDot) {
+                // Formato brasileiro: 1.234,56
+                $str = str_replace('.', '', $str);
+                $str = str_replace(',', '.', $str);
+            } else {
+                // Formato americano: 1,234.56
+                $str = str_replace(',', '', $str);
+            }
+        } elseif ($lastComma !== false) {
+            // Apenas vírgula: 1234,56
+            $str = str_replace(',', '.', $str);
+        } elseif ($lastDot !== false) {
+            // Apenas ponto: milhar (1.300 ou 15.000) vs decimal (1.50 ou 1300.50)
+            if (substr_count($str, '.') > 1) {
+                $str = str_replace('.', '', $str);
+            } elseif (preg_match('/^[1-9]\d{0,2}\.\d{3}$/', $str)) {
+                $str = str_replace('.', '', $str);
+            }
+        }
+
+        return $str;
+    }
+
+    private function normalizeQuantityString(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $str = trim($value);
+        if ($str === '') {
+            return null;
+        }
+        $str = preg_replace('/[^\d.,]/', '', $str) ?? '';
+        if ($str === '') {
+            return null;
+        }
+        if (str_contains($str, ',') && str_contains($str, '.')) {
+            $str = str_replace('.', '', $str);
+            $str = str_replace(',', '.', $str);
+        } elseif (str_contains($str, ',')) {
+            $str = str_replace(',', '.', $str);
+        }
+        return $str;
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $couple = Auth::user()->couple;
-        if ($request->filled('initial_balance')) {
-            $rawBal = trim((string) $request->input('initial_balance'));
-            if (str_contains($rawBal, ',')) {
-                $rawBal = str_replace('.', '', $rawBal);
-                $rawBal = str_replace(',', '.', $rawBal);
-            }
-            $request->merge(['initial_balance' => $rawBal]);
+
+        if ($request->has('target_amount')) {
+            $request->merge(['target_amount' => $this->normalizeMoneyString($request->input('target_amount'))]);
+        }
+        if ($request->has('initial_balance')) {
+            $request->merge(['initial_balance' => $this->normalizeMoneyString($request->input('initial_balance'))]);
+        }
+        if ($request->has('asset_quantity')) {
+            $request->merge(['asset_quantity' => $this->normalizeQuantityString($request->input('asset_quantity'))]);
+        }
+        if ($request->has('asset_avg_price')) {
+            $request->merge(['asset_avg_price' => $this->normalizeMoneyString($request->input('asset_avg_price'))]);
         }
 
         $validated = $request->validate([
@@ -130,10 +200,13 @@ class FinancialProjectController extends Controller
         }
 
         $quantity = isset($validated['asset_quantity']) && $validated['asset_quantity'] !== ''
-            ? (float) str_replace(',', '.', (string) $validated['asset_quantity'])
+            ? (float) $validated['asset_quantity']
             : null;
         $avgPrice = isset($validated['asset_avg_price']) && $validated['asset_avg_price'] !== ''
-            ? (float) str_replace(',', '.', (string) $validated['asset_avg_price'])
+            ? (float) $validated['asset_avg_price']
+            : null;
+        $targetAmount = isset($validated['target_amount']) && $validated['target_amount'] !== ''
+            ? (float) $validated['target_amount']
             : null;
 
         $project = FinancialProject::create([
@@ -143,7 +216,7 @@ class FinancialProjectController extends Controller
             'asset_code' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $assetCode : null,
             'asset_quantity' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $quantity : null,
             'asset_avg_price' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $avgPrice : null,
-            'target_amount' => $validated['target_amount'] ?? null,
+            'target_amount' => $targetAmount,
             'color' => $validated['color'] ?? null,
             'is_active' => $request->boolean('is_active', true),
         ]);
@@ -174,6 +247,16 @@ class FinancialProjectController extends Controller
     {
         $this->authorizeCofrinho($cofrinho);
 
+        if ($request->has('target_amount')) {
+            $request->merge(['target_amount' => $this->normalizeMoneyString($request->input('target_amount'))]);
+        }
+        if ($request->has('asset_quantity')) {
+            $request->merge(['asset_quantity' => $this->normalizeQuantityString($request->input('asset_quantity'))]);
+        }
+        if ($request->has('asset_avg_price')) {
+            $request->merge(['asset_avg_price' => $this->normalizeMoneyString($request->input('asset_avg_price'))]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'asset_type' => ['nullable', 'string', Rule::in([
@@ -192,31 +275,62 @@ class FinancialProjectController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $assetType = $validated['asset_type'] ?? $cofrinho->asset_type ?? FinancialProject::ASSET_TYPE_FIAT;
-        $assetCode = ! empty($validated['asset_code']) ? strtoupper(trim($validated['asset_code'])) : null;
-        if ($assetType === FinancialProject::ASSET_TYPE_CRYPTO && empty($assetCode)) {
-            $assetCode = 'BTC';
-        }
-
-        $quantity = isset($validated['asset_quantity']) && $validated['asset_quantity'] !== ''
-            ? (float) str_replace(',', '.', (string) $validated['asset_quantity'])
-            : null;
-        $avgPrice = isset($validated['asset_avg_price']) && $validated['asset_avg_price'] !== ''
-            ? (float) str_replace(',', '.', (string) $validated['asset_avg_price'])
-            : null;
-
-        $cofrinho->update([
+        $updateData = [
             'name' => $validated['name'],
-            'asset_type' => $assetType,
-            'asset_code' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $assetCode : null,
-            'asset_quantity' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $quantity : null,
-            'asset_avg_price' => $assetType !== FinancialProject::ASSET_TYPE_FIAT ? $avgPrice : null,
-            'target_amount' => $validated['target_amount'] ?? null,
             'color' => $validated['color'] ?? null,
             'is_active' => $request->boolean('is_active', true),
-        ]);
+        ];
 
-        return redirect()->route('cofrinhos.index')->with('success', 'Cofrinho atualizado.');
+        if ($request->has('target_amount')) {
+            $updateData['target_amount'] = isset($validated['target_amount']) && $validated['target_amount'] !== ''
+                ? (float) $validated['target_amount']
+                : null;
+        }
+
+        if ($request->has('asset_type')) {
+            $assetType = $validated['asset_type'] ?? FinancialProject::ASSET_TYPE_FIAT;
+            $updateData['asset_type'] = $assetType;
+
+            if ($assetType !== FinancialProject::ASSET_TYPE_FIAT) {
+                $assetCode = ! empty($validated['asset_code']) ? strtoupper(trim($validated['asset_code'])) : null;
+                if ($assetType === FinancialProject::ASSET_TYPE_CRYPTO && empty($assetCode)) {
+                    $assetCode = 'BTC';
+                }
+                $updateData['asset_code'] = $assetCode;
+                $updateData['asset_quantity'] = isset($validated['asset_quantity']) && $validated['asset_quantity'] !== ''
+                    ? (float) $validated['asset_quantity']
+                    : null;
+                $updateData['asset_avg_price'] = isset($validated['asset_avg_price']) && $validated['asset_avg_price'] !== ''
+                    ? (float) $validated['asset_avg_price']
+                    : null;
+            } else {
+                $updateData['asset_code'] = null;
+                $updateData['asset_quantity'] = null;
+                $updateData['asset_avg_price'] = null;
+            }
+        } elseif ($cofrinho->isCustomAsset()) {
+            if ($request->has('asset_code')) {
+                $updateData['asset_code'] = ! empty($validated['asset_code']) ? strtoupper(trim($validated['asset_code'])) : null;
+            }
+            if ($request->has('asset_quantity')) {
+                $updateData['asset_quantity'] = isset($validated['asset_quantity']) && $validated['asset_quantity'] !== ''
+                    ? (float) $validated['asset_quantity']
+                    : null;
+            }
+            if ($request->has('asset_avg_price')) {
+                $updateData['asset_avg_price'] = isset($validated['asset_avg_price']) && $validated['asset_avg_price'] !== ''
+                    ? (float) $validated['asset_avg_price']
+                    : null;
+            }
+        }
+
+        $cofrinho->update($updateData);
+
+        if ($request->input('_redirect_to') === 'show') {
+            return redirect()->route('cofrinhos.show', $cofrinho)->with('success', 'Cofrinho atualizado com sucesso.');
+        }
+
+        return redirect()->route('cofrinhos.index')->with('success', 'Cofrinho atualizado com sucesso.');
     }
 
     public function storeAssetAporte(Request $request, FinancialProject $cofrinho): RedirectResponse

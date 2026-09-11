@@ -173,6 +173,9 @@
         @if (session('error'))
             <x-alert type="danger" class="mb-4" :message="session('error')" />
         @endif
+        @if ($errors->any() && old('_cofrinho_form') === 'edit')
+            <x-alert type="danger" class="mb-4" message="Não foi possível atualizar o cofrinho. Verifique os campos com erro." />
+        @endif
 
         <!-- TOP INDICADORES DA POSIÇÃO -->
         <section class="dz-kpi-grid mb-4">
@@ -995,16 +998,17 @@
                     @method('PUT')
                     <input type="hidden" name="_cofrinho_form" value="edit">
                     <input type="hidden" name="cofrinho_id" value="{{ $cofrinho->id }}">
+                    <input type="hidden" name="_redirect_to" value="show">
                     <div class="modal-body vstack gap-3">
                         <div>
                             <x-input-label for="fp-edit-name" value="Nome do cofrinho" />
-                            <x-text-input id="fp-edit-name" name="name" class="mt-1 rounded-3" value="{{ $cofrinho->name }}" required />
+                            <x-text-input id="fp-edit-name" name="name" class="mt-1 rounded-3" value="{{ old('_cofrinho_form') === 'edit' ? old('name', $cofrinho->name) : $cofrinho->name }}" required />
                             <x-input-error :messages="$errors->get('name')" class="mt-2" />
                         </div>
 
                         <div>
                             <x-input-label for="fp-edit-target" value="Meta financeira (R$, opcional)" />
-                            <x-text-input id="fp-edit-target" name="target_amount" type="text" class="mt-1 rounded-3" value="{{ $cofrinho->target_amount !== null ? number_format((float) $cofrinho->target_amount, 2, ',', '.') : '' }}" placeholder="0,00" />
+                            <x-text-input id="fp-edit-target" name="target_amount" type="text" class="mt-1 rounded-3" value="{{ old('_cofrinho_form') === 'edit' ? old('target_amount') : ($cofrinho->target_amount !== null ? number_format((float) $cofrinho->target_amount, 2, ',', '.') : '') }}" placeholder="0,00" />
                             <x-input-error :messages="$errors->get('target_amount')" class="mt-2" />
                         </div>
                         <div>
@@ -1013,7 +1017,7 @@
                                 type="color"
                                 id="fp-edit-color"
                                 name="color"
-                                value="{{ $cofrinho->color ?: '#0d9488' }}"
+                                value="{{ old('_cofrinho_form') === 'edit' ? old('color', $cofrinho->color ?: '#0d9488') : ($cofrinho->color ?: '#0d9488') }}"
                                 class="form-control form-control-color w-100 mt-1 rounded-3"
                             >
                             <x-input-error :messages="$errors->get('color')" class="mt-2" />
@@ -1021,7 +1025,7 @@
 
                         <div class="form-check form-switch pt-1">
                             <input type="hidden" name="is_active" value="0">
-                            <input class="form-check-input" type="checkbox" name="is_active" id="fp-edit-is-active" value="1" @checked($cofrinho->is_active)>
+                            <input class="form-check-input" type="checkbox" name="is_active" id="fp-edit-is-active" value="1" @checked(old('_cofrinho_form') === 'edit' ? old('is_active', $cofrinho->is_active) : $cofrinho->is_active)>
                             <label class="form-check-label fw-semibold" for="fp-edit-is-active">Cofrinho ativo</label>
                             <div class="form-text mt-0">Cofrinhos desativados não aparecem em novos lançamentos e aportes.</div>
                         </div>
@@ -1293,6 +1297,12 @@
                         });
                     }
 
+                    @if ($errors->any() && old('_cofrinho_form') === 'edit')
+                        const editModalEl = document.getElementById('modalCofrinhoEdit');
+                        if (editModalEl && window.bootstrap?.Modal) {
+                            window.bootstrap.Modal.getOrCreateInstance(editModalEl).show();
+                        }
+                    @endif
                 }
 
 

@@ -224,4 +224,77 @@ class FinancialProjectShowTest extends TestCase
         $this->assertStringContainsString('href="'.$showUrl.'"', $html);
         $this->assertStringContainsString('data-cofrinho-url="'.$showUrl.'"', $html);
     }
+
+    public function test_can_update_cofrinho_target_with_brazilian_currency_format(): void
+    {
+        ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        $response = $this->actingAs($user)->put(route('cofrinhos.update', $project), [
+            'name' => 'Viagem Japão 2027',
+            'target_amount' => '35.500,50',
+            'color' => '#10b981',
+            'is_active' => '1',
+            '_redirect_to' => 'show',
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.show', $project));
+        $response->assertSessionHas('success', 'Cofrinho atualizado com sucesso.');
+
+        $project->refresh();
+        $this->assertSame('Viagem Japão 2027', $project->name);
+        $this->assertEquals(35500.50, (float) $project->target_amount);
+    }
+
+    public function test_can_clear_cofrinho_target_amount(): void
+    {
+        ['user' => $user, 'project' => $project] = $this->seedCofrinhoSetup();
+
+        $response = $this->actingAs($user)->put(route('cofrinhos.update', $project), [
+            'name' => $project->name,
+            'target_amount' => '',
+            'color' => $project->color,
+            'is_active' => '1',
+            '_redirect_to' => 'show',
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.show', $project));
+
+        $project->refresh();
+        $this->assertNull($project->target_amount);
+    }
+
+    public function test_updating_from_show_preserves_custom_asset_attributes(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedCofrinhoSetup();
+
+        $assetProject = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Ações Petrobras',
+            'asset_type' => FinancialProject::ASSET_TYPE_STOCK,
+            'asset_code' => 'PETR4',
+            'asset_quantity' => '100.00000000',
+            'asset_avg_price' => '38.50',
+            'target_amount' => '10000.00',
+            'color' => '#0284c7',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('cofrinhos.update', $assetProject), [
+            'name' => 'Ações Petrobras (PETR4)',
+            'target_amount' => '15.000,00',
+            'color' => '#0284c7',
+            'is_active' => '1',
+            '_redirect_to' => 'show',
+        ]);
+
+        $response->assertRedirect(route('cofrinhos.show', $assetProject));
+
+        $assetProject->refresh();
+        $this->assertSame('Ações Petrobras (PETR4)', $assetProject->name);
+        $this->assertEquals(15000.00, (float) $assetProject->target_amount);
+        $this->assertSame(FinancialProject::ASSET_TYPE_STOCK, $assetProject->asset_type);
+        $this->assertSame('PETR4', $assetProject->asset_code);
+        $this->assertEquals(100.0, (float) $assetProject->asset_quantity);
+        $this->assertEquals(38.50, (float) $assetProject->asset_avg_price);
+    }
 }
