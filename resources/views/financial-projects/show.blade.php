@@ -143,6 +143,7 @@
                         <span class="badge rounded-pill text-bg-primary">R$ Moeda</span>
                     @endif
                 </div>
+
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <a href="{{ route('cofrinhos.index') }}" class="btn btn-outline-secondary rounded-pill px-3">
@@ -184,18 +185,44 @@
                     </div>
                 </div>
                 <div>
-                    <div class="dz-kpi-card__value text-primary dz-privacy-blur">
+                    <div class="dz-kpi-card__value text-primary dz-privacy-blur" id="show-current-balance">
                         R$ {{ number_format($currentBalance, 2, ',', '.') }}
                     </div>
                     <div class="dz-kpi-card__footer">
                         @if($isAsset)
-                            <span>{{ rtrim(rtrim(number_format((float) $cofrinho->asset_quantity, 8, ',', '.'), '0'), ',') }} {{ $cofrinho->assetUnitLabel() }} acumulados</span>
+                            <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-1">
+                                <span class="fw-medium">{{ rtrim(rtrim(number_format((float) $cofrinho->asset_quantity, 8, ',', '.'), '0'), ',') }} {{ $cofrinho->assetUnitLabel() }}</span>
+                                @if($quotePrice)
+                                    <div class="d-inline-flex align-items-center gap-1" title="Cotação ao vivo {{ $currentQuote?->source ? '(Fonte: ' . $currentQuote->source . ')' : '' }}">
+                                        <span class="text-secondary">Cotação:</span>
+                                        <strong class="text-body" id="show-card-quote-price">R$ {{ number_format($quotePrice, 2, ',', '.') }}</strong>
+                                        @if($currentQuote?->pctChange24h !== null)
+                                            <span class="badge rounded-pill {{ $currentQuote->pctChange24h >= 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }}" style="font-size: 0.65rem; padding: 0.15rem 0.35rem; font-weight: 600;" id="show-card-quote-pct">
+                                                {{ $currentQuote->formattedPctChange() }}
+                                            </span>
+                                        @endif
+                                        <button
+                                            type="button"
+                                            class="btn btn-link p-0 text-decoration-none js-btn-refresh-quote-show"
+                                            data-asset-type="{{ $cofrinho->asset_type }}"
+                                            data-asset-code="{{ $cofrinho->asset_code }}"
+                                            data-asset-quantity="{{ (float) $cofrinho->asset_quantity }}"
+                                            data-total-invested="{{ (float) $totalInvested }}"
+                                            data-asset-avg-price="{{ (float) $cofrinho->asset_avg_price }}"
+                                            title="Atualizar cotação agora"
+                                            style="font-size: 0.85rem; color: var(--dz-primary); line-height: 1;"
+                                        >⟳</button>
+                                    </div>
+                                @endif
+                            </div>
                         @else
                             <span>Saldo total disponível</span>
                         @endif
                     </div>
+
                 </div>
             </div>
+
 
             <!-- Total Aportado -->
             <div class="dz-card dz-kpi-card">
@@ -224,7 +251,7 @@
                 <div class="dz-kpi-card__head">
                     <span class="dz-kpi-card__label">{{ $isAsset ? 'Lucro / Valorização' : 'Rendimentos / Juros' }}</span>
                     @if($isAsset)
-                        <div class="dz-kpi-card__icon-box {{ $profit >= 0 ? 'dz-kpi-card__icon-box--success' : 'dz-kpi-card__icon-box--danger' }}" style="{{ $profit < 0 ? 'background: rgba(239, 68, 68, 0.15); color: #dc2626;' : '' }}">
+                        <div class="dz-kpi-card__icon-box {{ $profit >= 0 ? 'dz-kpi-card__icon-box--success' : 'dz-kpi-card__icon-box--danger' }}" id="show-profit-icon" style="{{ $profit < 0 ? 'background: rgba(239, 68, 68, 0.15); color: #dc2626;' : '' }}">
                             {{ $profit >= 0 ? '🚀' : '📉' }}
                         </div>
                     @else
@@ -239,11 +266,11 @@
                             $profitFormatted = ($profit >= 0 ? '+' : '-') . 'R$ ' . number_format(abs($profit), 2, ',', '.');
                             $profitPctFormatted = ($profitPct !== null ? (($profitPct >= 0 ? '+' : '') . number_format($profitPct, 2, ',', '.') . '%') : '—');
                         @endphp
-                        <div class="dz-kpi-card__value {{ $profit >= 0 ? 'text-success' : 'text-danger' }} dz-privacy-blur">
+                        <div class="dz-kpi-card__value {{ $profit >= 0 ? 'text-success' : 'text-danger' }} dz-privacy-blur" id="show-profit-value">
                             {{ $profitFormatted }}
                         </div>
                         <div class="dz-kpi-card__footer">
-                            <span class="{{ $profit >= 0 ? 'text-success' : 'text-danger' }} fw-semibold">{{ $profitPctFormatted }}</span>
+                            <span class="{{ $profit >= 0 ? 'text-success' : 'text-danger' }} fw-semibold" id="show-profit-pct">{{ $profitPctFormatted }}</span>
                             <span>de rentabilidade</span>
                         </div>
                     @else
@@ -257,6 +284,7 @@
                     @endif
                 </div>
             </div>
+
 
             <!-- Meta Financeira -->
             <div class="dz-card dz-kpi-card">
@@ -458,6 +486,8 @@
                                 </strong>
                             </div>
                         </div>
+
+
 
                         <!-- Legenda do Gráfico de Acumulação -->
                         <div class="d-flex align-items-center gap-3 px-4 pt-2 pb-1 small text-secondary flex-wrap">
@@ -1069,7 +1099,18 @@
     @endif
 
     @push('scripts')
+        <style>
+            @keyframes fa-spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .fa-spin {
+                display: inline-block;
+                animation: fa-spin 1s infinite linear;
+            }
+        </style>
         <script>
+
             (function () {
                 function initShowPage() {
                     const bs = typeof bootstrap !== 'undefined' ? bootstrap : window.bootstrap;
@@ -1161,7 +1202,99 @@
                         showPrc.addEventListener('input', onShowPriceChange);
                         showPrc.addEventListener('change', onShowPriceChange);
                     }
+
+                    // Atualização de Cotação via AJAX dinâmica (sem reload, igual à tela de cofrinhos)
+                    const refreshBtn = document.querySelector('.js-btn-refresh-quote-show');
+                    if (refreshBtn) {
+                        refreshBtn.addEventListener('click', function (e) {
+                            if (e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                            }
+                            const type = this.getAttribute('data-asset-type') || 'crypto';
+                            const code = this.getAttribute('data-asset-code') || '';
+                            const qty = parseFloat(this.getAttribute('data-asset-quantity')) || 0;
+                            const invested = parseFloat(this.getAttribute('data-total-invested')) || 0;
+                            if (!code) return;
+
+                            this.classList.add('fa-spin');
+                            this.style.pointerEvents = 'none';
+
+                            fetch(`{{ route('cofrinhos.quote') }}?type=${encodeURIComponent(type)}&code=${encodeURIComponent(code)}&fresh=1`)
+                                .then(res => res.json())
+                                .then(res => {
+                                    if (res.success && res.data) {
+                                        const newPrice = parseFloat(res.data.price) || 0;
+                                        if (newPrice <= 0) return;
+
+                                        // 1. Atualiza valor da cotação no Card 1
+                                        const quotePriceEl = document.getElementById('show-card-quote-price');
+                                        if (quotePriceEl && res.data.formatted_price) {
+                                            quotePriceEl.textContent = res.data.formatted_price;
+                                        }
+
+                                        // 2. Atualiza badge de variação 24h
+                                        const quotePctEl = document.getElementById('show-card-quote-pct');
+                                        if (quotePctEl) {
+                                            if (res.data.pct_change_24h !== null && res.data.pct_change_24h !== undefined) {
+                                                const isPositivePct = res.data.pct_change_24h >= 0;
+                                                quotePctEl.textContent = (isPositivePct ? '+' : '') + Number(res.data.pct_change_24h).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+                                                quotePctEl.className = `badge rounded-pill ${isPositivePct ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}`;
+                                                quotePctEl.classList.remove('d-none');
+                                            } else {
+                                                quotePctEl.classList.add('d-none');
+                                            }
+                                        }
+
+                                        // 3. Atualiza Patrimônio Atual no Card 1
+                                        const balanceEl = document.getElementById('show-current-balance');
+                                        const newBalance = qty > 0 ? (qty * newPrice) : 0;
+                                        if (balanceEl && qty > 0) {
+                                            balanceEl.textContent = 'R$ ' + newBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                        }
+
+                                        // 4. Atualiza Lucro / Valorização no Card 3
+                                        const profitValEl = document.getElementById('show-profit-value');
+                                        const profitPctEl = document.getElementById('show-profit-pct');
+                                        const profitIconEl = document.getElementById('show-profit-icon');
+
+                                        if (profitValEl && profitPctEl && qty > 0) {
+                                            const profit = newBalance - invested;
+                                            const profitPct = invested > 0.0001 ? ((newBalance / invested) - 1) * 100 : 0;
+                                            const isProfit = profit >= 0;
+                                            const prefix = isProfit ? '+' : '-';
+
+                                            profitValEl.textContent = `${prefix}R$ ${Math.abs(profit).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                            profitValEl.className = `dz-kpi-card__value ${isProfit ? 'text-success' : 'text-danger'} dz-privacy-blur`;
+
+                                            profitPctEl.textContent = `${isProfit ? '+' : ''}${profitPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+                                            profitPctEl.className = `${isProfit ? 'text-success' : 'text-danger'} fw-semibold`;
+
+                                            if (profitIconEl) {
+                                                profitIconEl.textContent = isProfit ? '🚀' : '📉';
+                                                profitIconEl.className = `dz-kpi-card__icon-box ${isProfit ? 'dz-kpi-card__icon-box--success' : 'dz-kpi-card__icon-box--danger'}`;
+                                                profitIconEl.style.background = isProfit ? '' : 'rgba(239, 68, 68, 0.15)';
+                                                profitIconEl.style.color = isProfit ? '' : '#dc2626';
+                                            }
+                                        }
+
+                                        // 5. Atualiza campo de cotação no modal de aporte
+                                        const modalPriceInput = document.getElementById('modal-aporte-price');
+                                        if (modalPriceInput) {
+                                            modalPriceInput.value = newPrice.toFixed(2);
+                                        }
+                                    }
+                                })
+                                .catch(err => console.debug('Quote refresh failed:', err))
+                                .finally(() => {
+                                    this.classList.remove('fa-spin');
+                                    this.style.pointerEvents = '';
+                                });
+                        });
+                    }
+
                 }
+
 
                 if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', initShowPage);

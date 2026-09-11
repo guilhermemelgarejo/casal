@@ -408,8 +408,22 @@ class FinancialProjectAssetTest extends TestCase
             'date' => '2026-09-10',
         ]);
 
+        Http::fake([
+            'https://api.binance.com/api/v3/ticker/24hr*' => Http::response([
+                'lastPrice' => '350000.00',
+                'priceChangePercent' => '2.50',
+                'highPrice' => '360000.00',
+                'lowPrice' => '340000.00',
+            ], 200),
+            'https://api.binance.com/api/v3/klines*' => Http::response([], 200),
+        ]);
+
         $response = $this->actingAs($user)->get(route('cofrinhos.show', $project));
         $response->assertOk();
+
+        // Cotação atual visível na tela
+        $response->assertSee('Cotação:');
+        $response->assertSee('R$ 350.000,00');
 
         // Cards e Gráficos de Ativos
         $response->assertSee('Lucro / Valorização');
@@ -419,6 +433,7 @@ class FinancialProjectAssetTest extends TestCase
 
         // Não deve exibir "Lançar Juros" no header de ativos
         $response->assertDontSee('💰 Lançar Juros');
+
 
         // Estrutura das séries de gráficos
         $chartData = $response->viewData('chartData');
