@@ -84,17 +84,96 @@
         </div>
     @endif
     @if ($showAlert)
-        <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3 rounded-4" role="alert">
+        <!-- Alerta de Limite de Gastos: Versão Completa (Padrão) -->
+        <div id="dashboard-spending-alert-full" class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-start gap-3 rounded-4" role="alert">
             <div class="rounded-3 bg-danger-subtle text-danger d-flex align-items-center justify-content-center flex-shrink-0 p-2">
                 <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
-            <div>
+            <div class="flex-grow-1 min-w-0">
                 <h3 class="h6 text-danger-emphasis mb-1 fw-bold">Atenção com os gastos do mês!</h3>
                 <p class="small mb-0 text-danger">
                     Vocês atingiram <strong>{{ number_format($thresholdPercentage, 0) }}%</strong> da renda planejada (R$ <span class="duozen-privacy-blur">{{ number_format($thresholdAmount, 2, ',', '.') }}</span>). Gastos atuais somam <strong class="duozen-privacy-blur">R$ {{ number_format($totalExpense, 2, ',', '.') }}</strong>.
                 </p>
             </div>
+            <button type="button" class="btn-close flex-shrink-0 ms-auto mt-1" id="btn-collapse-spending-alert" aria-label="Minimizar aviso" title="Minimizar aviso"></button>
         </div>
+
+        <!-- Alerta de Limite de Gastos: Versão Compacta -->
+        <div id="dashboard-spending-alert-compact" class="alert alert-danger border-0 shadow-sm mb-3 py-1.5 px-3 rounded-3 align-items-center justify-content-between gap-2" role="alert" style="display: none; cursor: pointer;">
+            <div class="d-flex align-items-center gap-2 small text-danger min-w-0">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="flex-shrink-0 text-danger">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div class="text-truncate">
+                    <strong class="text-danger-emphasis">Atenção aos gastos:</strong>
+                    <span>Vocês atingiram <strong>{{ number_format($thresholdPercentage, 0) }}%</strong> da renda planejada (Gastos: <strong class="duozen-privacy-blur">R$ {{ number_format($totalExpense, 2, ',', '.') }}</strong>)</span>
+                </div>
+            </div>
+            <button type="button" class="btn btn-link text-danger-emphasis p-0 text-decoration-none small flex-shrink-0 d-inline-flex align-items-center gap-1 fw-semibold" id="btn-expand-spending-alert" title="Expandir aviso" style="font-size: 0.8rem; white-space: nowrap;">
+                <span>Expandir</span>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+        </div>
+
+        <script>
+            (function() {
+                var fullAlert = document.getElementById('dashboard-spending-alert-full');
+                var compactAlert = document.getElementById('dashboard-spending-alert-compact');
+                var btnCollapse = document.getElementById('btn-collapse-spending-alert');
+                var btnExpand = document.getElementById('btn-expand-spending-alert');
+
+                // Aplicar estado salvo no navegador imediatamente para evitar flickering
+                try {
+                    if (localStorage.getItem('duozen_spending_alert_collapsed') === 'true') {
+                        if (fullAlert && compactAlert) {
+                            fullAlert.style.display = 'none';
+                            fullAlert.classList.remove('d-flex');
+                            compactAlert.style.display = 'flex';
+                        }
+                    }
+                } catch (e) {}
+
+                // Minimizar para versão compacta ao clicar no 'X'
+                if (btnCollapse && fullAlert && compactAlert) {
+                    btnCollapse.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fullAlert.style.display = 'none';
+                        fullAlert.classList.remove('d-flex');
+                        compactAlert.style.display = 'flex';
+                        try {
+                            localStorage.setItem('duozen_spending_alert_collapsed', 'true');
+                        } catch (err) {}
+                    });
+                }
+
+                // Expandir para versão completa
+                function expandAlert(e) {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                    if (compactAlert && fullAlert) {
+                        compactAlert.style.display = 'none';
+                        fullAlert.style.display = 'flex';
+                        fullAlert.classList.add('d-flex');
+                        try {
+                            localStorage.removeItem('duozen_spending_alert_collapsed');
+                        } catch (err) {}
+                    }
+                }
+
+                if (btnExpand) {
+                    btnExpand.addEventListener('click', expandAlert);
+                }
+
+                if (compactAlert) {
+                    compactAlert.addEventListener('click', function(e) {
+                        expandAlert(e);
+                    });
+                }
+            })();
+        </script>
     @endif
 
     <!-- 1. CARDS DE KPIS & MÉTRICAS -->
