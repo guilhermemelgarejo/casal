@@ -482,6 +482,157 @@ class FinancialProjectController extends Controller
         return redirect()->back(fallback: route('cofrinhos.index'))->with('success', $msg);
     }
 
+    public function storeAssetSale(Request $request, FinancialProject $cofrinho): RedirectResponse
+    {
+        $this->authorizeCofrinho($cofrinho);
+
+        if (! $cofrinho->isCustomAsset()) {
+            return redirect()->back()->with('error', 'Operação permitida apenas para cofrinhos de ativos.');
+        }
+
+        // Normaliza valores numéricos (aceita vírgula ou formato brasileiro)
+        foreach (['amount', 'asset_quantity', 'asset_unit_price'] as $field) {
+            if ($request->filled($field)) {
+                $raw = (string) $request->input($field);
+                if (str_contains($raw, ',') && str_contains($raw, '.')) {
+                    $raw = str_replace('.', '', $raw);
+                    $raw = str_replace(',', '.', $raw);
+                } elseif (str_contains($raw, ',')) {
+                    $raw = str_replace(',', '.', $raw);
+                }
+                $request->merge([$field => $raw]);
+            }
+        }
+
+        // Se quantidade não foi preenchida diretamente mas temos valor e cotação, calcula automaticamente
+        if ((! $request->filled('asset_quantity') || (float) $request->input('asset_quantity') <= 0)
+            && $request->filled('amount')
+            && $request->filled('asset_unit_price')
+            && (float) $request->input('asset_unit_price') > 0
+        ) {
+            $calcQty = (float) $request->input('amount') / (float) $request->input('asset_unit_price');
+            $request->merge(['asset_quantity' => number_format($calcQty, 8, '.', '')]);
+        }
+
+        // Se cotação não foi preenchida diretamente mas temos valor e quantidade, calcula automaticamente
+        if ((! $request->filled('asset_unit_price') || (float) $request->input('asset_unit_price') <= 0)
+            && $request->filled('amount')
+            && $request->filled('asset_quantity')
+            && (float) $request->input('asset_quantity') > 0
+        ) {
+            $calcPrc = (float) $request->input('amount') / (float) $request->input('asset_quantity');
+            $request->merge(['asset_unit_price' => number_format($calcPrc, 4, '.', '')]);
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'asset_quantity' => ['required', 'numeric', 'min:0.00000001'],
+            'asset_unit_price' => ['nullable', 'numeric', 'gt:0'],
+            'date' => ['required', 'date'],
+            'note' => ['nullable', 'string', 'max:255'],
+            'account_id' => ['nullable', 'exists:accounts,id'],
+        ]);
+
+        $amount = (float) str_replace(',', '.', (string) $validated['amount']);
+        $quantity = (float) str_replace(',', '.', (string) $validated['asset_quantity']);
+        $unitPrice = ! empty($validated['asset_unit_price'])
+            ? (float) str_replace(',', '.', (string) $validated['asset_unit_price'])
+            : ($quantity > 0 ? ($amount / $quantity) : null);
+        $date = $validated['date'];
+        $note = $validated['note'] ?? null;
+        $accountId = ! empty($validated['account_id']) ? (int) $validated['account_id'] : null;
+
+        $currentQty = (float) ($cofrinho->asset_quantity ?? 0);
+        if ($quantity > $currentQty + 0.00000001) {
+            $unitLabel = $cofrinho->assetUnitLabel();
+            return redirect()->back()->withErrors([
+                'asset_quantity' => "Quantidade a vender ({$quantity}) não pode ser maior que o saldo atual ({$currentQty} {$unitLabel}).",
+            ]);
+        }
+
+        DB::transaction(function () use ($cofrinho, $amount, $quantity, $unitPrice, $date, $note, $accountId) {
+            // 1. Deduz a quantidade do ativo mantendo o Preço Médio inalterado
+            $cofrinho->registerWithdrawal($quantity);
+
+            $linkedTxId = null;
+
+            // 2. Se selecionou conta bancária de destino, gera a transação de receita
+            if ($accountId !== null) {
+                $account = Account::query()
+                    ->where('couple_id', Auth::user()->couple_id)
+                    ->whereKey($accountId)
+                    ->first();
+
+                if ($account && $account->isRegular()) {
+                    $category = Category::query()
+                        ->where('couple_id', Auth::user()->couple_id)
+                        ->where('system_key', Category::SYSTEM_KEY_PIGGY_BANK_WITHDRAWAL)
+                        ->first();
+
+                    if (! $category) {
+                        $category = Category::query()
+                            ->where('couple_id', Auth::user()->couple_id)
+                            ->where('type', 'income')
+                            ->orderBy('id')
+                            ->first();
+                    }
+
+                    $dateObj = Carbon::parse($date);
+                    $desc = "Venda {$cofrinho->name} (-{$quantity} {$cofrinho->assetUnitLabel()})";
+
+                    $tx = Transaction::create([
+                        'couple_id' => Auth::user()->couple_id,
+                        'user_id' => Auth::id(),
+                        'account_id' => $account->id,
+                        'description' => $desc,
+                        'amount' => number_format($amount, 2, '.', ''),
+                        'payment_method' => $account->getEffectivePaymentMethods()[0] ?? 'Pix',
+                        'type' => 'income',
+                        'date' => $date,
+                        'reference_month' => (int) $dateObj->month,
+                        'reference_year' => (int) $dateObj->year,
+                        'financial_project_id' => $cofrinho->id,
+                    ]);
+
+                    if ($category) {
+                        $tx->syncCategorySplits([
+                            [
+                                'category_id' => $category->id,
+                                'amount' => number_format($amount, 2, '.', ''),
+                            ],
+                        ]);
+                    }
+
+                    $linkedTxId = $tx->id;
+                }
+            }
+
+            // 3. Grava a entrada histórica vinculando o ID da transação
+            $entryNote = $note;
+            if ($linkedTxId !== null) {
+                $entryNote = trim(($entryNote ?? '') . " [tx:{$linkedTxId}]");
+            }
+
+            FinancialProjectEntry::create([
+                'couple_id' => Auth::user()->couple_id,
+                'user_id' => Auth::id(),
+                'financial_project_id' => $cofrinho->id,
+                'type' => FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL,
+                'amount' => number_format($amount, 2, '.', ''),
+                'asset_quantity' => number_format($quantity, 8, '.', ''),
+                'asset_unit_price' => number_format($unitPrice ?? ($amount / $quantity), 4, '.', ''),
+                'asset_resulting_avg_price' => number_format((float) ($cofrinho->asset_avg_price ?? 0), 4, '.', ''),
+                'date' => $date,
+                'note' => $entryNote !== '' ? $entryNote : null,
+            ]);
+        });
+
+        $unitLabel = $cofrinho->assetUnitLabel();
+        $msg = "Venda de {$quantity} {$unitLabel} registrada com sucesso.";
+
+        return redirect()->back(fallback: route('cofrinhos.index'))->with('success', $msg);
+    }
+
     public function show(Request $request, FinancialProject $cofrinho): View
     {
         $this->authorizeCofrinho($cofrinho);
@@ -518,13 +669,15 @@ class FinancialProjectController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        // Mapeia lançamentos de aporte no ativo com suas transações bancárias correspondentes
+        // Mapeia lançamentos de aporte e venda no ativo com suas transações bancárias correspondentes
         $usedTxIds = [];
         $entryTxMap = [];
         foreach ($allEntries as $entry) {
-            if ($entry->type !== FinancialProjectEntry::TYPE_ASSET_APORTE) {
+            if (! in_array($entry->type, [FinancialProjectEntry::TYPE_ASSET_APORTE, FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL], true)) {
                 continue;
             }
+
+            $expectedTxType = $entry->type === FinancialProjectEntry::TYPE_ASSET_APORTE ? 'expense' : 'income';
 
             $matchedTx = null;
             if (preg_match('/\[tx:(\d+)\]/', (string) $entry->note, $matches)) {
@@ -533,11 +686,11 @@ class FinancialProjectController extends Controller
 
             if (! $matchedTx) {
                 $entryDate = Carbon::parse($entry->date)->format('Y-m-d');
-                $matchedTx = $allTransactions->first(function (Transaction $t) use ($entry, $entryDate, $usedTxIds) {
+                $matchedTx = $allTransactions->first(function (Transaction $t) use ($entry, $entryDate, $usedTxIds, $expectedTxType) {
                     if (in_array((int) $t->id, $usedTxIds, true)) {
                         return false;
                     }
-                    if ($t->type !== 'expense') {
+                    if ($t->type !== $expectedTxType) {
                         return false;
                     }
                     if (Carbon::parse($t->date)->format('Y-m-d') !== $entryDate) {
@@ -617,7 +770,14 @@ class FinancialProjectController extends Controller
                 $defaultDesc = 'Juros lançados no cofrinho';
             } elseif ($isWithdrawal) {
                 $kind = 'retirada';
-                $defaultDesc = 'Movimentação no cofrinho';
+                if ($matchedTx && ! empty($matchedTx->description)) {
+                    $defaultDesc = $matchedTx->description;
+                } elseif ($entry->asset_quantity) {
+                    $qtyLabel = rtrim(rtrim(number_format((float) $entry->asset_quantity, 8, ',', '.'), '0'), ',');
+                    $defaultDesc = "Venda {$cofrinho->name} (-{$qtyLabel} {$cofrinho->assetUnitLabel()})";
+                } else {
+                    $defaultDesc = 'Resgate / Venda do ativo';
+                }
             } else {
                 $kind = 'aporte';
                 if ($isAporte && $matchedTx && ! empty($matchedTx->description)) {

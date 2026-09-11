@@ -518,6 +518,147 @@ class FinancialProjectAssetTest extends TestCase
         // 0.01 BTC * R$ 300.000,00 = R$ 3.000,00
         $this->assertEquals(3000.00, $janSeries['balance']);
     }
+
+    public function test_asset_sale_reduces_quantity_and_keeps_average_price(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.05000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('cofrinhos.asset-sale.store', $project), [
+            'amount' => '8000.00',
+            'asset_quantity' => '0.02000000',
+            'asset_unit_price' => '400000.00',
+            'date' => '2026-09-10',
+            'note' => 'Venda parcial de lucro',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $project->refresh();
+        $this->assertEquals(0.03, (float) $project->asset_quantity);
+        $this->assertEquals(300000.00, (float) $project->asset_avg_price);
+
+        $entry = FinancialProjectEntry::where('financial_project_id', $project->id)
+            ->where('type', FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL)
+            ->first();
+
+        $this->assertNotNull($entry);
+        $this->assertEquals(8000.00, (float) $entry->amount);
+        $this->assertEquals(0.02, (float) $entry->asset_quantity);
+        $this->assertEquals(400000.00, (float) $entry->asset_unit_price);
+        $this->assertEquals(300000.00, (float) $entry->asset_resulting_avg_price);
+        $this->assertEquals('Venda parcial de lucro', $entry->note);
+    }
+
+    public function test_asset_sale_with_account_credits_income_transaction_and_links_entry(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.05000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('cofrinhos.asset-sale.store', $project), [
+            'amount' => '8000.00',
+            'asset_quantity' => '0.02000000',
+            'asset_unit_price' => '400000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+            'note' => 'Venda creditada no banco',
+        ]);
+
+        $response->assertRedirect();
+
+        $tx = Transaction::where('financial_project_id', $project->id)
+            ->where('account_id', $account->id)
+            ->first();
+
+        $this->assertNotNull($tx);
+        $this->assertEquals('income', $tx->type);
+        $this->assertEquals(8000.00, (float) $tx->amount);
+
+        $entry = FinancialProjectEntry::where('financial_project_id', $project->id)
+            ->where('type', FinancialProjectEntry::TYPE_ASSET_WITHDRAWAL)
+            ->first();
+
+        $this->assertNotNull($entry);
+        $this->assertStringContainsString("[tx:{$tx->id}]", (string) $entry->note);
+    }
+
+    public function test_asset_sale_cannot_exceed_current_quantity(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.01000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('cofrinhos.asset-sale.store', $project), [
+            'amount' => '8000.00',
+            'asset_quantity' => '0.02000000',
+            'asset_unit_price' => '400000.00',
+            'date' => '2026-09-10',
+        ]);
+
+        $response->assertSessionHasErrors('asset_quantity');
+
+        $project->refresh();
+        $this->assertEquals(0.01, (float) $project->asset_quantity);
+    }
+
+    public function test_asset_sale_with_account_does_not_duplicate_rows_in_show_history(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->seedAssetSetup();
+
+        $project = FinancialProject::create([
+            'couple_id' => $couple->id,
+            'name' => 'Bitcoin Cofrinho',
+            'asset_type' => 'crypto',
+            'asset_code' => 'BTC',
+            'asset_quantity' => '0.05000000',
+            'asset_avg_price' => '300000.00',
+        ]);
+
+        // Venda vinculada à conta bancária
+        $this->actingAs($user)->post(route('cofrinhos.asset-sale.store', $project), [
+            'amount' => '4000.00',
+            'asset_quantity' => '0.01000000',
+            'asset_unit_price' => '400000.00',
+            'date' => '2026-09-10',
+            'account_id' => $account->id,
+        ]);
+
+        $showResponse = $this->actingAs($user)->get(route('cofrinhos.show', $project));
+        $showResponse->assertOk();
+
+        // Deve existir apenas 1 movimentação (a entrada histórica com conta mapeada, sem a transação duplicada)
+        $movements = $showResponse->viewData('movements');
+        $this->assertCount(1, $movements);
+
+        $mov = $movements->first();
+        $this->assertEquals('retirada', $mov['kind']);
+        $this->assertEquals(-4000.00, (float) $mov['amount']);
+        $this->assertEquals($account->name, $mov['account_name']);
+    }
 }
 
 

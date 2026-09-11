@@ -120,6 +120,9 @@
         @if (session('error'))
             <x-alert type="danger" class="mb-4" :message="session('error')" />
         @endif
+        @if ($errors->any() && (old('_cofrinho_form') === 'create' || old('_cofrinho_form') === 'edit'))
+            <x-alert type="danger" class="mb-4" message="Não foi possível salvar o cofrinho. Verifique os campos com erro." />
+        @endif
 
         <!-- TOP KPIS DUOZEN 2.0 -->
         <section class="dz-kpi-grid mb-4">
@@ -700,6 +703,80 @@
                     }
                 });
 
+                // Sincronizador de Vendas em Ativos e Simulador de Saldo Restante
+                document.querySelectorAll('.js-asset-venda-form').forEach(function (form) {
+                    const cofrinhoId = form.getAttribute('data-cofrinho-id');
+                    const amountInput = form.querySelector('.js-venda-amount');
+                    const priceInput = form.querySelector('.js-venda-price');
+                    const quantityInput = form.querySelector('.js-venda-quantity');
+
+                    const curQtyEl = document.getElementById('sim-venda-cur-qty-' + cofrinhoId);
+                    const newQtyEl = document.getElementById('sim-venda-new-qty-' + cofrinhoId);
+
+                    let q0 = 0;
+                    if (curQtyEl) {
+                        const txt = curQtyEl.textContent.trim().split(' ')[0].replace(/\./g, '').replace(',', '.');
+                        q0 = parseFloat(txt) || 0;
+                    }
+
+                    function updateQuotePrice() {
+                        const amt = parseInputNumber(amountInput.value);
+                        const qty = parseInputNumber(quantityInput.value);
+                        if (amt > 0 && qty > 0) {
+                            const newPrc = amt / qty;
+                            priceInput.value = newPrc >= 1 ? newPrc.toFixed(2) : newPrc.toFixed(4);
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    function recomputeSim() {
+                        const qty = parseInputNumber(quantityInput.value);
+                        if (qty > 0) {
+                            let newQty = Math.max(0, q0 - qty);
+                            if (newQtyEl) newQtyEl.textContent = newQty.toLocaleString('pt-BR', { maximumFractionDigits: 8 });
+                        } else {
+                            if (newQtyEl) newQtyEl.textContent = '—';
+                        }
+                    }
+
+                    if (amountInput && priceInput && quantityInput) {
+                        const onAmountChange = function () {
+                            const qty = parseInputNumber(quantityInput.value);
+                            if (qty > 0) {
+                                updateQuotePrice();
+                            } else {
+                                const amt = parseInputNumber(amountInput.value);
+                                const prc = parseInputNumber(priceInput.value);
+                                if (amt > 0 && prc > 0) {
+                                    quantityInput.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                                }
+                            }
+                            recomputeSim();
+                        };
+                        amountInput.addEventListener('input', onAmountChange);
+                        amountInput.addEventListener('change', onAmountChange);
+
+                        const onQuantityChange = function () {
+                            updateQuotePrice();
+                            recomputeSim();
+                        };
+                        quantityInput.addEventListener('input', onQuantityChange);
+                        quantityInput.addEventListener('change', onQuantityChange);
+
+                        const onPriceChange = function () {
+                            const prc = parseInputNumber(priceInput.value);
+                            const amt = parseInputNumber(amountInput.value);
+                            if (amt > 0 && prc > 0) {
+                                quantityInput.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                            }
+                            recomputeSim();
+                        };
+                        priceInput.addEventListener('input', onPriceChange);
+                        priceInput.addEventListener('change', onPriceChange);
+                    }
+                });
+
                 // Atualizacao de Cotacao via AJAX
                 document.querySelectorAll('.js-btn-refresh-quote').forEach(function (btn) {
                     btn.addEventListener('click', function (e) {
@@ -744,10 +821,14 @@
                                         }
                                     }
 
-                                    // 3. Atualiza preco pre-preenchido no modal de aporte
+                                    // 3. Atualiza preco pre-preenchido no modal de aporte e no modal de venda
                                     const modalPriceInput = document.getElementById('asset_price_' + cofrinhoId);
                                     if (modalPriceInput) {
                                         modalPriceInput.value = newPrice.toFixed(2);
+                                    }
+                                    const modalVendaPriceInput = document.getElementById('asset_venda_price_' + cofrinhoId);
+                                    if (modalVendaPriceInput) {
+                                        modalVendaPriceInput.value = newPrice.toFixed(2);
                                     }
                                 }
                             })

@@ -153,6 +153,9 @@
                     <button type="button" class="btn btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalAssetAporte">
                         + Aporte no Ativo
                     </button>
+                    <button type="button" class="btn btn-outline-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalAssetVenda">
+                        − Venda / Resgate
+                    </button>
                 @endif
                 @if(! $isAsset)
                     <button type="button" class="btn btn-outline-success rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalCofrinhoInterest">
@@ -1102,6 +1105,83 @@
         </div>
     @endif
 
+    {{-- MODAL VENDA / RESGATE EM ATIVO (SE FOR ATIVO CUSTOMIZADO) --}}
+    @if($isAsset)
+        <div class="modal fade" id="modalAssetVenda" tabindex="-1" aria-labelledby="modalAssetVendaLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                    <div class="modal-header bg-danger text-white border-0">
+                        <h2 class="modal-title h5 mb-0 text-white" id="modalAssetVendaLabel">
+                            Venda / Resgate — {{ $cofrinho->name }} ({{ $cofrinho->asset_code ?: $cofrinho->assetTypeLabel() }})
+                        </h2>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <form method="post" action="{{ route('cofrinhos.asset-sale.store', $cofrinho) }}">
+                        @csrf
+                        <div class="modal-body vstack gap-3">
+                            {{-- Posição Atual --}}
+                            <div class="p-3 rounded-3 border border-secondary-subtle bg-body-secondary">
+                                <div class="row g-2 text-center">
+                                    <div class="col-6">
+                                        <span class="small text-secondary d-block">Saldo disponível</span>
+                                        <strong class="fs-6">{{ rtrim(rtrim(number_format((float) $cofrinho->asset_quantity, 8, ',', '.'), '0'), ',') ?: '0' }} {{ $cofrinho->assetUnitLabel() }}</strong>
+                                    </div>
+                                    <div class="col-6">
+                                        <span class="small text-secondary d-block">Preço Médio atual</span>
+                                        <strong class="fs-6">R$ {{ number_format((float) $cofrinho->asset_avg_price, 2, ',', '.') }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <x-input-label for="modal-venda-amount" value="Valor total recebido (R$)" />
+                                    <x-text-input id="modal-venda-amount" name="amount" type="text" inputmode="decimal" class="mt-1 rounded-3 js-show-venda-amount" placeholder="0,00" required />
+                                </div>
+                                <div class="col-6">
+                                    <x-input-label for="modal-venda-price" value="Cotação de venda (R$)" />
+                                    <x-text-input id="modal-venda-price" name="asset_unit_price" type="text" inputmode="decimal" class="mt-1 rounded-3 js-show-venda-price" value="{{ $quotePrice !== null ? number_format((float) $quotePrice, 2, '.', '') : '' }}" placeholder="Qualquer valor de cotação" />
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <x-input-label for="modal-venda-quantity" value="Quantidade a vender ({{ $cofrinho->assetUnitLabel() }})" />
+                                    <x-text-input id="modal-venda-quantity" name="asset_quantity" type="text" inputmode="decimal" class="mt-1 rounded-3 js-show-venda-quantity" placeholder="0.00000000" required />
+                                </div>
+                                <div class="col-6">
+                                    <x-input-label for="modal-venda-date" value="Data da venda" />
+                                    <x-text-input id="modal-venda-date" name="date" type="date" class="mt-1 rounded-3" value="{{ now()->toDateString() }}" required />
+                                </div>
+                            </div>
+
+                            <div>
+                                <x-input-label for="modal-venda-account" value="Creditar em conta bancária (opcional)" />
+                                <select id="modal-venda-account" name="account_id" class="form-select mt-1 rounded-3">
+                                    <option value="">Nenhuma conta (custódia externa / reinvestido)</option>
+                                    @foreach($regularAccounts as $acc)
+                                        <option value="{{ $acc->id }}">
+                                            {{ $acc->name }} (Saldo: R$ {{ number_format((float) $acc->balance, 2, ',', '.') }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <x-input-label for="modal-venda-note" value="Observação (opcional)" />
+                                <x-text-input id="modal-venda-note" name="note" type="text" class="mt-1 rounded-3" placeholder="Ex: Venda parcial / realização de lucro" />
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary-subtle">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-danger rounded-pill px-4">Salvar venda</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @push('scripts')
         <style>
             @keyframes fa-spin {
@@ -1207,6 +1287,54 @@
                         showPrc.addEventListener('change', onShowPriceChange);
                     }
 
+                    // Sincronizador de campos no modal de venda de ativos
+                    const showVendaAmt = document.getElementById('modal-venda-amount');
+                    const showVendaPrc = document.getElementById('modal-venda-price');
+                    const showVendaQty = document.getElementById('modal-venda-quantity');
+
+                    function updateVendaQuotePrice() {
+                        if (!showVendaAmt || !showVendaQty || !showVendaPrc) return;
+                        const amt = parseInputNumber(showVendaAmt.value);
+                        const qty = parseInputNumber(showVendaQty.value);
+                        if (amt > 0 && qty > 0) {
+                            const newPrc = amt / qty;
+                            showVendaPrc.value = newPrc >= 1 ? newPrc.toFixed(2) : newPrc.toFixed(4);
+                        }
+                    }
+
+                    if (showVendaAmt && showVendaPrc && showVendaQty) {
+                        const onShowVendaAmountChange = function () {
+                            const qty = parseInputNumber(showVendaQty.value);
+                            if (qty > 0) {
+                                updateVendaQuotePrice();
+                            } else {
+                                const amt = parseInputNumber(showVendaAmt.value);
+                                const prc = parseInputNumber(showVendaPrc.value);
+                                if (amt > 0 && prc > 0) {
+                                    showVendaQty.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                                }
+                            }
+                        };
+                        showVendaAmt.addEventListener('input', onShowVendaAmountChange);
+                        showVendaAmt.addEventListener('change', onShowVendaAmountChange);
+
+                        const onShowVendaQuantityChange = function () {
+                            updateVendaQuotePrice();
+                        };
+                        showVendaQty.addEventListener('input', onShowVendaQuantityChange);
+                        showVendaQty.addEventListener('change', onShowVendaQuantityChange);
+
+                        const onShowVendaPriceChange = function () {
+                            const prc = parseInputNumber(showVendaPrc.value);
+                            const amt = parseInputNumber(showVendaAmt.value);
+                            if (amt > 0 && prc > 0) {
+                                showVendaQty.value = (amt / prc).toFixed(8).replace(/\.?0+$/, '');
+                            }
+                        };
+                        showVendaPrc.addEventListener('input', onShowVendaPriceChange);
+                        showVendaPrc.addEventListener('change', onShowVendaPriceChange);
+                    }
+
                     // Atualização de Cotação via AJAX dinâmica (sem reload, igual à tela de cofrinhos)
                     const refreshBtn = document.querySelector('.js-btn-refresh-quote-show');
                     if (refreshBtn) {
@@ -1282,10 +1410,14 @@
                                             }
                                         }
 
-                                        // 5. Atualiza campo de cotação no modal de aporte
+                                        // 5. Atualiza campo de cotação no modal de aporte e no modal de venda
                                         const modalPriceInput = document.getElementById('modal-aporte-price');
                                         if (modalPriceInput) {
                                             modalPriceInput.value = newPrice.toFixed(2);
+                                        }
+                                        const modalVendaPriceInput = document.getElementById('modal-venda-price');
+                                        if (modalVendaPriceInput) {
+                                            modalVendaPriceInput.value = newPrice.toFixed(2);
                                         }
                                     }
                                 })
