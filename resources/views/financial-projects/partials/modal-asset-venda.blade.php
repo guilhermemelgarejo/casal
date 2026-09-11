@@ -22,7 +22,7 @@
                 @csrf
                 <div class="modal-body vstack gap-3">
                     {{-- Posicao Atual --}}
-                    <div class="p-3 rounded-3 border border-secondary-subtle bg-body-secondary">
+                    <div class="cofrinhos-modal-section">
                         <div class="row g-2 text-center">
                             <div class="col-6">
                                 <span class="small text-secondary d-block">Saldo disponível</span>
@@ -76,7 +76,7 @@
                     </div>
 
                     {{-- Simulador dinamico do Saldo Restante --}}
-                    <div class="p-3 rounded-3 border border-danger-subtle bg-danger-subtle">
+                    <div class="cofrinhos-venda-sim-card">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="small fw-bold text-danger">Saldo após a venda</span>
                             <span class="badge rounded-pill text-bg-danger-subtle text-danger border border-danger-subtle">Simulação</span>
@@ -102,7 +102,7 @@
                     </div>
 
                     {{-- Vincular Transacao em Conta --}}
-                    <div class="p-3 rounded-3 border border-secondary-subtle bg-body-tertiary">
+                    <div class="cofrinhos-modal-section">
                         <div class="form-check form-switch mb-0">
                             <input class="form-check-input js-toggle-account-tx" type="checkbox" role="switch" id="with_venda_account_tx_{{ $p->id }}" name="with_account_tx" value="1" checked>
                             <label class="form-check-label fw-semibold small" for="with_venda_account_tx_{{ $p->id }}">

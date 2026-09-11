@@ -90,13 +90,23 @@ html {
 
     /* Bootstrap 5 Theme Overrides */
     --bs-body-bg: #131D31;
+    --bs-body-bg-rgb: 19, 29, 49;
     --bs-body-color: #E2E8F0;
+    --bs-body-color-rgb: 226, 232, 240;
     --bs-emphasis-color: #F8FAFC;
     --bs-secondary-color: #94A3B8;
+    --bs-secondary-color-rgb: 148, 163, 184;
     --bs-tertiary-bg: #182238;
+    --bs-tertiary-bg-rgb: 24, 34, 56;
     --bs-secondary-bg: #1E293B;
+    --bs-secondary-bg-rgb: 30, 41, 59;
     --bs-border-color: #1E293B;
     --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
+
+    --bs-primary-bg-subtle: rgba(124, 58, 237, 0.18);
+    --bs-primary-border-subtle: rgba(124, 58, 237, 0.4);
+    --bs-danger-bg-subtle: rgba(244, 63, 94, 0.15);
+    --bs-danger-border-subtle: rgba(244, 63, 94, 0.4);
 
     --dz-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
     --dz-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
@@ -2333,6 +2343,27 @@ body.dz-privacy-active .duozen-privacy-blur,
     background-color: var(--dz-bg-card-subtle) !important;
 }
 
+[data-theme="dark"] .bg-body-secondary {
+    background-color: #182238 !important;
+}
+
+[data-theme="dark"] .bg-body-tertiary {
+    background-color: #182238 !important;
+}
+
+[data-theme="dark"] .bg-danger-subtle {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+}
+
+[data-theme="dark"] .border-danger-subtle {
+    border-color: rgba(244, 63, 94, 0.35) !important;
+}
+
+[data-theme="dark"] .text-bg-danger-subtle {
+    background-color: rgba(244, 63, 94, 0.18) !important;
+    color: #fb7185 !important;
+}
+
 /* Contas Correntes no Modo Escuro */
 [data-theme="dark"] .dz-account-card {
     background: var(--dz-bg-card) !important;
@@ -2514,6 +2545,47 @@ body.dz-privacy-active .duozen-privacy-blur,
     background: #182238 !important;
     border: 1px solid #1E293B !important;
     border-radius: var(--dz-radius-md) !important;
+}
+
+/* Seções de Modais Cofrinhos (Aporte / Venda / etc) e utilitários de fundo */
+[data-theme="dark"] .cofrinhos-modal-section,
+[data-theme="dark"] .modal .cofrinhos-modal-section,
+[data-theme="dark"] .modal .bg-body-secondary,
+[data-theme="dark"] .modal .bg-body-tertiary {
+    background-color: #182238 !important;
+    border: 1px solid #1E293B !important;
+    border-radius: var(--dz-radius-md) !important;
+}
+
+[data-theme="dark"] .cofrinhos-pm-sim-card,
+[data-theme="dark"] .modal .cofrinhos-pm-sim-card {
+    border-color: rgba(124, 58, 237, 0.4) !important;
+    background: rgba(124, 58, 237, 0.1) !important;
+}
+
+[data-theme="dark"] .cofrinhos-venda-sim-card,
+[data-theme="dark"] .modal .cofrinhos-venda-sim-card {
+    border-color: rgba(244, 63, 94, 0.4) !important;
+    background: rgba(244, 63, 94, 0.1) !important;
+}
+
+[data-theme="dark"] body .modal .modal-header.bg-danger,
+[data-theme="dark"] .modal .modal-header.bg-danger {
+    background: #dc3545 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] body .modal .modal-header.bg-danger .modal-title,
+[data-theme="dark"] .modal .modal-header.bg-danger .modal-title {
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] body .modal .modal-header.bg-danger .btn-close,
+[data-theme="dark"] .modal .modal-header.bg-danger .btn-close,
+[data-theme="dark"] .modal .btn-close.btn-close-white {
+    filter: none !important;
+    opacity: 0.85;
 }
 
 [data-theme="dark"] .tx-modal-table-wrap {

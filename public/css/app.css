@@ -5605,10 +5605,27 @@ body.duozen-onboarding-active {
     gap: 0.6rem;
 }
 
+.cofrinhos-modal-section,
+.cofrinhos-page .cofrinhos-modal-section {
+    padding: 1rem;
+    border-radius: var(--bs-border-radius-lg, 0.75rem);
+    border: 1px solid var(--bs-border-color-translucent);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cofrinhos-pm-sim-card,
 .cofrinhos-page .cofrinhos-pm-sim-card {
     border-radius: 1rem;
     border: 1px dashed var(--bs-primary-border-subtle);
     background: color-mix(in srgb, var(--bs-primary) 6%, var(--bs-body-bg));
+    padding: 0.9rem 1.1rem;
+}
+
+.cofrinhos-venda-sim-card,
+.cofrinhos-page .cofrinhos-venda-sim-card {
+    border-radius: 1rem;
+    border: 1px dashed rgba(244, 63, 94, 0.35);
+    background: color-mix(in srgb, #f43f5e 6%, var(--bs-body-bg));
     padding: 0.9rem 1.1rem;
 }
 
@@ -5843,6 +5860,7 @@ body.duozen-onboarding-active {
     );
 }
 
+.cofrinhos-juros-modal-head,
 .cofrinhos-page .cofrinhos-juros-modal-head {
     background: linear-gradient(
         135deg,

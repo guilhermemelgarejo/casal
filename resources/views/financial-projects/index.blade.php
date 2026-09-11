@@ -113,7 +113,7 @@
         </button>
     </x-slot>
 
-    <div class="container-xxl py-4 px-3 px-lg-4">
+    <div class="container-xxl py-4 px-3 px-lg-4 cofrinhos-page">
         @if (session('success'))
             <x-alert type="success" class="mb-4" :message="session('success')" />
         @endif
