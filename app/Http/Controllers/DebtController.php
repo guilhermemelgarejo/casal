@@ -212,17 +212,17 @@ class DebtController extends Controller
                 return back()->withErrors(['start_date' => 'Informe a data do primeiro vencimento.'])->withInput();
             }
 
-            // Validação: Valor Total não pode ser menor que a soma das parcelas
+            // Validação: A soma das parcelas geradas não pode exceder o valor total da dívida
             if ($installmentAmountNormalized !== null && (float) $installmentAmountNormalized > 0) {
                 $totalCount = (int) $validated['total_installments'];
                 $sumOfInstallments = round((float) $installmentAmountNormalized * $totalCount, 2);
                 $totalAmountFloat = round((float) $totalAmountNormalized, 2);
 
-                if ($totalAmountFloat < ($sumOfInstallments - 0.05)) {
+                if ($sumOfInstallments > ($totalAmountFloat + 0.05)) {
                     $totalFormatted = number_format($totalAmountFloat, 2, ',', '.');
                     $sumFormatted = number_format($sumOfInstallments, 2, ',', '.');
                     return back()->withErrors([
-                        'total_amount' => "O valor total (R$ {$totalFormatted}) não pode ser menor que a soma das {$totalCount} parcelas (R$ {$sumFormatted}). Ajuste o valor total para incluir os juros ou recalcule o valor da parcela.",
+                        'total_amount' => "A soma das {$totalCount} parcelas (R$ {$sumFormatted}) não pode exceder o valor total da dívida (R$ {$totalFormatted}). Aumente o valor total ou ajuste o valor da parcela.",
                     ])->withInput();
                 }
             }
@@ -242,7 +242,7 @@ class DebtController extends Controller
                 'start_date' => ! empty($validated['start_date']) ? $validated['start_date'] : null,
                 'default_account_id' => $validated['default_account_id'] ?? null,
                 'default_category_id' => $validated['default_category_id'] ?? null,
-                'color' => $validated['color'] ?: '#f59e0b',
+                'color' => ! empty($validated['color']) ? $validated['color'] : '#f59e0b',
                 'notes' => $validated['notes'] ?? null,
                 'is_active' => true,
             ]);
@@ -265,6 +265,7 @@ class DebtController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:191',
             'creditor' => 'nullable|string|max:191',
+            'total_amount' => 'nullable|string',
             'color' => 'nullable|string|max:32',
             'notes' => 'nullable|string|max:1000',
             'default_account_id' => [
@@ -285,16 +286,47 @@ class DebtController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
-        $debt->update([
+        $totalAmountNormalized = null;
+        if (! empty($validated['total_amount'])) {
+            $totalAmountNormalized = $this->normalizeMoneyString($validated['total_amount']);
+            $totalAmountFloat = (float) $totalAmountNormalized;
+            if ($totalAmountFloat <= 0) {
+                return back()->withErrors(['total_amount' => 'O valor total deve ser maior que zero.'])->withInput();
+            }
+
+            $totalPaid = $debt->totalPaid();
+            $pendingSum = $debt->pendingInstallmentsSum();
+            $minRequired = round($totalPaid + $pendingSum, 2);
+
+            if ($totalAmountFloat < ($minRequired - 0.05)) {
+                $minFormatted = number_format($minRequired, 2, ',', '.');
+                $newFormatted = number_format($totalAmountFloat, 2, ',', '.');
+                return back()->withErrors([
+                    'total_amount' => "O valor total da dívida (R$ {$newFormatted}) não pode ser inferior ao valor já comprometido em parcelas pagas e pendentes (R$ {$minFormatted}). Ajuste as parcelas restantes antes de reduzir o total da dívida.",
+                ])->withInput();
+            }
+        }
+
+        $updateData = [
             'name' => $validated['name'],
             'creditor' => $validated['creditor'] ?? null,
-            'color' => $validated['color'] ?: $debt->color,
+            'color' => ! empty($validated['color']) ? $validated['color'] : $debt->color,
             'notes' => $validated['notes'] ?? null,
             'default_account_id' => $validated['default_account_id'] ?? null,
             'default_category_id' => $validated['default_category_id'] ?? null,
             'user_id' => $validated['user_id'] ?? null,
             'is_active' => $request->has('is_active') ? $request->boolean('is_active') : $debt->is_active,
-        ]);
+        ];
+
+        if ($totalAmountNormalized !== null) {
+            $updateData['total_amount'] = $totalAmountNormalized;
+        }
+
+        $debt->update($updateData);
+
+        if ($debt->isPaidOff() && $debt->is_active) {
+            $debt->update(['is_active' => false]);
+        }
 
         return redirect()->route('debts.index', ['tab' => 'dividas'])
             ->with('success', 'Dados da dívida atualizados com sucesso!');
@@ -803,6 +835,392 @@ class DebtController extends Controller
         }
 
         return $redirect->with('success', "{$count} parcela(s) pendente(s) restaurada(s) para o valor original do contrato.");
+    }
+
+    public function adjustRemainingInstallments(Request $request, Debt $debt): RedirectResponse
+    {
+        $couple = Auth::user()->couple;
+        abort_if((int) $debt->couple_id !== (int) $couple->id, 403);
+        abort_if(! $debt->isInstallments(), 400, 'Esta operação é válida apenas para dívidas parceladas.');
+
+        $validated = $request->validate([
+            'new_installment_amount' => 'required|string',
+            'due_day' => 'nullable|integer|min:1|max:31',
+            'first_due_date' => 'nullable|date',
+            'update_total_amount' => 'nullable|boolean',
+            'reduce_installments_count' => 'nullable|integer|min:1',
+            'adjust_last_installment' => 'nullable|boolean',
+        ]);
+
+        $newAmountNormalized = $this->normalizeMoneyString($validated['new_installment_amount']);
+        $newAmountFloat = (float) $newAmountNormalized;
+
+        if ($newAmountFloat <= 0) {
+            return back()->withErrors(['new_installment_amount' => 'O valor da parcela deve ser maior que zero.'])->withInput();
+        }
+
+        $pendingInstallments = $debt->pendingInstallments()->orderBy('installment_number')->get();
+        $pendingCount = $pendingInstallments->count();
+
+        if ($pendingCount === 0) {
+            return back()->withErrors(['general' => 'Esta dívida não possui parcelas pendentes para ajustar.']);
+        }
+
+        $updateTotalAmount = $request->boolean('update_total_amount');
+        $adjustLastInstallment = $request->boolean('adjust_last_installment');
+        $reduceCount = ! empty($validated['reduce_installments_count']) ? (int) $validated['reduce_installments_count'] : null;
+
+        DB::transaction(function () use ($debt, $pendingInstallments, $pendingCount, $newAmountNormalized, $newAmountFloat, $validated, $updateTotalAmount, $reduceCount, $adjustLastInstallment) {
+            $paidCount = $debt->paidCount();
+            $paidTotal = $debt->totalPaid();
+            $currentRemaining = $debt->remainingBalance();
+
+            $targetPendingCount = $pendingCount;
+            $hasReducedCount = false;
+
+            if ($reduceCount !== null && $reduceCount > 0 && $reduceCount < $pendingCount) {
+                $targetPendingCount = $reduceCount;
+                $hasReducedCount = true;
+
+                // Remove as parcelas pendentes excedentes do final
+                $toRemove = $pendingInstallments->slice($reduceCount);
+                foreach ($toRemove as $instToDelete) {
+                    $instToDelete->delete();
+                }
+
+                $activePending = $pendingInstallments->take($reduceCount);
+                $debt->update([
+                    'total_installments' => $paidCount + $targetPendingCount,
+                ]);
+            } else {
+                $activePending = $pendingInstallments;
+            }
+
+            $newPendingSum = round($newAmountFloat * $targetPendingCount, 2);
+            $exceedsRemaining = $newPendingSum > ($currentRemaining + 0.05);
+
+            $shouldAdjustLast = ! $updateTotalAmount && ($adjustLastInstallment || ($hasReducedCount && $exceedsRemaining));
+
+            // Validação de teto se NÃO for para atualizar o valor total da dívida
+            if (! $updateTotalAmount) {
+                if ($shouldAdjustLast) {
+                    $sumOthers = round(($targetPendingCount - 1) * $newAmountFloat, 2);
+                    if ($sumOthers >= ($currentRemaining + 0.05)) {
+                        $remFormatted = number_format($currentRemaining, 2, ',', '.');
+                        $sumFormatted = number_format($sumOthers, 2, ',', '.');
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'new_installment_amount' => "O valor de R$ " . number_format($newAmountFloat, 2, ',', '.') . " é alto demais para {$targetPendingCount} parcelas: as primeiras " . ($targetPendingCount - 1) . " parcelas já somam R$ {$sumFormatted}, excedendo o saldo devedor de R$ {$remFormatted}. Reduza o valor da parcela ou reduza para menos parcelas.",
+                        ]);
+                    }
+                } else {
+                    $newPendingSum = round($newAmountFloat * $targetPendingCount, 2);
+                    if ($newPendingSum > ($currentRemaining + 0.05)) {
+                        $remFormatted = number_format($currentRemaining, 2, ',', '.');
+                        $sumFormatted = number_format($newPendingSum, 2, ',', '.');
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'new_installment_amount' => "A soma das parcelas (R$ {$sumFormatted}) excederá o saldo restante da dívida (R$ {$remFormatted}). Reduza o valor da parcela, diminua a quantidade de parcelas ou marque a opção de atualizar o total da dívida.",
+                        ]);
+                    }
+                }
+            }
+
+            // Tratamento das datas de vencimento
+            $dueDay = ! empty($validated['due_day']) ? (int) $validated['due_day'] : $debt->due_day;
+            $firstDueDate = ! empty($validated['first_due_date']) ? Carbon::parse($validated['first_due_date']) : null;
+            $targetDueDay = $dueDay ?: ($firstDueDate ? $firstDueDate->day : ($debt->due_day ?: 10));
+
+            // Atualiza cada uma das parcelas pendentes mantidas
+            $totalActive = $activePending->count();
+            $accumulated = 0.0;
+
+            foreach ($activePending->values() as $index => $inst) {
+                // Cálculo da data
+                if ($firstDueDate) {
+                    $ref = $firstDueDate->copy()->addMonthsNoOverflow($index);
+                    $effectiveDay = min($targetDueDay, $ref->daysInMonth);
+                    $calculatedDueDate = Carbon::createFromDate($ref->year, $ref->month, $effectiveDay)->toDateString();
+                } elseif ($dueDay) {
+                    $baseDate = $inst->due_date ? Carbon::parse($inst->due_date) : Carbon::today()->addMonthsNoOverflow($index);
+                    $effectiveDay = min($targetDueDay, $baseDate->daysInMonth);
+                    $calculatedDueDate = Carbon::createFromDate($baseDate->year, $baseDate->month, $effectiveDay)->toDateString();
+                } else {
+                    $calculatedDueDate = $inst->due_date ? $inst->due_date->toDateString() : null;
+                }
+
+                // Cálculo do valor
+                if ($shouldAdjustLast && $index === ($totalActive - 1)) {
+                    // Última parcela residual cravando no saldo restante caso necessário
+                    $residual = max(0.0, round($currentRemaining - $accumulated, 2));
+                    $parcelAmount = number_format($residual, 2, '.', '');
+                } else {
+                    $parcelAmount = $newAmountNormalized;
+                    $accumulated += $newAmountFloat;
+                }
+
+                $origAmount = $inst->original_amount ?? $inst->amount;
+
+                $inst->update([
+                    'amount' => $parcelAmount,
+                    'original_amount' => $origAmount,
+                    'due_date' => $calculatedDueDate,
+                ]);
+            }
+
+            // Atualização dos metadados da dívida
+            $debtUpdates = [
+                'installment_amount' => $newAmountNormalized,
+            ];
+
+            if ($dueDay) {
+                $debtUpdates['due_day'] = $dueDay;
+            }
+
+            if ($firstDueDate && ! $debt->start_date) {
+                $debtUpdates['start_date'] = $firstDueDate->toDateString();
+            }
+
+            if ($updateTotalAmount) {
+                $actualPendingSum = (float) $debt->pendingInstallments()->sum('amount');
+                $debtUpdates['total_amount'] = round($paidTotal + $actualPendingSum, 2);
+            }
+
+            $debt->update($debtUpdates);
+
+            if ($debt->isPaidOff()) {
+                $debt->update(['is_active' => false]);
+            }
+        });
+
+        $redirectUrl = $request->input('redirect_to');
+        $scheduleDebtId = $request->input('schedule_debt_id', $debt->id);
+
+        if ($redirectUrl && str_starts_with($redirectUrl, url('/'))) {
+            $redirect = redirect($redirectUrl);
+        } elseif ($request->headers->has('referer')) {
+            $redirect = redirect()->back();
+        } else {
+            $redirect = redirect()->route('debts.index', ['tab' => 'agenda']);
+        }
+
+        if ($scheduleDebtId) {
+            $redirect->with('open_schedule_debt_id', (int) $scheduleDebtId);
+        }
+
+        return $redirect->with('success', 'Parcelas restantes atualizadas com sucesso!');
+    }
+
+    public function storeInstallment(Request $request, Debt $debt): RedirectResponse
+    {
+        $couple = Auth::user()->couple;
+        abort_if((int) $debt->couple_id !== (int) $couple->id, 403);
+        abort_if(! $debt->isInstallments(), 400, 'Apenas dívidas parceladas aceitam adição de parcelas.');
+
+        $validated = $request->validate([
+            'amount' => 'required|string',
+            'due_date' => 'required|date',
+            'notes' => 'nullable|string|max:255',
+            'update_total_amount' => 'nullable|boolean',
+        ]);
+
+        $amountNormalized = $this->normalizeMoneyString($validated['amount']);
+        $amountFloat = (float) $amountNormalized;
+
+        if ($amountFloat <= 0) {
+            return back()->withErrors(['amount' => 'O valor da parcela deve ser maior que zero.'])->withInput();
+        }
+
+        $updateTotalAmount = $request->boolean('update_total_amount');
+        $currentPendingSum = (float) $debt->pendingInstallments()->sum('amount');
+        $newPendingSum = round($currentPendingSum + $amountFloat, 2);
+        $remainingBalance = $debt->remainingBalance();
+
+        if (! $updateTotalAmount && ($newPendingSum > ($remainingBalance + 0.05))) {
+            $remFormatted = number_format($remainingBalance, 2, ',', '.');
+            $newFormatted = number_format($newPendingSum, 2, ',', '.');
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => "A inclusão desta parcela fará a soma das parcelas (R$ {$newFormatted}) exceder o saldo restante da dívida (R$ {$remFormatted}). Reduza o valor da parcela ou marque a opção de atualizar o total da dívida.",
+            ]);
+        }
+
+        DB::transaction(function () use ($debt, $couple, $validated, $amountNormalized, $updateTotalAmount) {
+            $debt->installments()->create([
+                'couple_id' => $couple->id,
+                'installment_number' => ($debt->installments()->max('installment_number') ?? 0) + 1,
+                'due_date' => $validated['due_date'],
+                'original_amount' => $amountNormalized,
+                'amount' => $amountNormalized,
+                'status' => DebtInstallment::STATUS_PENDING,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            $this->renumberDebtInstallments($debt);
+
+            if ($updateTotalAmount) {
+                $newTotalDebt = $debt->totalPaid() + (float) $debt->pendingInstallments()->sum('amount');
+                $debt->update([
+                    'total_amount' => number_format($newTotalDebt, 2, '.', ''),
+                ]);
+            }
+        });
+
+        $redirectUrl = $request->input('redirect_to');
+        $scheduleDebtId = $request->input('schedule_debt_id', $debt->id);
+
+        if ($redirectUrl && str_starts_with($redirectUrl, url('/'))) {
+            $redirect = redirect($redirectUrl);
+        } elseif ($request->headers->has('referer')) {
+            $redirect = redirect()->back();
+        } else {
+            $redirect = redirect()->route('debts.index', ['tab' => 'agenda']);
+        }
+
+        if ($scheduleDebtId) {
+            $redirect->with('open_schedule_debt_id', (int) $scheduleDebtId);
+        }
+
+        return $redirect->with('success', 'Parcela adicionada com sucesso!');
+    }
+
+    public function updateInstallment(Request $request, DebtInstallment $installment): RedirectResponse
+    {
+        $couple = Auth::user()->couple;
+        abort_if((int) $installment->couple_id !== (int) $couple->id, 403);
+
+        $debt = $installment->debt;
+        abort_if(! $debt || ! $debt->isInstallments(), 404);
+        abort_if(! $installment->isPending(), 400, 'Apenas parcelas pendentes podem ser editadas diretamente.');
+
+        $validated = $request->validate([
+            'amount' => 'required|string',
+            'due_date' => 'required|date',
+            'notes' => 'nullable|string|max:255',
+            'update_total_amount' => 'nullable|boolean',
+        ]);
+
+        $amountNormalized = $this->normalizeMoneyString($validated['amount']);
+        $amountFloat = (float) $amountNormalized;
+
+        if ($amountFloat <= 0) {
+            return back()->withErrors(['amount' => 'O valor da parcela deve ser maior que zero.'])->withInput();
+        }
+
+        $updateTotalAmount = $request->boolean('update_total_amount');
+        $diff = $amountFloat - (float) $installment->amount;
+        $currentPendingSum = (float) $debt->pendingInstallments()->sum('amount');
+        $newPendingSum = round($currentPendingSum + $diff, 2);
+        $remainingBalance = $debt->remainingBalance();
+
+        if (! $updateTotalAmount && ($newPendingSum > ($remainingBalance + 0.05))) {
+            $remFormatted = number_format($remainingBalance, 2, ',', '.');
+            $newFormatted = number_format($newPendingSum, 2, ',', '.');
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => "O novo valor da parcela fará a soma das parcelas (R$ {$newFormatted}) exceder o saldo restante da dívida (R$ {$remFormatted}). Reduza o valor ou marque a opção de atualizar o total da dívida.",
+            ]);
+        }
+
+        DB::transaction(function () use ($debt, $installment, $validated, $amountNormalized, $updateTotalAmount) {
+            $origAmount = $installment->original_amount ?? $installment->amount;
+
+            $installment->update([
+                'amount' => $amountNormalized,
+                'original_amount' => $origAmount,
+                'due_date' => $validated['due_date'],
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            $this->renumberDebtInstallments($debt);
+
+            if ($updateTotalAmount) {
+                $newTotalDebt = $debt->totalPaid() + (float) $debt->pendingInstallments()->sum('amount');
+                $debt->update([
+                    'total_amount' => number_format($newTotalDebt, 2, '.', ''),
+                ]);
+            }
+        });
+
+        $redirectUrl = $request->input('redirect_to');
+        $scheduleDebtId = $request->input('schedule_debt_id', $debt->id);
+
+        if ($redirectUrl && str_starts_with($redirectUrl, url('/'))) {
+            $redirect = redirect($redirectUrl);
+        } elseif ($request->headers->has('referer')) {
+            $redirect = redirect()->back();
+        } else {
+            $redirect = redirect()->route('debts.index', ['tab' => 'agenda']);
+        }
+
+        if ($scheduleDebtId) {
+            $redirect->with('open_schedule_debt_id', (int) $scheduleDebtId);
+        }
+
+        return $redirect->with('success', 'Parcela atualizada com sucesso!');
+    }
+
+    public function destroyInstallment(Request $request, DebtInstallment $installment): RedirectResponse
+    {
+        $couple = Auth::user()->couple;
+        abort_if((int) $installment->couple_id !== (int) $couple->id, 403);
+
+        $debt = $installment->debt;
+        abort_if(! $debt || ! $debt->isInstallments(), 404);
+        abort_if(! $installment->isPending(), 400, 'Parcelas já pagas não podem ser excluídas diretamente. Desfaça o pagamento primeiro.');
+
+        DB::transaction(function () use ($debt, $installment) {
+            $installment->delete();
+            $this->renumberDebtInstallments($debt);
+        });
+
+        $redirectUrl = $request->input('redirect_to');
+        $scheduleDebtId = $request->input('schedule_debt_id', $debt->id);
+
+        if ($redirectUrl && str_starts_with($redirectUrl, url('/'))) {
+            $redirect = redirect($redirectUrl);
+        } elseif ($request->headers->has('referer')) {
+            $redirect = redirect()->back();
+        } else {
+            $redirect = redirect()->route('debts.index', ['tab' => 'agenda']);
+        }
+
+        if ($scheduleDebtId) {
+            $redirect->with('open_schedule_debt_id', (int) $scheduleDebtId);
+        }
+
+        return $redirect->with('success', 'Parcela removida com sucesso!');
+    }
+
+    private function renumberDebtInstallments(Debt $debt): void
+    {
+        $allInstallments = $debt->installments()->orderBy('installment_number')->get();
+
+        $regularInstallments = $allInstallments->filter(function ($inst) {
+            return $inst->isPending() || ! $inst->isExtraordinaryAmortization();
+        })->sortBy(function ($inst) {
+            return $inst->due_date ? $inst->due_date->toDateString() : '9999-12-31';
+        })->values();
+
+        $regularCount = $regularInstallments->count();
+
+        foreach ($regularInstallments as $index => $inst) {
+            $expectedNum = $index + 1;
+            if ($inst->installment_number !== $expectedNum) {
+                $inst->update(['installment_number' => $expectedNum]);
+            }
+        }
+
+        $debt->update([
+            'total_installments' => $regularCount,
+        ]);
+
+        $extraInstallments = $allInstallments->filter(function ($inst) {
+            return ! $inst->isPending() && $inst->isExtraordinaryAmortization();
+        })->sortBy('id')->values();
+
+        foreach ($extraInstallments as $extraIndex => $extraInst) {
+            $expectedExtraNum = $regularCount + 1 + $extraIndex;
+            if ($extraInst->installment_number !== $expectedExtraNum) {
+                $extraInst->update(['installment_number' => $expectedExtraNum]);
+            }
+        }
     }
 
     private function normalizeMoneyString(string $val): string

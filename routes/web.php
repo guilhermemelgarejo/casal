@@ -89,6 +89,10 @@ Route::middleware(['auth', 'has-couple', 'couple-billing'])->group(function () {
     Route::post('/dividas/parcelas/{installment}/desfazer', [DebtController::class, 'unpayInstallment'])->name('debts.installments.unpay');
     Route::patch('/dividas/parcelas/{installment}/resetar-valor', [DebtController::class, 'resetInstallmentAmount'])->name('debts.installments.reset-amount');
     Route::post('/dividas/{debt}/resetar-parcelas', [DebtController::class, 'resetAllInstallmentsAmount'])->name('debts.reset-all-installments');
+    Route::post('/dividas/{debt}/ajustar-parcelas-restantes', [DebtController::class, 'adjustRemainingInstallments'])->name('debts.adjust-remaining-installments');
+    Route::post('/dividas/{debt}/parcelas', [DebtController::class, 'storeInstallment'])->name('debts.installments.store');
+    Route::patch('/dividas/parcelas/{installment}', [DebtController::class, 'updateInstallment'])->name('debts.installments.update');
+    Route::delete('/dividas/parcelas/{installment}', [DebtController::class, 'destroyInstallment'])->name('debts.installments.destroy');
     Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
     Route::post('/accounts/transfer', [AccountTransferController::class, 'store'])->name('accounts.transfer');
     Route::post('/accounts', [AccountController::class, 'store'])->name('accounts.store');

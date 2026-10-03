@@ -551,8 +551,10 @@ class DebtTest extends TestCase
         $this->assertEquals(DebtInstallment::STATUS_PENDING, $inst8->status);
         $this->assertEquals(800.00, (float)$inst8->amount);
 
-        // Saldo devedor: #1..#7 (7 * 1000 = 7000) + #8 (800) = 7800.00
-        $this->assertEquals(7800.00, $debt->remainingBalance());
+        // Parcelas pendentes: #1..#7 (7 * 1000 = 7000) + #8 (800) = 7800.00
+        $this->assertEquals(7800.00, $debt->pendingInstallmentsSum());
+        // Saldo restante contratual: 10.000 - 1.700 = 8.300,00
+        $this->assertEquals(8300.00, $debt->remainingBalance());
         $this->assertEquals(1700.00, $debt->totalPaid());
     }
 
@@ -697,8 +699,9 @@ class DebtTest extends TestCase
         $this->assertEquals(DebtInstallment::STATUS_PENDING, $inst4->status);
         $this->assertEquals(300.00, (float)$inst4->amount);
 
-        // Saldo devedor restante: #1 (500) + #3 (500) + #4 (300) + #5 (500) = 1800.00
-        $this->assertEquals(1800.00, $debt->remainingBalance());
+        // Parcelas pendentes: #1 (500) + #3 (500) + #4 (300) + #5 (500) = 1800.00
+        $this->assertEquals(1800.00, $debt->pendingInstallmentsSum());
+        $this->assertEquals(1850.00, $debt->remainingBalance());
         $this->assertEquals(650.00, $debt->totalPaid());
     }
 
@@ -922,5 +925,565 @@ class DebtTest extends TestCase
         ]);
         $responseAll->assertRedirect(route('debts.index', ['tab' => 'agenda']));
         $this->assertEquals(1000.00, (float)$inst2->fresh()->amount);
+    }
+
+    public function test_user_can_create_debt_where_installments_sum_is_less_than_total_amount(): void
+    {
+        ['user' => $user] = $this->setupCoupleAndUser();
+
+        // Total 5.000,00 com 5 parcelas de 600,00 (soma = 3.000,00 < 5.000,00)
+        $response = $this->actingAs($user)->post(route('debts.store'), [
+            'name' => 'Financiamento Flexível',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => '5.000,00',
+            'total_installments' => 5,
+            'installment_amount' => '600,00',
+            'start_date' => '2026-09-15',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('debts.index', ['tab' => 'agenda']));
+
+        $debt = Debt::where('name', 'Financiamento Flexível')->first();
+        $this->assertNotNull($debt);
+        $this->assertEquals(5000.00, (float) $debt->total_amount);
+        $this->assertCount(5, $debt->installments);
+        $this->assertEquals(3000.00, $debt->pendingInstallmentsSum());
+        $this->assertEquals(5000.00, $debt->remainingBalance());
+    }
+
+    public function test_user_can_update_debt_total_amount_respecting_existing_installments_ceiling(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Empréstimo Flex',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 4000.00,
+            'total_installments' => 3,
+            'start_date' => '2026-09-15',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments(); // 3 parcelas de ~1333.33 somando 4000
+
+        // 1. Aumentar o total da dívida para 6.000 é permitido
+        $responseUp = $this->actingAs($user)->put(route('debts.update', $debt), [
+            'name' => 'Empréstimo Flex',
+            'total_amount' => '6.000,00',
+        ]);
+        $responseUp->assertSessionHasNoErrors();
+        $this->assertEquals(6000.00, (float) $debt->fresh()->total_amount);
+        $this->assertEquals(6000.00, $debt->fresh()->remainingBalance());
+
+        // 2. Reduzir o total para 2.000 (quando as parcelas pendentes somam 4000) DEVE falhar
+        $responseDown = $this->actingAs($user)->put(route('debts.update', $debt), [
+            'name' => 'Empréstimo Flex',
+            'total_amount' => '2.000,00',
+        ]);
+        $responseDown->assertSessionHasErrors('total_amount');
+        $this->assertEquals(6000.00, (float) $debt->fresh()->total_amount);
+    }
+
+    public function test_user_can_adjust_remaining_installments_updating_debt_total_amount(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account, 'category' => $category] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Financiamento Reforma',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 3000.00,
+            'total_installments' => 3,
+            'start_date' => '2026-09-15',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Paga a primeira parcela (1.000)
+        $inst1 = $debt->installments()->where('installment_number', 1)->first();
+        $this->actingAs($user)->post(route('debts.installments.pay', $inst1), [
+            'amount' => '1000.00',
+            'account_id' => $account->id,
+            'paid_at' => '2026-09-15',
+        ]);
+
+        // Ajusta as 2 parcelas restantes para R$ 1.500 cada, marcando para atualizar o total
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '1.500,00',
+            'update_total_amount' => '1',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $debt->refresh();
+        // Total da dívida agora é: 1.000 (já pago) + (2 * 1.500) = 4.000,00
+        $this->assertEquals(4000.00, (float) $debt->total_amount);
+        $this->assertEquals(1000.00, $debt->totalPaid());
+        $this->assertEquals(3000.00, $debt->remainingBalance());
+
+        $pending = $debt->pendingInstallments()->get();
+        $this->assertCount(2, $pending);
+        foreach ($pending as $p) {
+            $this->assertEquals(1500.00, (float) $p->amount);
+        }
+    }
+
+    public function test_user_can_adjust_remaining_installments_keeping_debt_total_amount(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Financiamento Curso',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 3000.00,
+            'total_installments' => 3,
+            'start_date' => '2026-09-15',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Paga a primeira parcela (1.000)
+        $inst1 = $debt->installments()->where('installment_number', 1)->first();
+        $this->actingAs($user)->post(route('debts.installments.pay', $inst1), [
+            'amount' => '1000.00',
+            'account_id' => $account->id,
+            'paid_at' => '2026-09-15',
+        ]);
+
+        // Ajusta as 2 restantes para R$ 800 cada, mantendo o total da dívida
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '800,00',
+            'update_total_amount' => '0',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $debt->refresh();
+        // Total da dívida permanece 3.000,00
+        $this->assertEquals(3000.00, (float) $debt->total_amount);
+        $this->assertEquals(1000.00, $debt->totalPaid());
+        $this->assertEquals(2000.00, $debt->remainingBalance());
+
+        $pending = $debt->pendingInstallments()->get();
+        $this->assertCount(2, $pending);
+        foreach ($pending as $p) {
+            $this->assertEquals(800.00, (float) $p->amount);
+        }
+        $this->assertEquals(1600.00, $debt->pendingInstallmentsSum());
+    }
+
+    public function test_adjusting_remaining_installments_exceeding_balance_fails_if_not_updating_total_and_no_reduction(): void
+    {
+        ['user' => $user, 'couple' => $couple, 'account' => $account] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Financiamento Viagem',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 3000.00,
+            'total_installments' => 3,
+            'start_date' => '2026-09-15',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Paga a primeira parcela (1.000). Saldo devedor restante = 2.000
+        $inst1 = $debt->installments()->where('installment_number', 1)->first();
+        $this->actingAs($user)->post(route('debts.installments.pay', $inst1), [
+            'amount' => '1000.00',
+            'account_id' => $account->id,
+            'paid_at' => '2026-09-15',
+        ]);
+
+        // Tenta colocar 2 parcelas de R$ 1.200 (soma 2.400 > 2.000) mantendo o total
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '1.200,00',
+            'update_total_amount' => '0',
+        ]);
+
+        $response->assertSessionHasErrors('new_installment_amount');
+    }
+
+    public function test_adjusting_remaining_installments_with_reduction_reduces_count_and_adjusts_residual(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        // Dívida com saldo de 1.000 e 5 parcelas de 200
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Financiamento Aparelho',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 1000.00,
+            'total_installments' => 5,
+            'start_date' => '2026-09-15',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Usuário quer alterar para parcelas de R$ 300, aceitando reduzir para 4 parcelas
+        // (3 de R$ 300 + 1 de R$ 100 = R$ 1.000)
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '300,00',
+            'update_total_amount' => '0',
+            'reduce_installments_count' => 4,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $debt->refresh();
+        $this->assertEquals(1000.00, (float) $debt->total_amount);
+        $this->assertEquals(4, (int) $debt->total_installments);
+
+        $pending = $debt->pendingInstallments()->orderBy('installment_number')->get();
+        $this->assertCount(4, $pending);
+
+        // Primeiras 3 de 300
+        $this->assertEquals(300.00, (float) $pending[0]->amount);
+        $this->assertEquals(300.00, (float) $pending[1]->amount);
+        $this->assertEquals(300.00, (float) $pending[2]->amount);
+        // Última parcela com o residual de 100
+        $this->assertEquals(100.00, (float) $pending[3]->amount);
+
+        // Soma total das parcelas cravada em 1.000
+        $this->assertEquals(1000.00, $debt->pendingInstallmentsSum());
+        $this->assertEquals(1000.00, $debt->remainingBalance());
+    }
+
+    public function test_user_can_adjust_due_date_and_due_day_of_remaining_installments(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Financiamento Mudança de Data',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 3000.00,
+            'total_installments' => 3,
+            'start_date' => '2026-09-10',
+            'due_day' => 10,
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Altera para dia 25 e primeira parcela para 2026-11-25
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '1000,00',
+            'due_day' => 25,
+            'first_due_date' => '2026-11-25',
+            'update_total_amount' => '0',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $debt->refresh();
+        $this->assertEquals(25, $debt->due_day);
+
+        $pending = $debt->pendingInstallments()->orderBy('installment_number')->get();
+        $this->assertCount(3, $pending);
+        $this->assertEquals('2026-11-25', $pending[0]->due_date->toDateString());
+        $this->assertEquals('2026-12-25', $pending[1]->due_date->toDateString());
+        $this->assertEquals('2027-01-25', $pending[2]->due_date->toDateString());
+    }
+
+    public function test_adjust_remaining_installments_reducing_count_with_residual_last_installment(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        // 10 parcelas de 1.500 = 15.000
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida 15k Teste',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 15000.00,
+            'total_installments' => 10,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Aumenta valor da parcela para 1.600 e reduz para 9 parcelas
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '1600,00',
+            'update_total_amount' => '0',
+            'reduce_installments_count' => '9',
+            'adjust_last_installment' => '1',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $debt->refresh();
+        $this->assertEquals(9, $debt->total_installments);
+        $this->assertEquals(15000.00, $debt->remainingBalance());
+
+        $pending = $debt->pendingInstallments()->orderBy('installment_number')->get();
+        $this->assertCount(9, $pending);
+
+        // Primeiras 8 de 1.600 = 12.800
+        for ($i = 0; $i < 8; $i++) {
+            $this->assertEquals(1600.00, (float) $pending[$i]->amount);
+        }
+
+        // Última parcela com 2.200 (15.000 - 12.800)
+        $this->assertEquals(2200.00, (float) $pending[8]->amount);
+        $this->assertEquals(15000.00, $debt->pendingInstallmentsSum());
+    }
+
+    public function test_adjust_remaining_installments_keeping_count_with_residual_last_installment(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        // 10 parcelas de 1.500 = 15.000
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida 15k Manter Parcelas',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 15000.00,
+            'total_installments' => 10,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Aumenta valor da parcela para 1.600, mantém 10 parcelas e ajusta última para cravar
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '1600,00',
+            'update_total_amount' => '0',
+            'reduce_installments_count' => '10',
+            'adjust_last_installment' => '1',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $debt->refresh();
+        $this->assertEquals(10, $debt->total_installments);
+        $this->assertEquals(15000.00, $debt->remainingBalance());
+
+        $pending = $debt->pendingInstallments()->orderBy('installment_number')->get();
+        $this->assertCount(10, $pending);
+
+        // Primeiras 9 de 1.600 = 14.400
+        for ($i = 0; $i < 9; $i++) {
+            $this->assertEquals(1600.00, (float) $pending[$i]->amount);
+        }
+
+        // Última parcela com 600 (15.000 - 14.400)
+        $this->assertEquals(600.00, (float) $pending[9]->amount);
+        $this->assertEquals(15000.00, $debt->pendingInstallmentsSum());
+    }
+
+    public function test_adjust_remaining_installments_reducing_count_with_sum_less_than_total_does_not_inflate_last_installment(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        // Dívida de 20.000 com 10 parcelas de 1.500 = 15.000 (menor que o total)
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida 20k Teste',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 20000.00,
+            'total_installments' => 10,
+            'installment_amount' => 1500.00,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Usuário reduz para 9 parcelas de 1.000 sem solicitar ajuste residual da última
+        $response = $this->actingAs($user)->post(route('debts.adjust-remaining-installments', $debt), [
+            'new_installment_amount' => '1000,00',
+            'update_total_amount' => '0',
+            'reduce_installments_count' => '9',
+            'adjust_last_installment' => '0',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $debt->refresh();
+        $this->assertEquals(9, $debt->total_installments);
+        $this->assertEquals(20000.00, (float) $debt->total_amount);
+
+        $pending = $debt->pendingInstallments()->orderBy('installment_number')->get();
+        $this->assertCount(9, $pending);
+
+        // Todas as 9 parcelas devem ser exatamente 1.000,00 (sem inflar a última para 12.000)
+        foreach ($pending as $inst) {
+            $this->assertEquals(1000.00, (float) $inst->amount);
+        }
+
+        $this->assertEquals(9000.00, $debt->pendingInstallmentsSum());
+    }
+
+    public function test_user_can_add_single_installment_to_debt(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida Adicionar Parcela',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 5000.00,
+            'total_installments' => 2,
+            'installment_amount' => 1000.00,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        $this->assertEquals(2, $debt->total_installments);
+
+        // Adiciona 3ª parcela de 1.000 para 2026-11-01
+        $response = $this->actingAs($user)->post(route('debts.installments.store', $debt), [
+            'amount' => '1000,00',
+            'due_date' => '2026-11-01',
+            'notes' => 'Parcela adicional avulsa',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $debt->refresh();
+        $this->assertEquals(3, $debt->total_installments);
+        $this->assertEquals(5000.00, (float) $debt->total_amount);
+
+        $installments = $debt->installments()->orderBy('installment_number')->get();
+        $this->assertCount(3, $installments);
+        $this->assertEquals('2026-11-01', $installments[2]->due_date->toDateString());
+        $this->assertEquals(1000.00, (float) $installments[2]->amount);
+        $this->assertEquals('Parcela adicional avulsa', $installments[2]->notes);
+    }
+
+    public function test_cannot_add_installment_exceeding_total_debt_unless_flagged(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        // 2 parcelas de 1.000 = 2.000, total = 2.500
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida Teto Adicionar',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 2500.00,
+            'total_installments' => 2,
+            'installment_amount' => 1000.00,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        // Tenta adicionar parcela de 800 (2.000 + 800 = 2.800 > 2.500) sem flag
+        $response = $this->actingAs($user)->post(route('debts.installments.store', $debt), [
+            'amount' => '800,00',
+            'due_date' => '2026-11-01',
+        ]);
+
+        $response->assertSessionHasErrors('amount');
+        $this->assertEquals(2, $debt->fresh()->total_installments);
+
+        // Agora adiciona marcando update_total_amount = 1
+        $responseOk = $this->actingAs($user)->post(route('debts.installments.store', $debt), [
+            'amount' => '800,00',
+            'due_date' => '2026-11-01',
+            'update_total_amount' => '1',
+        ]);
+
+        $responseOk->assertSessionHasNoErrors();
+        $debt->refresh();
+        $this->assertEquals(3, $debt->total_installments);
+        $this->assertEquals(2800.00, (float) $debt->total_amount);
+    }
+
+    public function test_user_can_edit_single_pending_installment(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida Editar Parcela',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 5000.00,
+            'total_installments' => 2,
+            'installment_amount' => 1000.00,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        $firstInst = $debt->installments()->orderBy('installment_number')->first();
+
+        // Edita valor para 1.200 e vencimento para dia 15
+        $response = $this->actingAs($user)->patch(route('debts.installments.update', $firstInst), [
+            'amount' => '1200,00',
+            'due_date' => '2026-09-15',
+            'notes' => 'Ajuste pontual',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $firstInst->refresh();
+        $this->assertEquals(1200.00, (float) $firstInst->amount);
+        $this->assertEquals('2026-09-15', $firstInst->due_date->toDateString());
+        $this->assertEquals('Ajuste pontual', $firstInst->notes);
+    }
+
+    public function test_user_can_delete_single_pending_installment_with_renumbering(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida Deletar Parcela',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 3000.00,
+            'total_installments' => 3,
+            'installment_amount' => 1000.00,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        $installments = $debt->installments()->orderBy('installment_number')->get();
+        $this->assertCount(3, $installments);
+
+        // Exclui a parcela intermediária (#2)
+        $secondInst = $installments[1];
+        $response = $this->actingAs($user)->delete(route('debts.installments.destroy', $secondInst));
+
+        $response->assertSessionHasNoErrors();
+        $debt->refresh();
+        $this->assertEquals(2, $debt->total_installments);
+
+        $remaining = $debt->installments()->orderBy('installment_number')->get();
+        $this->assertCount(2, $remaining);
+
+        // A antiga parcela #3 agora deve ser numerada como #2
+        $this->assertEquals(1, $remaining[0]->installment_number);
+        $this->assertEquals(2, $remaining[1]->installment_number);
+    }
+
+    public function test_cannot_delete_paid_installment_directly(): void
+    {
+        ['user' => $user, 'couple' => $couple] = $this->setupCoupleAndUser();
+
+        $debt = Debt::create([
+            'couple_id' => $couple->id,
+            'name' => 'Dívida Não Deletar Paga',
+            'type' => Debt::TYPE_INSTALLMENTS,
+            'total_amount' => 2000.00,
+            'total_installments' => 2,
+            'installment_amount' => 1000.00,
+            'start_date' => '2026-09-01',
+            'is_active' => true,
+        ]);
+        $debt->generateScheduledInstallments();
+
+        $firstInst = $debt->installments()->first();
+        $firstInst->update(['status' => DebtInstallment::STATUS_PAID]);
+
+        $response = $this->actingAs($user)->delete(route('debts.installments.destroy', $firstInst));
+        $response->assertStatus(400);
+
+        $this->assertDatabaseHas('debt_installments', ['id' => $firstInst->id]);
     }
 }

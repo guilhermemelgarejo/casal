@@ -101,15 +101,24 @@ class Debt extends Model
             ->sum('amount');
     }
 
+    public function pendingInstallmentsSum(): float
+    {
+        return (float) $this->pendingInstallments()->sum('amount');
+    }
+
     public function remainingBalance(): float
     {
-        if ($this->isInstallments() && $this->installments()->exists()) {
-            return (float) $this->pendingInstallments()->sum('amount');
+        $total = (float) $this->total_amount;
+        if ($total > 0) {
+            $paid = $this->totalPaid();
+            return max(0.0, round($total - $paid, 2));
         }
 
-        $paid = $this->totalPaid();
-        $total = (float) $this->total_amount;
-        return max(0.0, $total - $paid);
+        if ($this->isInstallments() && $this->installments()->exists()) {
+            return $this->pendingInstallmentsSum();
+        }
+
+        return 0.0;
     }
 
     public function progressPercentage(): float

@@ -662,7 +662,7 @@
                             </div>
 
                             {{-- BOTÕES DE AÇÃO NO RODAPÉ DO CARD --}}
-                            <div class="p-2 p-sm-3 border-top d-flex align-items-center justify-content-between gap-2 flex-wrap" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                            <div class="p-2 p-sm-3 border-top d-flex align-items-center justify-content-between gap-1 gap-sm-2 flex-nowrap" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
                                 <div class="d-flex align-items-center gap-1 gap-sm-2 flex-nowrap">
                                     @if($debt->isFree())
                                         <button
@@ -735,6 +735,8 @@
                                         title="Editar dívida"
                                         aria-label="Editar dívida"
                                         data-id="{{ $debt->id }}"
+                                        data-type="{{ $debt->type }}"
+                                        data-has-pending="{{ $debt->pendingCount() > 0 ? '1' : '0' }}"
                                         data-name="{{ $debt->name }}"
                                         data-creditor="{{ $debt->creditor }}"
                                         data-color="{{ $debt->color }}"
@@ -742,10 +744,11 @@
                                         data-default-account="{{ $debt->default_account_id }}"
                                         data-default-category="{{ $debt->default_category_id }}"
                                         data-user-id="{{ $debt->user_id }}"
+                                        data-total-amount="{{ number_format((float)$debt->total_amount, 2, ',', '.') }}"
                                         data-is-active="{{ $debt->is_active ? '1' : '0' }}"
-                                        style="color: var(--dz-text-secondary);"
+                                        style="color: var(--dz-text-secondary); width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;"
                                     >
-                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                     </button>
 
                                     <form method="POST" action="{{ route('debts.toggle-active', $debt) }}"
@@ -1275,9 +1278,27 @@
                             <input type="text" class="form-control rounded-3" id="edit_debt_creditor" name="creditor">
                         </div>
 
-                        <div>
-                            <label for="edit_debt_color" class="form-label fw-semibold small text-secondary mb-1">Cor</label>
-                            <input type="color" class="form-control form-control-color w-100 rounded-3" id="edit_debt_color" name="color" style="height: 38px;">
+                        <div class="row g-2">
+                            <div class="col-md-7">
+                                <label for="edit_debt_total_amount" class="form-label fw-semibold small text-secondary mb-1">Valor Total da Dívida (R$)</label>
+                                <input type="text" class="form-control rounded-3 fw-bold" id="edit_debt_total_amount" name="total_amount" placeholder="0,00">
+                                <div class="form-text" style="font-size: 0.72rem;">Não pode ser menor que o total já pago e comprometido em parcelas.</div>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="edit_debt_color" class="form-label fw-semibold small text-secondary mb-1">Cor</label>
+                                <input type="color" class="form-control form-control-color w-100 rounded-3" id="edit_debt_color" name="color" style="height: 38px;">
+                            </div>
+                        </div>
+
+                        {{-- BANNER DE ATALHO PARA AJUSTAR PARCELAS RESTANTES --}}
+                        <div class="p-2 p-sm-3 rounded-3 border d-flex align-items-center justify-content-between gap-2 flex-wrap" id="edit_debt_adjust_banner" style="display: none; background: var(--dz-primary-subtle, rgba(79, 70, 229, 0.08)); border-color: rgba(79, 70, 229, 0.25) !important;">
+                            <div>
+                                <div class="fw-semibold small" style="color: var(--dz-primary);">Ajustar parcelas restantes?</div>
+                                <div class="text-secondary small" style="font-size: 0.72rem;">Altere valores, vencimentos ou diminua a quantidade restante.</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 text-nowrap fw-semibold" id="btn_edit_debt_trigger_adjust" style="font-size: 0.78rem;">
+                                Ajustar Parcelas ↗
+                            </button>
                         </div>
 
                         <div class="row g-2">
@@ -1393,7 +1414,7 @@
                             <button type="button" class="btn btn-sm btn-outline-secondary js-schedule-filter-btn rounded-pill px-3 py-1" data-filter="overdue">Atrasadas (<span id="schedule_count_overdue">0</span>)</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary js-schedule-filter-btn rounded-pill px-3 py-1" data-filter="paid">Pagas (<span id="schedule_count_paid">0</span>)</button>
                         </div>
-                        <div class="d-flex align-items-center gap-2 ms-auto">
+                        <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
                             <div id="schedule_reset_all_wrapper" style="display: none;">
                                 <form id="form_schedule_reset_all" method="POST" action=""
                                     data-confirm="Deseja restaurar todas as parcelas pendentes com valor alterado para o valor original de contrato?"
@@ -1404,10 +1425,21 @@
                                     @csrf
                                     <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
                                     <input type="hidden" name="schedule_debt_id" id="schedule_reset_all_debt_id" value="">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill px-3 py-1" style="font-size: 0.78rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Restaura todas as parcelas pendentes para os valores originais do contrato">
-                                        <i class="bi bi-arrow-counterclockwise me-1"></i>Resetar valores originais
+                                    <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1" style="font-size: 0.78rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Restaura todas as parcelas pendentes para os valores originais do contrato">
+                                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        <span>Resetar valores originais</span>
                                     </button>
                                 </form>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1" id="schedule_btn_add_inst" style="font-size: 0.78rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Adicionar uma nova parcela avulsa ao cronograma">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                <span>Nova Parcela</span>
+                            </button>
+                            <div id="schedule_bulk_edit_wrapper" style="display: none;">
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1" id="schedule_btn_bulk_edit" style="font-size: 0.78rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Alterar valor e vencimento de todas as parcelas restantes">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                    <span>Ajustar parcelas restantes</span>
+                                </button>
                             </div>
                             <a id="schedule_btn_view_page" href="#" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1" style="font-size: 0.78rem;">
                                 Abrir na Agenda ↗
@@ -1424,7 +1456,7 @@
                                     <th class="py-2" style="min-width: 105px;">Vencimento</th>
                                     <th class="py-2 text-end" style="min-width: 110px;">Valor</th>
                                     <th class="py-2 text-center" style="width: 95px;">Status</th>
-                                    <th class="pe-3 py-2 text-end" style="width: 100px;">Ação</th>
+                                    <th class="pe-3 py-2 text-end text-nowrap" style="min-width: 175px;">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="schedule_table_body">
@@ -1434,15 +1466,254 @@
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0 d-flex justify-content-between flex-wrap gap-2">
-                    <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
                         <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" id="schedule_btn_amortize">
                             💵 Amortizar esta Dívida
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" id="schedule_btn_bulk_edit_footer">
+                            ✏️ Ajustar Parcelas Restantes
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" id="schedule_btn_add_inst_footer">
+                            ➕ Nova Parcela
                         </button>
                     </div>
                     <button type="button" class="btn btn-sm btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
                         Fechar
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ========================================================================= --}}
+    {{-- MODAL 6: AJUSTAR TODAS AS PARCELAS RESTANTES (EM LOTE)                    --}}
+    {{-- ========================================================================= --}}
+    <div class="modal fade" id="modalAdjustRemainingInstallments" tabindex="-1" aria-labelledby="modalAdjustRemainingInstallmentsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background: var(--dz-bg-card);">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h2 class="modal-title h5 fw-bold mb-0" id="modalAdjustRemainingInstallmentsLabel" style="color: var(--dz-text-title);">Ajustar Parcelas Restantes</h2>
+                        <div id="adjust_debt_subtitle" class="small text-secondary mt-1"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <form id="formAdjustRemainingInstallments" method="POST" action="">
+                    @csrf
+                    <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+                    <input type="hidden" name="schedule_debt_id" id="adjust_schedule_debt_id" value="">
+                    <input type="hidden" name="reduce_installments_count" id="adjust_reduce_installments_count" value="">
+                    <input type="hidden" name="adjust_last_installment" id="adjust_adjust_last_installment" value="0">
+
+                    <div class="modal-body vstack gap-3 pt-3">
+                        {{-- CARDS DE RESUMO --}}
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="p-2 p-sm-3 rounded-3 border h-100" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                                    <div class="small text-secondary text-truncate" style="font-size: 0.72rem;" title="Parcelas Restantes">Parcelas</div>
+                                    <div class="fw-bold mt-1 text-body text-truncate" style="font-size: 0.95rem;" id="adjust_stat_pending_count">0</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="p-2 p-sm-3 rounded-3 border h-100" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                                    <div class="small text-secondary text-truncate" style="font-size: 0.72rem;" title="Saldo Devedor Restante">Saldo Restante</div>
+                                    <div class="fw-bold mt-1 text-danger text-truncate" style="font-size: 0.95rem;" id="adjust_stat_remaining">R$ 0,00</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="p-2 p-sm-3 rounded-3 border h-100" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                                    <div class="small text-secondary text-truncate" style="font-size: 0.72rem;" title="Total Contratado da Dívida">Total Dívida</div>
+                                    <div class="fw-bold mt-1 text-body text-truncate" style="font-size: 0.95rem;" id="adjust_stat_total">R$ 0,00</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- QUANTIDADE DE PARCELAS E NOVO VALOR --}}
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <div class="p-3 rounded-3 border h-100" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                                    <label for="adjust_target_installments_count" class="form-label fw-semibold small text-secondary mb-1">
+                                        Qtd. de Parcelas Restantes *
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control form-control-lg rounded-start-3 fw-bold" id="adjust_target_installments_count" min="1" max="100" placeholder="Qtd">
+                                        <span class="input-group-text rounded-end-3 text-secondary small">parcelas</span>
+                                    </div>
+                                    <div class="form-text mt-1" style="font-size: 0.72rem;">
+                                        Altere para diminuir a quantidade de parcelas.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-7">
+                                <div class="p-3 rounded-3 border h-100" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                                    <label for="adjust_new_installment_amount" class="form-label fw-semibold small text-secondary mb-1">
+                                        Novo Valor da Parcela (R$) *
+                                    </label>
+                                    <input type="text" class="form-control form-control-lg rounded-3 fw-bold" id="adjust_new_installment_amount" name="new_installment_amount" placeholder="0,00" required>
+                                    <div class="form-text mt-1" style="font-size: 0.72rem;">
+                                        Valor aplicado às parcelas restantes.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- VENCIMENTOS --}}
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label for="adjust_due_day" class="form-label fw-semibold small text-secondary mb-1">Novo Dia de Vencimento (Fixo)</label>
+                                <input type="number" class="form-control rounded-3" id="adjust_due_day" name="due_day" min="1" max="31" placeholder="Ex: 10, 15, 25">
+                                <div class="form-text" style="font-size: 0.72rem;">Define o dia fixo do mês em que cada parcela vencerá.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="adjust_first_due_date" class="form-label fw-semibold small text-secondary mb-1">Data da 1ª Parcela Restante</label>
+                                <input type="date" class="form-control rounded-3" id="adjust_first_due_date" name="first_due_date">
+                                <div class="form-text" style="font-size: 0.72rem;">Recalcula a sequência mês a mês a partir desta data.</div>
+                            </div>
+                        </div>
+
+                        {{-- OPÇÃO: INFLUENCIAR OU NÃO O SALDO TOTAL DA DÍVIDA --}}
+                        <div class="p-3 rounded-3 border" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border) !important;">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" role="switch" id="adjust_update_total_amount" name="update_total_amount" value="1">
+                                <label class="form-check-label fw-semibold" for="adjust_update_total_amount" style="color: var(--dz-text-title);">
+                                    Atualizar o valor total da dívida para a nova soma das parcelas
+                                </label>
+                            </div>
+                            <div class="small text-secondary" id="adjust_update_total_help" style="font-size: 0.75rem;">
+                                <strong>Desmarcado (Padrão):</strong> Mantém o valor total da dívida contratada inalterado. As parcelas abertas não podem exceder o saldo restante.
+                            </div>
+                        </div>
+
+                        {{-- PAINEL DE FEEDBACK / ALERTA DE EXCESSO / SUGESTÃO INTELIGENTE DE REDUÇÃO --}}
+                        <div id="adjust_feedback_panel" style="display: none;">
+                            {{-- Preenchido dinamicamente via JS --}}
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4" id="adjust_btn_submit">
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- ========================================================================= --}}
+    {{-- MODAL 7: ADICIONAR PARCELA AVULSA AO CRONOGRAMA                           --}}
+    {{-- ========================================================================= --}}
+    <div class="modal fade" id="modalAddSingleInstallment" tabindex="-1" aria-labelledby="modalAddSingleInstallmentLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background: var(--dz-bg-card);">
+                <form id="formAddSingleInstallment" method="POST" action="">
+                    @csrf
+                    <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+                    <input type="hidden" name="schedule_debt_id" id="add_inst_schedule_debt_id" value="">
+                    <div class="modal-header border-0 pb-0">
+                        <div>
+                            <h2 class="modal-title h5 fw-bold mb-0" id="modalAddSingleInstallmentLabel" style="color: var(--dz-text-title);">Nova Parcela</h2>
+                            <div id="add_inst_debt_subtitle" class="small text-secondary mt-1"></div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" onclick="if(activeScheduleDebtId) openDebtSchedule(activeScheduleDebtId);"></button>
+                    </div>
+                    <div class="modal-body pt-3">
+                        <div class="row g-3">
+                            <div class="col-12 col-sm-6">
+                                <label for="add_inst_amount" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Valor da Parcela <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text border-end-0 fw-semibold text-secondary" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border);">R$</span>
+                                    <input type="text" class="form-control border-start-0 ps-1 fw-bold" id="add_inst_amount" name="amount" placeholder="0,00" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label for="add_inst_due_date" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Data de Vencimento <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="add_inst_due_date" name="due_date" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                            </div>
+                            <div class="col-12">
+                                <label for="add_inst_notes" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Observações / Descrição</label>
+                                <input type="text" class="form-control" id="add_inst_notes" name="notes" placeholder="Ex: Parcela renegociada, taxa adicional, etc." style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="add_inst_update_total" name="update_total_amount" value="1">
+                                    <label class="form-check-label small fw-semibold" for="add_inst_update_total" style="color: var(--dz-text-title);">
+                                        Atualizar o valor total da dívida
+                                    </label>
+                                </div>
+                                <div class="small text-secondary mt-1" style="font-size: 0.75rem;">
+                                    Se a nova parcela fizer a soma ultrapassar o saldo contratado, marque esta opção para estender o teto total da dívida.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal" onclick="if(activeScheduleDebtId) openDebtSchedule(activeScheduleDebtId);">Cancelar</button>
+                        <button type="submit" class="btn btn-success rounded-pill px-4 d-inline-flex align-items-center gap-1" id="btn_submit_add_inst" style="background: #10b981; border: none;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                            <span>Adicionar Parcela</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- ========================================================================= --}}
+    {{-- MODAL 8: EDITAR PARCELA AVULSA                                            --}}
+    {{-- ========================================================================= --}}
+    <div class="modal fade" id="modalEditSingleInstallment" tabindex="-1" aria-labelledby="modalEditSingleInstallmentLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background: var(--dz-bg-card);">
+                <form id="formEditSingleInstallment" method="POST" action="">
+                    @csrf
+                    <input type="hidden" name="_method" value="PATCH">
+                    <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+                    <input type="hidden" name="schedule_debt_id" id="edit_inst_schedule_debt_id" value="">
+                    <div class="modal-header border-0 pb-0">
+                        <div>
+                            <h2 class="modal-title h5 fw-bold mb-0" id="modalEditSingleInstallmentLabel" style="color: var(--dz-text-title);">Editar Parcela</h2>
+                            <div id="edit_inst_debt_subtitle" class="small text-secondary mt-1"></div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" onclick="if(activeScheduleDebtId) openDebtSchedule(activeScheduleDebtId);"></button>
+                    </div>
+                    <div class="modal-body pt-3">
+                        <div class="row g-3">
+                            <div class="col-12 col-sm-6">
+                                <label for="edit_inst_amount" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Valor da Parcela <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text border-end-0 fw-semibold text-secondary" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border);">R$</span>
+                                    <input type="text" class="form-control border-start-0 ps-1 fw-bold" id="edit_inst_amount" name="amount" placeholder="0,00" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label for="edit_inst_due_date" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Data de Vencimento <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="edit_inst_due_date" name="due_date" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                            </div>
+                            <div class="col-12">
+                                <label for="edit_inst_notes" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Observações / Descrição</label>
+                                <input type="text" class="form-control" id="edit_inst_notes" name="notes" placeholder="Ex: Negociação pontual de juros, etc." style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="edit_inst_update_total" name="update_total_amount" value="1">
+                                    <label class="form-check-label small fw-semibold" for="edit_inst_update_total" style="color: var(--dz-text-title);">
+                                        Atualizar o valor total da dívida
+                                    </label>
+                                </div>
+                                <div class="small text-secondary mt-1" style="font-size: 0.75rem;">
+                                    Se o novo valor fizer a soma ultrapassar o saldo contratado, marque esta opção para estender o teto total da dívida.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal" onclick="if(activeScheduleDebtId) openDebtSchedule(activeScheduleDebtId);">Cancelar</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4" id="btn_submit_edit_inst">
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1474,6 +1745,7 @@
                 'total_count' => $totalCount,
                 'extra_count' => $extraCount,
                 'pending_count' => $pendingCount,
+                'due_day' => $d->due_day,
                 'installments' => $d->installments->sortBy('installment_number')->map(function($inst) use ($d, $now) {
                     $isOverdue = $inst->isOverdue($now);
                     $isExtraordinary = $inst->isExtraordinaryAmortization();
@@ -1622,14 +1894,23 @@
             const count = parseInt(installmentsInput.value, 10) || 1;
 
             if (origin === 'installment') {
-                // Usuário digitou o valor unitário da parcela -> recalcula o valor total
+                // Usuário digitou o valor unitário da parcela -> sugere valor total apenas se estiver vazio
                 const instVal = parseMoneyNumber(installmentAmountInput.value);
-                if (instVal > 0 && count > 0) {
+                const currentTotal = parseMoneyNumber(totalInput.value);
+                if (instVal > 0 && count > 0 && currentTotal <= 0) {
                     const total = instVal * count;
                     totalInput.value = formatMoneyNumber(total);
                 }
-            } else {
-                // Usuário digitou o valor total ou alterou a quantidade de parcelas -> calcula o valor da parcela
+            } else if (origin === 'total') {
+                // Usuário digitou o valor total -> se parcela estiver vazia, sugere a divisão
+                const totalVal = parseMoneyNumber(totalInput.value);
+                const currentInst = parseMoneyNumber(installmentAmountInput.value);
+                if (totalVal > 0 && count > 0 && currentInst <= 0) {
+                    const perMonth = totalVal / count;
+                    installmentAmountInput.value = formatMoneyNumber(perMonth);
+                }
+            } else if (origin === 'count') {
+                // Usuário alterou a quantidade de parcelas -> calcula o valor sugerido da parcela
                 const totalVal = parseMoneyNumber(totalInput.value);
                 if (totalVal > 0 && count > 0) {
                     const perMonth = totalVal / count;
@@ -2127,6 +2408,18 @@
                     }
                 }
 
+                // Botão de ajustar parcelas restantes (em lote)
+                const bulkEditWrapper = document.getElementById('schedule_bulk_edit_wrapper');
+                const bulkEditFooterBtn = document.getElementById('schedule_btn_bulk_edit_footer');
+                const hasPending = (debt.pending_count || 0) > 0 && debt.type === 'installments';
+
+                if (bulkEditWrapper) {
+                    bulkEditWrapper.style.display = hasPending ? 'block' : 'none';
+                }
+                if (bulkEditFooterBtn) {
+                    bulkEditFooterBtn.style.display = hasPending ? 'inline-block' : 'none';
+                }
+
                 renderScheduleTable();
 
                 const scheduleModalEl = document.getElementById('modalDebtSchedule');
@@ -2136,6 +2429,474 @@
                 }
             }
             window.openDebtSchedule = openDebtSchedule;
+
+            // Abre o modal de ajuste de parcelas restantes
+            function openAdjustRemainingModal(debtId) {
+                activeScheduleDebtId = debtId;
+                const debt = debtsScheduleData[debtId];
+                if (!debt) return;
+
+                // Fecha o modal de cronograma se aberto
+                const scheduleModalEl = document.getElementById('modalDebtSchedule');
+                if (scheduleModalEl && typeof bootstrap !== 'undefined') {
+                    const modal = bootstrap.Modal.getInstance(scheduleModalEl);
+                    if (modal) modal.hide();
+                }
+
+                const form = document.getElementById('formAdjustRemainingInstallments');
+                if (form) form.action = `/dividas/${debt.id}/ajustar-parcelas-restantes`;
+
+                const scheduleDebtInput = document.getElementById('adjust_schedule_debt_id');
+                if (scheduleDebtInput) scheduleDebtInput.value = debt.id;
+
+                const subtitle = document.getElementById('adjust_debt_subtitle');
+                if (subtitle) {
+                    subtitle.textContent = `Dívida: ${debt.name} • ${debt.pending_count} parcelas pendentes • Saldo restante: R$ ${debt.remaining_formatted}`;
+                }
+
+                const statCount = document.getElementById('adjust_stat_pending_count');
+                if (statCount) statCount.textContent = debt.pending_count;
+
+                const statRem = document.getElementById('adjust_stat_remaining');
+                if (statRem) statRem.textContent = `R$ ${debt.remaining_formatted}`;
+
+                const statTotal = document.getElementById('adjust_stat_total');
+                if (statTotal) statTotal.textContent = `R$ ${debt.total_amount_formatted}`;
+
+                const targetCountInput = document.getElementById('adjust_target_installments_count');
+                if (targetCountInput) {
+                    targetCountInput.value = debt.pending_count;
+                    targetCountInput.max = debt.pending_count;
+                }
+
+                // Próxima parcela pendente para preencher o valor sugerido e vencimento
+                const nextPending = (debt.installments || []).find(i => i.status === 'pending');
+                const amountInput = document.getElementById('adjust_new_installment_amount');
+                if (amountInput) {
+                    amountInput.value = nextPending ? nextPending.amount_formatted : '';
+                }
+
+                const dueDayInput = document.getElementById('adjust_due_day');
+                if (dueDayInput) {
+                    dueDayInput.value = debt.due_day || '';
+                }
+
+                const firstDateInput = document.getElementById('adjust_first_due_date');
+                if (firstDateInput) {
+                    firstDateInput.value = nextPending && nextPending.due_date_raw ? nextPending.due_date_raw : '';
+                }
+
+                const updateCheck = document.getElementById('adjust_update_total_amount');
+                if (updateCheck) {
+                    updateCheck.checked = false;
+                }
+
+                const reduceInput = document.getElementById('adjust_reduce_installments_count');
+                if (reduceInput) {
+                    reduceInput.value = '';
+                }
+
+                const adjustLastInput = document.getElementById('adjust_adjust_last_installment');
+                if (adjustLastInput) {
+                    adjustLastInput.value = '0';
+                }
+
+                updateAdjustInstallmentsPreview();
+
+                const adjustModalEl = document.getElementById('modalAdjustRemainingInstallments');
+                if (adjustModalEl && typeof bootstrap !== 'undefined') {
+                    const modal = bootstrap.Modal.getOrCreateInstance(adjustModalEl);
+                    modal.show();
+                }
+            }
+            window.openAdjustRemainingModal = openAdjustRemainingModal;
+
+            // Abre o modal de adicionar parcela avulsa
+            function openAddSingleInstallmentModal(debtId) {
+                const targetDebtId = debtId || activeScheduleDebtId;
+                if (!targetDebtId) return;
+
+                const debt = debtsScheduleData[targetDebtId];
+                if (!debt) return;
+
+                activeScheduleDebtId = targetDebtId;
+
+                // Fecha modal do cronograma se aberto
+                const scheduleModalEl = document.getElementById('modalDebtSchedule');
+                if (scheduleModalEl && typeof bootstrap !== 'undefined') {
+                    const modal = bootstrap.Modal.getInstance(scheduleModalEl);
+                    if (modal) modal.hide();
+                }
+
+                const form = document.getElementById('formAddSingleInstallment');
+                if (form) form.action = `/dividas/${debt.id}/parcelas`;
+
+                const scheduleDebtInput = document.getElementById('add_inst_schedule_debt_id');
+                if (scheduleDebtInput) scheduleDebtInput.value = debt.id;
+
+                const subtitle = document.getElementById('add_inst_debt_subtitle');
+                if (subtitle) {
+                    subtitle.textContent = `${debt.name} • Saldo restante: R$ ${debt.remaining_formatted}`;
+                }
+
+                // Sugere data e valor: 1 mês após a última parcela existente
+                const installments = debt.installments || [];
+                let defaultAmount = '';
+                let defaultDate = '';
+
+                if (installments.length > 0) {
+                    const lastInst = installments[installments.length - 1];
+                    defaultAmount = lastInst.amount_formatted || '';
+                    if (lastInst.due_date_raw) {
+                        const parts = lastInst.due_date_raw.split('-');
+                        if (parts.length === 3) {
+                            const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                            d.setMonth(d.getMonth() + 1);
+                            const yr = d.getFullYear();
+                            const mo = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            defaultDate = `${yr}-${mo}-${day}`;
+                        }
+                    }
+                }
+
+                if (!defaultAmount && debt.total_amount && debt.total_count) {
+                    defaultAmount = formatMoneyNumber(debt.total_amount / debt.total_count);
+                }
+
+                const amountEl = document.getElementById('add_inst_amount');
+                if (amountEl) amountEl.value = defaultAmount;
+
+                const dateEl = document.getElementById('add_inst_due_date');
+                if (dateEl) dateEl.value = defaultDate;
+
+                const notesEl = document.getElementById('add_inst_notes');
+                if (notesEl) notesEl.value = '';
+
+                const checkEl = document.getElementById('add_inst_update_total');
+                if (checkEl) checkEl.checked = false;
+
+                const addModalEl = document.getElementById('modalAddSingleInstallment');
+                if (addModalEl && typeof bootstrap !== 'undefined') {
+                    const modal = bootstrap.Modal.getOrCreateInstance(addModalEl);
+                    modal.show();
+                }
+            }
+            window.openAddSingleInstallmentModal = openAddSingleInstallmentModal;
+
+            // Abre o modal de editar parcela avulsa
+            function openEditSingleInstallmentModal(instId, amount, dueDate, notes, number) {
+                if (!activeScheduleDebtId) return;
+                const debt = debtsScheduleData[activeScheduleDebtId];
+                if (!debt) return;
+
+                // Fecha modal do cronograma se aberto
+                const scheduleModalEl = document.getElementById('modalDebtSchedule');
+                if (scheduleModalEl && typeof bootstrap !== 'undefined') {
+                    const modal = bootstrap.Modal.getInstance(scheduleModalEl);
+                    if (modal) modal.hide();
+                }
+
+                const form = document.getElementById('formEditSingleInstallment');
+                if (form) form.action = `/dividas/parcelas/${instId}`;
+
+                const scheduleDebtInput = document.getElementById('edit_inst_schedule_debt_id');
+                if (scheduleDebtInput) scheduleDebtInput.value = debt.id;
+
+                const title = document.getElementById('modalEditSingleInstallmentLabel');
+                if (title) title.textContent = `Editar Parcela #${number}`;
+
+                const subtitle = document.getElementById('edit_inst_debt_subtitle');
+                if (subtitle) {
+                    subtitle.textContent = `${debt.name} • Saldo restante: R$ ${debt.remaining_formatted}`;
+                }
+
+                const amountEl = document.getElementById('edit_inst_amount');
+                if (amountEl) amountEl.value = amount || '';
+
+                const dateEl = document.getElementById('edit_inst_due_date');
+                if (dateEl) dateEl.value = dueDate || '';
+
+                const notesEl = document.getElementById('edit_inst_notes');
+                if (notesEl) notesEl.value = notes || '';
+
+                const checkEl = document.getElementById('edit_inst_update_total');
+                if (checkEl) checkEl.checked = false;
+
+                const editModalEl = document.getElementById('modalEditSingleInstallment');
+                if (editModalEl && typeof bootstrap !== 'undefined') {
+                    const modal = bootstrap.Modal.getOrCreateInstance(editModalEl);
+                    modal.show();
+                }
+            }
+            window.openEditSingleInstallmentModal = openEditSingleInstallmentModal;
+
+            function updateAdjustInstallmentsPreview(source = null) {
+                if (!activeScheduleDebtId) return;
+                const debt = debtsScheduleData[activeScheduleDebtId];
+                if (!debt) return;
+
+                const amountInput = document.getElementById('adjust_new_installment_amount');
+                const targetCountInput = document.getElementById('adjust_target_installments_count');
+                const updateCheck = document.getElementById('adjust_update_total_amount');
+                const reduceInput = document.getElementById('adjust_reduce_installments_count');
+                const adjustLastInput = document.getElementById('adjust_adjust_last_installment');
+                const feedbackPanel = document.getElementById('adjust_feedback_panel');
+                const submitBtn = document.getElementById('adjust_btn_submit');
+                const helpText = document.getElementById('adjust_update_total_help');
+
+                if (!amountInput || !feedbackPanel) return;
+
+                const pendingCount = debt.pending_count || 0;
+                const remainingBalance = debt.remaining || 0;
+                const isUpdateTotal = updateCheck ? updateCheck.checked : false;
+
+                let targetCount = parseInt(targetCountInput?.value, 10);
+                if (isNaN(targetCount) || targetCount < 1) targetCount = pendingCount;
+                if (targetCount > pendingCount) targetCount = pendingCount;
+
+                if (targetCountInput && parseInt(targetCountInput.value, 10) !== targetCount) {
+                    targetCountInput.value = targetCount;
+                }
+
+                if (helpText) {
+                    if (isUpdateTotal) {
+                        helpText.innerHTML = `<strong>Marcado:</strong> O valor total da dívida será recalculado para refletir exatamente o que já foi pago + a nova soma das parcelas.`;
+                    } else {
+                        helpText.innerHTML = `<strong>Desmarcado (Padrão):</strong> Mantém o valor total da dívida contratada (R$ ${debt.total_amount_formatted}) inalterado. As parcelas abertas não poderão exceder o saldo restante de R$ ${debt.remaining_formatted}.`;
+                    }
+                }
+
+                // Se a alteração não veio do clique em uma das opções sugeridas de ajuste residual, desativa a flag de cravar última parcela
+                if (source !== 'option' && adjustLastInput) {
+                    adjustLastInput.value = '0';
+                }
+
+                const unitAmount = parseMoneyNumber(amountInput.value);
+
+                if (unitAmount <= 0) {
+                    feedbackPanel.style.display = 'none';
+                    feedbackPanel.innerHTML = '';
+                    if (submitBtn) submitBtn.disabled = true;
+                    return;
+                }
+
+                const totalNewPending = unitAmount * targetCount;
+                const shouldAdjustLast = adjustLastInput && adjustLastInput.value === '1';
+
+                if (isUpdateTotal) {
+                    if (reduceInput) reduceInput.value = (targetCount < pendingCount) ? targetCount : '';
+                    if (adjustLastInput) adjustLastInput.value = '0';
+                    feedbackPanel.style.display = 'block';
+                    const newTotalDebt = debt.paid + totalNewPending;
+                    const reduceNote = (targetCount < pendingCount) ? ` (${pendingCount - targetCount} excedentes removidas)` : '';
+                    feedbackPanel.innerHTML = `
+                        <div class="alert alert-info border-0 rounded-3 mb-0 p-3 d-flex align-items-center gap-2" style="background: rgba(59, 130, 246, 0.12); color: #1e40af;">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div>
+                                <div><strong>${targetCount}</strong> parcelas de <strong>R$ ${formatMoneyNumber(unitAmount)}</strong> somarão <strong>R$ ${formatMoneyNumber(totalNewPending)}</strong>${reduceNote}.</div>
+                                <div class="small mt-1">O valor total da dívida será ajustado de R$ ${debt.total_amount_formatted} para <strong>R$ ${formatMoneyNumber(newTotalDebt)}</strong>.</div>
+                            </div>
+                        </div>
+                    `;
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                }
+
+                // Quando mantém o total da dívida:
+                // Verifica se o ajuste da última parcela está ativado para cravar no saldo restante
+                if (shouldAdjustLast) {
+                    const firstSum = (targetCount - 1) * unitAmount;
+                    if (firstSum >= (remainingBalance + 0.05)) {
+                        if (adjustLastInput) adjustLastInput.value = '0';
+                    } else {
+                        const lastAmount = Math.max(0, Math.round((remainingBalance - firstSum) * 100) / 100);
+                        if (reduceInput) reduceInput.value = (targetCount < pendingCount) ? targetCount : '';
+
+                        feedbackPanel.style.display = 'block';
+                        let distText = '';
+                        if (targetCount === 1) {
+                            distText = `<strong>1 parcela de R$ ${formatMoneyNumber(remainingBalance)}</strong>`;
+                        } else if (Math.abs(lastAmount - unitAmount) < 0.01) {
+                            distText = `<strong>${targetCount} parcelas de R$ ${formatMoneyNumber(unitAmount)}</strong>`;
+                        } else {
+                            distText = `<strong>${targetCount - 1} parcela(s) de R$ ${formatMoneyNumber(unitAmount)}</strong> + <strong>1 parcela final de R$ ${formatMoneyNumber(lastAmount)}</strong>`;
+                        }
+
+                        const removedSnippet = (targetCount < pendingCount)
+                            ? ` Quantidade reduzida de <strong>${pendingCount}</strong> para <strong>${targetCount}</strong> (${pendingCount - targetCount} parcelas removidas).`
+                            : ` Quantidade mantida em <strong>${targetCount}</strong> parcelas.`;
+
+                        feedbackPanel.innerHTML = `
+                            <div class="alert alert-success border-0 rounded-3 mb-0 p-3" style="background: rgba(16, 185, 129, 0.12); color: #065f46;">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                                    <span class="fw-bold d-inline-flex align-items-center"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="me-1"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Distribuição cravada no saldo restante!</span>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-0" id="btn_cancel_distribution" style="font-size: 0.72rem;">Trocar distribuição</button>
+                                </div>
+                                <div class="small">${removedSnippet}</div>
+                                <div class="small mt-1">
+                                    Distribuição: ${distText}, totalizando exatamente <strong>R$ ${formatMoneyNumber(remainingBalance)}</strong>.
+                                </div>
+                            </div>
+                        `;
+
+                        const cancelBtn = document.getElementById('btn_cancel_distribution');
+                        if (cancelBtn) {
+                            cancelBtn.onclick = function() {
+                                if (adjustLastInput) adjustLastInput.value = '0';
+                                if (reduceInput) reduceInput.value = '';
+                                updateAdjustInstallmentsPreview();
+                            };
+                        }
+
+                        if (submitBtn) submitBtn.disabled = false;
+                        return;
+                    }
+                }
+
+                // Se a soma de todas as parcelas inteiras exceder o saldo restante
+                if (totalNewPending > (remainingBalance + 0.05)) {
+                    const excess = totalNewPending - remainingBalance;
+                    feedbackPanel.style.display = 'block';
+
+                    const options = [];
+
+                    // Opção 1: Manter a quantidade de parcelas atual, ajustando a última para baixo (resíduo menor)
+                    const firstSumSameCount = (targetCount - 1) * unitAmount;
+                    if (targetCount > 1 && firstSumSameCount < remainingBalance) {
+                        const lastSame = Math.round((remainingBalance - firstSumSameCount) * 100) / 100;
+                        if (lastSame > 0) {
+                            options.push({
+                                count: targetCount,
+                                label: `Manter ${targetCount} parcelas`,
+                                detail: `${targetCount - 1} de R$ ${formatMoneyNumber(unitAmount)} + 1 última de R$ ${formatMoneyNumber(lastSame)}`,
+                                btnClass: 'btn-outline-warning text-dark'
+                            });
+                        }
+                    }
+
+                    // Opção 2: Reduzir para a quantidade máxima inteira que cabe
+                    const maxFull = Math.floor(remainingBalance / unitAmount);
+                    if (maxFull >= 1 && maxFull < targetCount) {
+                        const remFull = Math.round((remainingBalance - (maxFull * unitAmount)) * 100) / 100;
+                        if (remFull > 0.01) {
+                            const firstSumMax = (maxFull - 1) * unitAmount;
+                            if (firstSumMax < remainingBalance) {
+                                const lastMax = Math.round((remainingBalance - firstSumMax) * 100) / 100;
+                                options.push({
+                                    count: maxFull,
+                                    label: `Reduzir para ${maxFull} parcelas`,
+                                    detail: `${maxFull - 1} de R$ ${formatMoneyNumber(unitAmount)} + 1 última de R$ ${formatMoneyNumber(lastMax)} (economiza ${targetCount - maxFull} parcela${(targetCount - maxFull) > 1 ? 's' : ''})`,
+                                    btnClass: 'btn-warning text-dark fw-bold'
+                                });
+                            }
+                        } else {
+                            options.push({
+                                count: maxFull,
+                                label: `Reduzir para ${maxFull} parcelas exatas`,
+                                detail: `${maxFull} parcelas de R$ ${formatMoneyNumber(unitAmount)} (sem resíduo, economiza ${targetCount - maxFull} parcela${(targetCount - maxFull) > 1 ? 's' : ''})`,
+                                btnClass: 'btn-warning text-dark fw-bold'
+                            });
+                        }
+                    }
+
+                    // Se maxFull + 1 for menor que targetCount (ex: unitAmount bem maior)
+                    if ((maxFull + 1) >= 1 && (maxFull + 1) < targetCount) {
+                        const firstSumPlus = maxFull * unitAmount;
+                        if (firstSumPlus < remainingBalance) {
+                            const lastPlus = Math.round((remainingBalance - firstSumPlus) * 100) / 100;
+                            if (lastPlus > 0) {
+                                options.push({
+                                    count: maxFull + 1,
+                                    label: `Reduzir para ${maxFull + 1} parcelas`,
+                                    detail: `${maxFull} de R$ ${formatMoneyNumber(unitAmount)} + 1 última de R$ ${formatMoneyNumber(lastPlus)} (economiza ${targetCount - (maxFull + 1)} parcela${(targetCount - (maxFull + 1)) > 1 ? 's' : ''})`,
+                                    btnClass: 'btn-warning text-dark fw-bold'
+                                });
+                            }
+                        }
+                    }
+
+                    // Remove opções duplicadas por quantidade
+                    const uniqueOptions = [];
+                    const seenCounts = new Set();
+                    for (const opt of options) {
+                        if (!seenCounts.has(opt.count)) {
+                            seenCounts.add(opt.count);
+                            uniqueOptions.push(opt);
+                        }
+                    }
+
+                    let optionsHtml = '';
+                    if (uniqueOptions.length > 0) {
+                        optionsHtml = `
+                            <div class="mt-2 pt-2 border-top border-warning-subtle">
+                                <div class="fw-semibold mb-2">💡 Escolha como deseja ajustar para quitar exatamente os R$ ${formatMoneyNumber(remainingBalance)}:</div>
+                                <div class="d-flex flex-column gap-2">
+                                    ${uniqueOptions.map(opt => `
+                                        <button type="button" class="btn btn-sm ${opt.btnClass} text-start rounded-3 px-3 py-2 js-btn-apply-opt" data-count="${opt.count}" style="background: rgba(255,255,255,0.85); border: 1px solid rgba(245, 158, 11, 0.4);">
+                                            <div>⚡ <strong>${opt.label}</strong></div>
+                                            <div class="small fw-normal mt-1" style="opacity: 0.85;">${opt.detail}</div>
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        optionsHtml = `
+                            <div class="mt-2 pt-2 border-top border-warning-subtle small">
+                                O valor informado de R$ ${formatMoneyNumber(unitAmount)} é superior ao saldo total restante de R$ ${formatMoneyNumber(remainingBalance)}. Marque a opção de atualizar o total ou informe um valor menor.
+                            </div>
+                        `;
+                    }
+
+                    feedbackPanel.innerHTML = `
+                        <div class="alert alert-warning border-0 rounded-3 mb-0 p-3" style="background: rgba(245, 158, 11, 0.15); color: #92400e;">
+                            <div class="d-flex align-items-start gap-2">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="flex-shrink-0 text-warning"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <div class="w-100">
+                                    <div class="fw-bold">O novo valor excede o saldo restante se todas as parcelas forem integrais!</div>
+                                    <div class="small mt-1">
+                                        ${targetCount} parcelas de R$ ${formatMoneyNumber(unitAmount)} somariam <strong>R$ ${formatMoneyNumber(totalNewPending)}</strong>, o que excede o saldo devedor restante de <strong>R$ ${formatMoneyNumber(remainingBalance)}</strong> (excesso de R$ ${formatMoneyNumber(excess)}).
+                                    </div>
+                                    ${optionsHtml}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    feedbackPanel.querySelectorAll('.js-btn-apply-opt').forEach(btn => {
+                        btn.onclick = function() {
+                            const chosenCount = parseInt(this.dataset.count, 10);
+                            if (targetCountInput) targetCountInput.value = chosenCount;
+                            if (reduceInput) reduceInput.value = (chosenCount < pendingCount) ? chosenCount : '';
+                            if (adjustLastInput) adjustLastInput.value = '1';
+                            updateAdjustInstallmentsPreview('option');
+                        };
+                    });
+
+                    if (submitBtn) submitBtn.disabled = true;
+                } else {
+                    // Valor é menor ou igual ao saldo restante
+                    if (reduceInput) reduceInput.value = (targetCount < pendingCount) ? targetCount : '';
+                    if (adjustLastInput) adjustLastInput.value = '0';
+                    feedbackPanel.style.display = 'block';
+
+                    const removedText = (targetCount < pendingCount)
+                        ? ` (${pendingCount - targetCount} parcela${(pendingCount - targetCount) > 1 ? 's' : ''} excedente${(pendingCount - targetCount) > 1 ? 's' : ''} removida${(pendingCount - targetCount) > 1 ? 's' : ''})`
+                        : '';
+
+                    feedbackPanel.innerHTML = `
+                        <div class="alert alert-success border-0 rounded-3 mb-0 p-3 d-flex align-items-center gap-2" style="background: rgba(16, 185, 129, 0.12); color: #065f46;">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="flex-shrink-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div class="w-100">
+                                <div><strong>${targetCount}</strong> parcelas de <strong>R$ ${formatMoneyNumber(unitAmount)}</strong> = <strong>R$ ${formatMoneyNumber(totalNewPending)}</strong>${removedText}.</div>
+                            </div>
+                        </div>
+                    `;
+
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            }
 
             // Renderiza a tabela de parcelas dentro do modal de cronograma
             function renderScheduleTable() {
@@ -2158,7 +2919,7 @@
                     tbody.innerHTML = `
                         <tr>
                             <td colspan="5" class="text-center py-4 text-secondary">
-                                <i class="bi bi-inbox fs-3 d-block mb-1"></i>
+                                <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="d-block mx-auto mb-2 text-secondary" style="opacity: 0.6;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-4.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H2"/></svg>
                                 Nenhuma parcela encontrada para o filtro selecionado.
                             </td>
                         </tr>
@@ -2172,13 +2933,13 @@
                 tbody.innerHTML = items.map(inst => {
                     let statusBadge = '';
                     if (inst.is_extraordinary) {
-                        statusBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fw-semibold"><i class="bi bi-check-circle me-1"></i>Amortizado</span>`;
+                        statusBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fw-semibold d-inline-flex align-items-center gap-1"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Amortizado</span>`;
                     } else if (inst.status === 'paid') {
-                        statusBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fw-semibold"><i class="bi bi-check-circle me-1"></i>Paga</span>`;
+                        statusBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fw-semibold d-inline-flex align-items-center gap-1"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Paga</span>`;
                     } else if (inst.is_overdue) {
-                        statusBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1 fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Atrasada</span>`;
+                        statusBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1 fw-semibold d-inline-flex align-items-center gap-1"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Atrasada</span>`;
                     } else {
-                        statusBadge = `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1 fw-semibold"><i class="bi bi-clock me-1"></i>A Vencer</span>`;
+                        statusBadge = `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1 fw-semibold d-inline-flex align-items-center gap-1"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>A Vencer</span>`;
                     }
 
                     let extraMeta = '';
@@ -2197,21 +2958,25 @@
                             ? 'Deseja desfazer esta amortização extraordinária? Isso excluirá o lançamento bancário associado e restaurará o saldo da conta.'
                             : 'Deseja desfazer o pagamento desta parcela? Isso excluirá o lançamento bancário associado e restaurará o saldo da conta.';
                         actionHtml = `
-                            <form method="POST" action="/dividas/parcelas/${inst.id}/desfazer"
-                                data-confirm="${confirmMsg}"
-                                data-confirm-title="${confirmTitle}"
-                                data-confirm-accept="Sim, desfazer"
-                                data-confirm-cancel="Cancelar"
-                                data-confirm-icon="warning"
-                                data-confirm-btn-class="btn btn-danger rounded-pill px-4"
-                                data-confirm-cancel-class="btn btn-outline-secondary rounded-pill px-4">
-                                <input type="hidden" name="_token" value="${csrfToken}">
-                                <input type="hidden" name="redirect_to" value="${window.location.href}">
-                                <input type="hidden" name="schedule_debt_id" value="${inst.debt_id}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" style="font-size: 0.75rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Desfazer pagamento e reabrir parcela">
-                                    <i class="bi bi-arrow-counterclockwise me-1"></i>Desfazer
-                                </button>
-                            </form>
+                            <div class="d-flex align-items-center justify-content-end flex-nowrap">
+                                <form method="POST" action="/dividas/parcelas/${inst.id}/desfazer"
+                                    class="m-0"
+                                    data-confirm="${confirmMsg}"
+                                    data-confirm-title="${confirmTitle}"
+                                    data-confirm-accept="Sim, desfazer"
+                                    data-confirm-cancel="Cancelar"
+                                    data-confirm-icon="warning"
+                                    data-confirm-btn-class="btn btn-danger rounded-pill px-4"
+                                    data-confirm-cancel-class="btn btn-outline-secondary rounded-pill px-4">
+                                    <input type="hidden" name="_token" value="${csrfToken}">
+                                    <input type="hidden" name="redirect_to" value="${window.location.href}">
+                                    <input type="hidden" name="schedule_debt_id" value="${inst.debt_id}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 0.75rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Desfazer pagamento e reabrir parcela">
+                                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        <span>Desfazer</span>
+                                    </button>
+                                </form>
+                            </div>
                         `;
                     } else {
                         let resetBtn = '';
@@ -2219,7 +2984,7 @@
                             const origFmt = formatMoneyNumber(inst.original_amount);
                             resetBtn = `
                                 <form method="POST" action="/dividas/parcelas/${inst.id}/resetar-valor"
-                                    class="m-0 me-1"
+                                    class="m-0 d-inline-flex align-items-center"
                                     data-confirm="Deseja restaurar a parcela #${inst.installment_number} para o valor original do contrato de R$ ${origFmt}?"
                                     data-confirm-title="Restaurar Valor Original?"
                                     data-confirm-accept="Sim, restaurar"
@@ -2229,15 +2994,47 @@
                                     <input type="hidden" name="_method" value="PATCH">
                                     <input type="hidden" name="redirect_to" value="${window.location.href}">
                                     <input type="hidden" name="schedule_debt_id" value="${debt.id}">
-                                    <button type="submit" class="btn btn-sm btn-icon rounded-circle text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Restaurar valor original (R$ ${origFmt})" aria-label="Restaurar valor original">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                    <button type="submit" class="accounts-action-btn text-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="Restaurar valor original (R$ ${origFmt})" aria-label="Restaurar valor original">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                     </button>
                                 </form>
                             `;
                         }
+                        let editBtn = `
+                            <button type="button" class="accounts-action-btn text-primary js-schedule-edit-inst-btn"
+                                data-inst-id="${inst.id}"
+                                data-amount="${inst.amount_formatted}"
+                                data-due-date="${inst.due_date_raw || ''}"
+                                data-notes="${inst.notes ? String(inst.notes).replace(/"/g, '&quot;') : ''}"
+                                data-number="${inst.installment_number}"
+                                data-bs-toggle="tooltip" data-bs-placement="top" title="Editar parcela #${inst.installment_number}" aria-label="Editar parcela #${inst.installment_number}">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            </button>
+                        `;
+
+                        let deleteBtn = `
+                            <form method="POST" action="/dividas/parcelas/${inst.id}"
+                                class="m-0 d-inline-flex align-items-center"
+                                data-confirm="Tem certeza que deseja excluir a parcela #${inst.installment_number} de R$ ${inst.amount_formatted}?"
+                                data-confirm-title="Excluir Parcela?"
+                                data-confirm-accept="Sim, excluir"
+                                data-confirm-cancel="Cancelar"
+                                data-confirm-icon="warning">
+                                <input type="hidden" name="_token" value="${csrfToken}">
+                                <input type="hidden" name="_method" value="DELETE">
+                                <input type="hidden" name="redirect_to" value="${window.location.href}">
+                                <input type="hidden" name="schedule_debt_id" value="${debt.id}">
+                                <button type="submit" class="accounts-action-btn text-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir parcela #${inst.installment_number}" aria-label="Excluir parcela #${inst.installment_number}">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </form>
+                        `;
+
                         actionHtml = `
-                            <div class="d-flex align-items-center justify-content-end">
+                            <div class="d-flex align-items-center justify-content-end gap-1 flex-nowrap">
                                 ${resetBtn}
+                                ${editBtn}
+                                ${deleteBtn}
                                 <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold js-schedule-pay-btn" data-inst-id="${inst.id}" style="background: #10b981; border: none; font-size: 0.8rem;">
                                     Pagar
                                 </button>
@@ -2331,7 +3128,7 @@
                     let mainColHtml = '';
 
                     if (inst.is_extraordinary) {
-                        numColHtml = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1 fw-bold" style="font-size: 0.72rem;"><i class="bi bi-lightning-charge-fill me-1"></i>Aporte</span>`;
+                        numColHtml = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1 fw-bold d-inline-flex align-items-center gap-1" style="font-size: 0.72rem;"><svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Aporte</span>`;
                         let cleanNotes = (inst.notes || '').replace(/^amortização\s+extraordinária\s*/i, '').trim();
                         if (cleanNotes.startsWith('(') && cleanNotes.endsWith(')')) {
                             cleanNotes = cleanNotes.slice(1, -1);
@@ -2366,9 +3163,7 @@
                                 ${statusBadge}
                             </td>
                             <td class="pe-3 py-2 text-end text-nowrap">
-                                <div class="d-flex justify-content-end align-items-center">
-                                    ${actionHtml}
-                                </div>
+                                ${actionHtml}
                             </td>
                         </tr>
                     `;
@@ -2447,6 +3242,18 @@
                         if (payModalEl && typeof bootstrap !== 'undefined') {
                             new bootstrap.Modal(payModalEl).show();
                         }
+                    });
+                });
+
+                // Listener para os botões Editar parcela de dentro da tabela do cronograma
+                tbody.querySelectorAll('.js-schedule-edit-inst-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const instId = this.dataset.instId;
+                        const amount = this.dataset.amount;
+                        const dueDate = this.dataset.dueDate;
+                        const notes = this.dataset.notes;
+                        const number = this.dataset.number;
+                        openEditSingleInstallmentModal(instId, amount, dueDate, notes, number);
                     });
                 });
             }
@@ -2602,6 +3409,8 @@
 
                     document.getElementById('edit_debt_name').value = this.dataset.name || '';
                     document.getElementById('edit_debt_creditor').value = this.dataset.creditor || '';
+                    const editTotalEl = document.getElementById('edit_debt_total_amount');
+                    if (editTotalEl) editTotalEl.value = this.dataset.totalAmount || '';
                     document.getElementById('edit_debt_color').value = this.dataset.color || '#f59e0b';
                     document.getElementById('edit_debt_notes').value = this.dataset.notes || '';
                     document.getElementById('edit_debt_account').value = this.dataset.defaultAccount || '';
@@ -2610,6 +3419,21 @@
                         document.getElementById('edit_debt_user_id').value = this.dataset.userId || '';
                     }
                     document.getElementById('edit_debt_is_active').checked = this.dataset.isActive === '1';
+
+                    const adjustBanner = document.getElementById('edit_debt_adjust_banner');
+                    const btnAdjustTrigger = document.getElementById('btn_edit_debt_trigger_adjust');
+                    if (adjustBanner && btnAdjustTrigger) {
+                        if (this.dataset.type === 'installments' && this.dataset.hasPending === '1') {
+                            adjustBanner.style.display = 'flex';
+                            btnAdjustTrigger.onclick = function() {
+                                const editModal = bootstrap.Modal.getInstance(document.getElementById('modalDebtEdit'));
+                                if (editModal) editModal.hide();
+                                openAdjustRemainingModal(parseInt(id, 10));
+                            };
+                        } else {
+                            adjustBanner.style.display = 'none';
+                        }
+                    }
 
                     if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
                         const tooltip = bootstrap.Tooltip.getInstance(this);
@@ -2622,6 +3446,98 @@
                     }
                 });
             });
+
+            const editTotalInput = document.getElementById('edit_debt_total_amount');
+            if (editTotalInput) {
+                editTotalInput.addEventListener('blur', function() {
+                    const val = parseMoneyNumber(this.value);
+                    if (val > 0) {
+                        this.value = formatMoneyNumber(val);
+                    }
+                });
+            }
+
+            // Listeners para o Modal de Ajuste de Parcelas Restantes
+            const btnBulkEdit = document.getElementById('schedule_btn_bulk_edit');
+            if (btnBulkEdit) {
+                btnBulkEdit.addEventListener('click', function() {
+                    if (activeScheduleDebtId) openAdjustRemainingModal(activeScheduleDebtId);
+                });
+            }
+            const btnBulkEditFooter = document.getElementById('schedule_btn_bulk_edit_footer');
+            if (btnBulkEditFooter) {
+                btnBulkEditFooter.addEventListener('click', function() {
+                    if (activeScheduleDebtId) openAdjustRemainingModal(activeScheduleDebtId);
+                });
+            }
+
+            const btnAddInst = document.getElementById('schedule_btn_add_inst');
+            if (btnAddInst) {
+                btnAddInst.addEventListener('click', function() {
+                    if (activeScheduleDebtId) openAddSingleInstallmentModal(activeScheduleDebtId);
+                });
+            }
+            const btnAddInstFooter = document.getElementById('schedule_btn_add_inst_footer');
+            if (btnAddInstFooter) {
+                btnAddInstFooter.addEventListener('click', function() {
+                    if (activeScheduleDebtId) openAddSingleInstallmentModal(activeScheduleDebtId);
+                });
+            }
+
+            const addInstAmountInput = document.getElementById('add_inst_amount');
+            if (addInstAmountInput) {
+                addInstAmountInput.addEventListener('blur', function() {
+                    const val = parseMoneyNumber(this.value);
+                    if (val > 0) this.value = formatMoneyNumber(val);
+                });
+            }
+
+            const editInstAmountInput = document.getElementById('edit_inst_amount');
+            if (editInstAmountInput) {
+                editInstAmountInput.addEventListener('blur', function() {
+                    const val = parseMoneyNumber(this.value);
+                    if (val > 0) this.value = formatMoneyNumber(val);
+                });
+            }
+
+            // Botão direto no card da dívida na listagem
+            document.querySelectorAll('.js-btn-direct-adjust').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const debtId = parseInt(this.dataset.debtId, 10);
+                    if (debtId) openAdjustRemainingModal(debtId);
+                });
+            });
+
+            const adjustTargetCountInput = document.getElementById('adjust_target_installments_count');
+            if (adjustTargetCountInput) {
+                adjustTargetCountInput.addEventListener('input', function() {
+                    updateAdjustInstallmentsPreview();
+                });
+                adjustTargetCountInput.addEventListener('change', function() {
+                    updateAdjustInstallmentsPreview();
+                });
+            }
+
+            const adjustAmountInput = document.getElementById('adjust_new_installment_amount');
+            if (adjustAmountInput) {
+                adjustAmountInput.addEventListener('input', function() {
+                    updateAdjustInstallmentsPreview();
+                });
+                adjustAmountInput.addEventListener('blur', function() {
+                    const val = parseMoneyNumber(this.value);
+                    if (val > 0) {
+                        this.value = formatMoneyNumber(val);
+                    }
+                    updateAdjustInstallmentsPreview();
+                });
+            }
+
+            const adjustUpdateTotalCheck = document.getElementById('adjust_update_total_amount');
+            if (adjustUpdateTotalCheck) {
+                adjustUpdateTotalCheck.addEventListener('change', function() {
+                    updateAdjustInstallmentsPreview();
+                });
+            }
 
             // Reabre modal de criação em caso de erro de validação
             @if($errors->has('total_amount') || $errors->has('total_installments') || $errors->has('start_date') || $errors->has('name') || $errors->has('default_category_id'))
