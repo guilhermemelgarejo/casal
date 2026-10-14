@@ -159,7 +159,12 @@ class BackupDatabaseToDrive extends Command
         if (!empty($clientId) && !empty($clientSecret) && !empty($refreshToken)) {
             $client->setClientId($clientId);
             $client->setClientSecret($clientSecret);
-            $client->refreshToken($refreshToken);
+            
+            $tokenResult = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+            if (is_array($tokenResult) && isset($tokenResult['error'])) {
+                $errorDesc = $tokenResult['error_description'] ?? $tokenResult['error'];
+                throw new \RuntimeException("Falha na autenticação do Google Drive ({$tokenResult['error']}): {$errorDesc}. O token expirou ou é inválido. Gere um novo com 'php artisan drive:auth'.");
+            }
 
             return new GoogleDriveService($client);
         }
