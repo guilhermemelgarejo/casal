@@ -15,11 +15,11 @@
     $cardAccent = $p->color ?: ($p->isBitcoin() ? '#f59e0b' : '#0d9488');
 @endphp
 <div class="col-md-6 col-xl-4">
-    <div class="card border-0 cofrinhos-project-card {{ ! $p->is_active ? 'cofrinhos-project-card--inactive' : '' }} d-flex flex-column h-100 shadow-sm" data-cofrinho-url="{{ route('cofrinhos.show', $p) }}" style="--cofrinho-accent: {{ e($cardAccent) }}; padding: 1.25rem;">
+    <div class="card border-0 cofrinhos-project-card {{ ! $p->is_active ? 'cofrinhos-project-card--inactive' : '' }} d-flex flex-column h-100 shadow-sm overflow-hidden" data-cofrinho-url="{{ route('cofrinhos.show', $p) }}" style="--cofrinho-accent: {{ e($cardAccent) }};">
         <div class="cofrinhos-project-card__accent" aria-hidden="true"></div>
         
         <!-- TOPO DO CARD: AVATAR, TÍTULO, BADGES E BOTÕES DE AÇÃO RÁPIDA -->
-        <div class="cofrinhos-project-card__top d-flex align-items-start justify-content-between gap-2 mb-2">
+        <div class="cofrinhos-project-card__top d-flex align-items-start justify-content-between gap-2">
             <a href="{{ route('cofrinhos.show', $p) }}" class="cofrinhos-project-card__header-link d-flex align-items-start min-w-0 flex-grow-1 text-decoration-none text-reset" style="gap: 0.95rem;" title="Ver visão geral de {{ $p->name }}">
                 <div class="cofrinhos-project-card__avatar flex-shrink-0" aria-hidden="true">
                     @if($p->isBitcoin())
@@ -135,7 +135,7 @@
         </div>
 
         <!-- CORPO PRINCIPAL DO CARD -->
-        <a href="{{ route('cofrinhos.show', $p) }}" class="cofrinhos-project-card__body-link d-flex flex-column flex-grow-1 justify-content-center py-2 text-decoration-none text-reset" title="Ver visão geral de {{ $p->name }}">
+        <a href="{{ route('cofrinhos.show', $p) }}" class="cofrinhos-project-card__body-link d-flex flex-column flex-grow-1 justify-content-center px-3 px-sm-4 py-3 text-decoration-none text-reset" title="Ver visão geral de {{ $p->name }}">
             @if($isAsset)
                 {{-- Seção de Ativo / Cripto --}}
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
@@ -222,7 +222,7 @@
         </a>
 
         <!-- RODAPÉ DO CARD: BOTÕES DE APORTE, RETIRADA E JUROS ALINHADOS NA MESMA LINHA -->
-        <div class="d-flex align-items-center gap-2 pt-1 mt-auto">
+        <div class="d-flex align-items-center gap-2 px-3 px-sm-4 pb-3 pb-sm-4 pt-1 mt-auto">
             @if(! $p->is_active)
                 <div class="d-flex align-items-center justify-content-between p-2 px-3 rounded-pill bg-body-secondary border border-secondary-subtle small text-secondary w-100">
                     <span>Cofrinho desativado</span>
