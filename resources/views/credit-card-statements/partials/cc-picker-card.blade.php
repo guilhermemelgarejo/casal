@@ -40,6 +40,9 @@
                 @if (! empty($pickerSummary['partial']) && $pickerSummary['remaining'] > 0.005 && $pickerSummary['remaining'] + 0.01 < $pickerSummary['spent_total'])
                     <div class="cc-pick-card-pending small opacity-90 mt-1" style="font-size: 0.7rem;">Pendente <span class="duozen-privacy-blur">R$ {{ $pickerSummary['remaining_str'] }}</span></div>
                 @endif
+                @if (isset($pickerSummary['items_count']))
+                    <div class="small opacity-75 mt-0.5" style="font-size: 0.68rem;">{{ $pickerSummary['items_count'] }} {{ $pickerSummary['items_count'] === 1 ? 'item' : 'itens' }}</div>
+                @endif
             @else
                 <div class="cc-pick-card-none small opacity-75">Sem fatura em aberto</div>
             @endif

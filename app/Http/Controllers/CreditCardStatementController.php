@@ -132,6 +132,7 @@ class CreditCardStatementController extends Controller
                 $key = $this->cycleKey((int) $row->account_id, (int) $row->reference_year, (int) $row->reference_month);
                 $meta = $metaByKey->get($key);
                 $liveTotal = (float) $row->spent_total;
+                $lines = $linesByKey->get($key, []);
 
                 return (object) [
                     'cycle_key' => $key,
@@ -139,8 +140,9 @@ class CreditCardStatementController extends Controller
                     'reference_month' => (int) $row->reference_month,
                     'reference_year' => (int) $row->reference_year,
                     'spent_total' => $meta !== null ? (float) $meta->spent_total : $liveTotal,
+                    'items_count' => count($lines),
                     'meta' => $meta,
-                    'cycle_lines' => $linesByKey->get($key, []),
+                    'cycle_lines' => $lines,
                 ];
             });
 
@@ -158,6 +160,7 @@ class CreditCardStatementController extends Controller
                         'reference_month' => (int) $meta->reference_month,
                         'reference_year' => (int) $meta->reference_year,
                         'spent_total' => (float) $meta->spent_total,
+                        'items_count' => 0,
                         'meta' => $meta,
                         'cycle_lines' => [],
                     ];
@@ -679,6 +682,14 @@ class CreditCardStatementController extends Controller
                 $dueIsSuggestion = false;
             }
 
+            $itemsCount = Transaction::query()
+                ->where('couple_id', $coupleId)
+                ->where('account_id', $account->id)
+                ->where('reference_month', $refMonth)
+                ->where('reference_year', $refYear)
+                ->where('type', 'expense')
+                ->count();
+
             return [
                 'reference_month' => $refMonth,
                 'reference_year' => $refYear,
@@ -688,6 +699,7 @@ class CreditCardStatementController extends Controller
                 'remaining' => $remaining,
                 'remaining_str' => number_format($remaining, 2, ',', '.'),
                 'partial' => $partial,
+                'items_count' => $itemsCount,
                 'due_label' => $dueForDisplay?->format('d/m/Y'),
                 'due_is_suggestion' => $dueIsSuggestion,
             ];

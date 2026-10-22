@@ -185,7 +185,7 @@ class Account extends Model
             ->where('account_id', $accountId)
             ->where('type', 'expense')
             ->groupBy('reference_month', 'reference_year')
-            ->selectRaw('reference_month, reference_year, SUM(amount) as spent')
+            ->selectRaw('reference_month, reference_year, SUM(amount) as spent, COUNT(*) as items_count')
             ->get()
             ->keyBy(fn ($t) => $t->reference_year.'-'.$t->reference_month);
 
@@ -224,6 +224,8 @@ class Account extends Model
             $virtualDue = $this->defaultStatementDueDate($m, $y);
             $due = $meta?->due_date ? Carbon::parse($meta->due_date) : $virtualDue;
 
+            $itemsCount = isset($txCycles[$key]) ? (int) $txCycles[$key]->items_count : 0;
+
             $item = [
                 'reference_month' => $m,
                 'reference_year' => $y,
@@ -231,6 +233,7 @@ class Account extends Model
                 'amount' => $spentTotal,
                 'remaining' => $remaining,
                 'is_paid' => $isPaid,
+                'items_count' => $itemsCount,
                 'due_date' => $due,
                 'due_label' => $due ? $due->format('d/m/Y') : null,
             ];
@@ -252,6 +255,7 @@ class Account extends Model
             'amount' => 0.0,
             'remaining' => 0.0,
             'is_paid' => false,
+            'items_count' => 0,
             'due_date' => $this->defaultStatementDueDate($nowMonth, $nowYear),
             'due_label' => $this->defaultStatementDueDate($nowMonth, $nowYear)?->format('d/m/Y'),
         ];

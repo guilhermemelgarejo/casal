@@ -92,7 +92,8 @@ class CreditCardStatementTest extends TestCase
                 ->assertOk()
                 ->assertSee('R$ 150,50', false)
                 ->assertSee('04/2026', false)
-                ->assertSee('Itens da fatura', false)
+                ->assertSee('Itens da fatura (1)', false)
+                ->assertSee('1 item', false)
                 ->assertSee('id="statement-cycle-', false)
                 ->assertSee('data-statement-cycle-key=', false)
                 ->assertSee('window.__invoiceCycleLinesByKey', false)
@@ -504,6 +505,7 @@ class CreditCardStatementTest extends TestCase
             ->assertOk()
             ->assertSee('01/2026', false)
             ->assertSee('R$ 123,45', false)
+            ->assertSee('0 itens', false)
             ->assertSee('Excluir', false);
     }
 

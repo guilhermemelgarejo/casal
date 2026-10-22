@@ -5,6 +5,7 @@
     $listedTotal = $filterCardId !== null ? (float) $invoiceCycles->sum(fn ($cycle) => (float) $cycle->spent_total) : 0.0;
     $listedPaid = $filterCardId !== null ? $invoiceCycles->filter(fn ($cycle) => $cycle->meta?->isPaid() ?? false)->count() : 0;
     $listedPartial = $filterCardId !== null ? $invoiceCycles->filter(fn ($cycle) => $cycle->meta?->hasPartialPayments() ?? false)->count() : 0;
+    $listedItemsTotal = $filterCardId !== null ? (int) $invoiceCycles->sum(fn ($cycle) => $cycle->items_count ?? count($cycle->cycle_lines ?? [])) : 0;
 @endphp
 
 <x-app-layout>
@@ -89,7 +90,7 @@
                         {{ $filterCardId !== null ? $invoiceCycles->count() : '—' }}
                     </div>
                     <div class="dz-kpi-card__footer">
-                        <span>{{ $listedPaid }} paga(s) • {{ $listedPartial }} parcial(is)</span>
+                        <span>{{ $listedPaid }} paga(s) • {{ $listedPartial }} parcial(is) • {{ $listedItemsTotal }} {{ $listedItemsTotal === 1 ? 'item' : 'itens' }}</span>
                         <span class="fw-bold {{ $filterCardId !== null ? 'dz-privacy-blur' : '' }}">{{ $filterCardId !== null ? 'R$ ' . number_format($listedTotal, 2, ',', '.') : '' }}</span>
                     </div>
                 </div>
@@ -199,6 +200,7 @@
                                     @foreach ($invoiceCycles as $cycle)
                                         @php
                                             $cycleSubtitle = $cycle->account->name.' — '.sprintf('%02d/%d', $cycle->reference_month, $cycle->reference_year);
+                                            $itemsCount = $cycle->items_count ?? count($cycle->cycle_lines ?? []);
                                         @endphp
                                         @php
                                             $meta = $cycle->meta;
@@ -258,6 +260,9 @@
                                                         @if ($meta?->is_avulsa)
                                                             <span class="cc-statement-status cc-statement-status--muted">Avulsa</span>
                                                         @endif
+                                                        <span class="badge rounded-pill" style="font-size: 0.72rem; font-weight: 700; background: var(--dz-bg-card-subtle, rgba(0,0,0,0.04)); color: var(--dz-text-secondary, #64748b); border: 1px solid var(--dz-border, rgba(0,0,0,0.08));" title="Quantidade de lançamentos nesta fatura">
+                                                            {{ $itemsCount }} {{ $itemsCount === 1 ? 'item' : 'itens' }}
+                                                        </span>
                                                         <span class="text-secondary small ms-md-2">
                                                             <strong>Vencimento:</strong>
                                                             @if ($dueForDisplay)
@@ -276,6 +281,9 @@
                                                 <div class="d-flex align-items-center gap-3 flex-wrap justify-content-between justify-content-lg-end">
                                                     <div class="text-lg-end">
                                                         <div class="cc-statement-total fw-bold text-body duozen-privacy-blur" style="font-size: 1.15rem; letter-spacing: -0.02em; line-height: 1.1;">R$ {{ number_format($cycle->spent_total, 2, ',', '.') }}</div>
+                                                        <div class="text-secondary small mt-0.5" style="font-size: 0.74rem;">
+                                                            {{ $itemsCount }} {{ $itemsCount === 1 ? 'item' : 'itens' }}
+                                                        </div>
                                                     </div>
 
                                                     <!-- Botões de Ação -->
@@ -306,7 +314,8 @@
                                                                 data-bs-target="#statementItemsModal"
                                                                 data-statement-subtitle="{{ $cycleSubtitle }}"
                                                                 data-statement-cycle-key="{{ $cycle->cycle_key }}"
-                                                            >📋 Itens da fatura</button>
+                                                                data-statement-items-count="{{ $itemsCount }}"
+                                                            >📋 Itens da fatura ({{ $itemsCount }})</button>
                                                         @endunless
 
                                                         <button
@@ -353,7 +362,10 @@
                                     <div class="modal-content cc-statement-items-modal">
                                         <div class="modal-header align-items-start">
                                             <div class="min-w-0 pe-2">
-                                                <h2 class="modal-title h5 mb-0" id="statementItemsModalLabel">Itens desta fatura</h2>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <h2 class="modal-title h5 mb-0" id="statementItemsModalLabel">Itens desta fatura</h2>
+                                                    <span id="statementItemsCountBadge" class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.72rem; font-weight: 700;"></span>
+                                                </div>
                                                 <p class="small text-secondary mb-0 mt-2 fw-semibold" id="statementItemsSubtitle"></p>
                                             </div>
                                             <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Fechar"></button>
@@ -375,7 +387,8 @@
                                                 </table>
                                             </div>
                                         </div>
-                                        <div class="modal-footer">
+                                        <div class="modal-footer d-flex align-items-center justify-content-between">
+                                            <span id="statementItemsFooterCount" class="text-secondary small fw-semibold"></span>
                                             <button type="button" class="btn btn-outline-secondary rounded-pill px-4" title="Fechar a lista de itens" data-bs-dismiss="modal">Fechar</button>
                                         </div>
                                     </div>
@@ -647,6 +660,8 @@
 
                                     const itemsModalEl = document.getElementById('statementItemsModal');
                                     const itemsSubtitleEl = document.getElementById('statementItemsSubtitle');
+                                    const itemsCountBadge = document.getElementById('statementItemsCountBadge');
+                                    const itemsFooterCount = document.getElementById('statementItemsFooterCount');
                                     const itemsTbody = document.getElementById('statementItemsTbody');
                                     const linesPayload = window.__invoiceCycleLinesByKey || {};
                                     if (itemsModalEl && itemsSubtitleEl && itemsTbody) {
@@ -656,6 +671,9 @@
                                             itemsSubtitleEl.textContent = btn.getAttribute('data-statement-subtitle') || '';
                                             const cycleKey = btn.getAttribute('data-statement-cycle-key');
                                             const lines = Array.isArray(linesPayload[cycleKey]) ? linesPayload[cycleKey] : [];
+                                            const countText = lines.length + (lines.length === 1 ? ' item' : ' itens');
+                                            if (itemsCountBadge) itemsCountBadge.textContent = countText;
+                                            if (itemsFooterCount) itemsFooterCount.textContent = 'Total: ' + countText;
                                             itemsTbody.innerHTML = '';
                                             if (!lines.length) {
                                                 const tr = document.createElement('tr');
