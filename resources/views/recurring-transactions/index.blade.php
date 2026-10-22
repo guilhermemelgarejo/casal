@@ -31,6 +31,8 @@
         $rtTotal = $items->count();
         $rtActive = $items->where('is_active', true)->count();
         $rtPendingCount = $pendingReminders->count();
+        $rtPendingIncomeCount = $pendingReminders->where('type', 'income')->count();
+        $rtPendingExpenseCount = $pendingReminders->where('type', 'expense')->count();
         $rtIncomeTotal = (float) $items->where('type', 'income')->where('is_active', true)->sum(fn ($item) => (float) $item->amount);
         $rtExpenseTotal = (float) $items->where('type', 'expense')->where('is_active', true)->sum(fn ($item) => (float) $item->amount);
         $rtCardCount = $items->where('funding', \App\Models\RecurringTransaction::FUNDING_CREDIT_CARD)->count();
@@ -113,7 +115,11 @@
                         {{ $rtPendingCount }}
                     </div>
                     <div class="dz-kpi-card__footer">
-                        <span>{{ $rtPendingCount > 0 ? 'Aguardando lançamento no painel' : 'Todos lançados!' }}</span>
+                        @if($rtPendingCount > 0)
+                            <span>{{ $rtPendingExpenseCount }} despesa(s) • {{ $rtPendingIncomeCount }} receita(s)</span>
+                        @else
+                            <span>Todos lançados!</span>
+                        @endif
                     </div>
                 </div>
             </div>

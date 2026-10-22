@@ -578,15 +578,26 @@
 
                         <div>
                             @foreach ($reminders as $rem)
+                                @php
+                                    $isIncome = ($rem['kind'] ?? 'expense') === 'income';
+                                @endphp
                                 <div class="dz-reminder-item">
                                     <div>
-                                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--dz-text-title);">{{ $rem['title'] }}</div>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span style="font-size: 0.75rem;">{{ $isIncome ? '🟢' : '🔴' }}</span>
+                                            <div style="font-weight: 700; font-size: 0.85rem; color: var(--dz-text-title);">{{ $rem['title'] }}</div>
+                                            <span class="badge rounded-pill" style="font-size: 0.62rem; padding: 0.15rem 0.4rem; {{ $isIncome ? 'background: rgba(16, 185, 129, 0.15); color: #059669;' : 'background: rgba(244, 63, 94, 0.15); color: #E11D48;' }}">
+                                                {{ $isIncome ? 'Receita' : 'Despesa' }}
+                                            </span>
+                                        </div>
                                         <div style="font-size: 0.72rem; color: var(--dz-text-secondary); margin-top: 0.1rem;">
                                             Vencimento em <strong>{{ $rem['due_date'] }}</strong> ({{ $rem['account'] }})
                                         </div>
                                     </div>
                                     <div style="text-align: right;">
-                                        <div style="font-weight: 800; font-size: 0.95rem; color: var(--dz-danger);" class="dz-privacy-blur">{{ $money($rem['amount']) }}</div>
+                                        <div style="font-weight: 800; font-size: 0.95rem; color: {{ $isIncome ? 'var(--dz-success)' : 'var(--dz-danger)' }};" class="dz-privacy-blur">
+                                            {{ $isIncome ? '+' : '-' }} {{ $money($rem['amount']) }}
+                                        </div>
                                         <span class="dz-due-pill" style="font-size: 0.65rem;">em {{ $rem['days_left'] }} dias</span>
                                     </div>
                                 </div>

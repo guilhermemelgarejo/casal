@@ -2096,6 +2096,24 @@ body.dz-privacy-active .duozen-privacy-blur,
     border-color: #10B981;
 }
 
+.dz-reminder-chip--recurring.dz-reminder-chip--expense {
+    border-top: 3.5px solid #F43F5E;
+    background: linear-gradient(180deg, rgba(244, 63, 94, 0.05) 0%, var(--dz-bg-canvas) 50%);
+}
+
+.dz-reminder-chip--recurring.dz-reminder-chip--expense:hover {
+    border-color: #F43F5E;
+}
+
+.dz-reminder-chip--income {
+    border-top: 3.5px solid #10B981 !important;
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, var(--dz-bg-canvas) 50%) !important;
+}
+
+.dz-reminder-chip--income:hover {
+    border-color: #10B981 !important;
+}
+
 .dz-reminder-chip--shortcut {
     border-top: 3.5px solid #F59E0B;
     background: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, var(--dz-bg-canvas) 50%);
@@ -2103,6 +2121,15 @@ body.dz-privacy-active .duozen-privacy-blur,
 
 .dz-reminder-chip--shortcut:hover {
     border-color: #F59E0B;
+}
+
+.dz-reminder-chip--shortcut.dz-reminder-chip--expense {
+    border-top: 3.5px solid #F43F5E;
+    background: linear-gradient(180deg, rgba(244, 63, 94, 0.05) 0%, var(--dz-bg-canvas) 50%);
+}
+
+.dz-reminder-chip--shortcut.dz-reminder-chip--expense:hover {
+    border-color: #F43F5E;
 }
 
 .dz-reminder-chip--overdue {
@@ -2124,8 +2151,20 @@ body.dz-privacy-active .duozen-privacy-blur,
     background: linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(30, 41, 59, 0.7) 50%);
 }
 
+[data-theme="dark"] .dz-reminder-chip--recurring.dz-reminder-chip--expense {
+    background: linear-gradient(180deg, rgba(244, 63, 94, 0.15) 0%, rgba(30, 41, 59, 0.7) 50%);
+}
+
+[data-theme="dark"] .dz-reminder-chip--income {
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(30, 41, 59, 0.7) 50%) !important;
+}
+
 [data-theme="dark"] .dz-reminder-chip--shortcut {
     background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(30, 41, 59, 0.7) 50%);
+}
+
+[data-theme="dark"] .dz-reminder-chip--shortcut.dz-reminder-chip--expense {
+    background: linear-gradient(180deg, rgba(244, 63, 94, 0.15) 0%, rgba(30, 41, 59, 0.7) 50%);
 }
 
 [data-theme="dark"] .dz-reminder-chip--overdue {

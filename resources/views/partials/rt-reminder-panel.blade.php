@@ -21,6 +21,24 @@
     $activeColumnsCount = ($hasMonthly ? 1 : 0) + ($hasMultiple ? 1 : 0) + ($hasInvoices ? 1 : 0) + ($hasDebts ? 1 : 0);
     $bothReminderKinds = $activeColumnsCount > 1;
 
+    // Métricas para diferenciação de Receitas e Despesas
+    $monthlyIncomes = $monthlyReminders->filter(fn ($r) => $r instanceof \App\Models\RecurringTransaction && $r->type === 'income');
+    $monthlyExpenses = $monthlyReminders->filter(fn ($r) => ! ($r instanceof \App\Models\RecurringTransaction && $r->type === 'income'));
+    $multipleIncomes = $multipleReminders->filter(fn ($r) => $r instanceof \App\Models\RecurringTransaction && $r->type === 'income');
+    $multipleExpenses = $multipleReminders->filter(fn ($r) => ! ($r instanceof \App\Models\RecurringTransaction && $r->type === 'income'));
+
+    $allIncomes = $monthlyIncomes->concat($multipleIncomes);
+    $incomesCount = $allIncomes->count();
+    $incomesTotal = (float) $allIncomes->sum('amount');
+
+    $expensesCount = $monthlyExpenses->count() + $multipleExpenses->count() + count($invoiceReminders) + count($debtReminders);
+    $expensesTotal = (float) $monthlyExpenses->sum('amount')
+        + (float) $multipleExpenses->sum('amount')
+        + (float) $invoiceReminders->sum('remaining')
+        + (float) $debtReminders->sum('amount');
+    $totalRemindersCount = $incomesCount + $expensesCount;
+    $hasMultipleKinds = $expensesCount > 0 && $incomesCount > 0;
+
     if (! isset($title)) {
         if ($bothReminderKinds) {
             $title = 'Lembretes & Vencimentos';
@@ -74,12 +92,30 @@
                 
                 <!-- Cabeçalho Compacto em Linha Única -->
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pb-2 border-bottom" style="border-color: var(--dz-border-subtle) !important;">
-                    <div class="d-flex align-items-center gap-2">
-                        <span style="font-size: 1.1rem; line-height: 1;">🔔</span>
-                        <h3 class="rt-reminder-card__title mb-0" style="font-size: 0.92rem; font-weight: 800; color: var(--dz-text-title);">{{ $title }}</h3>
-                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: {{ $reminderPanelHasOverdue ? 'rgba(244, 63, 94, 0.15)' : 'var(--dz-primary-subtle)' }}; color: {{ $reminderPanelHasOverdue ? 'var(--dz-danger)' : 'var(--dz-primary)' }};">
-                            {{ count($monthlyReminders) + count($multipleReminders) + count($invoiceReminders) + count($debtReminders) }} pendência(s)
-                        </span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="d-flex align-items-center gap-1">
+                            <span style="font-size: 1.1rem; line-height: 1;">🔔</span>
+                            <h3 class="rt-reminder-card__title mb-0" style="font-size: 0.92rem; font-weight: 800; color: var(--dz-text-title);">{{ $title }}</h3>
+                        </div>
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                            @if($reminderPanelHasOverdue)
+                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: var(--dz-danger);">
+                                    🔴 Vencido(s)
+                                </span>
+                            @endif
+                            @if($hasMultipleKinds)
+                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(244, 63, 94, 0.12); color: #E11D48;" title="Total a pagar: R$ {{ number_format($expensesTotal, 2, ',', '.') }}">
+                                    🔴 {{ $expensesCount }} a pagar: R$ {{ number_format($expensesTotal, 2, ',', '.') }}
+                                </span>
+                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;" title="Total a receber: R$ {{ number_format($incomesTotal, 2, ',', '.') }}">
+                                    🟢 {{ $incomesCount }} a receber: R$ {{ number_format($incomesTotal, 2, ',', '.') }}
+                                </span>
+                            @else
+                                <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: {{ $reminderPanelHasOverdue ? 'rgba(244, 63, 94, 0.15)' : 'var(--dz-primary-subtle)' }}; color: {{ $reminderPanelHasOverdue ? 'var(--dz-danger)' : 'var(--dz-primary)' }};">
+                                    {{ $totalRemindersCount }} pendência(s)
+                                </span>
+                            @endif
+                        </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         @if($hasRecurring && $manageUrl)
@@ -108,35 +144,47 @@
 
                 @php
                     $categoryCount = ($hasMonthly ? 1 : 0) + ($hasDebts ? 1 : 0) + ($hasInvoices ? 1 : 0) + ($hasMultiple ? 1 : 0);
-                    $totalRemindersCount = count($monthlyReminders) + count($multipleReminders) + count($invoiceReminders) + count($debtReminders);
                 @endphp
 
-                @if($categoryCount > 1)
-                    <!-- Barra de Filtros por Categoria -->
+                @if($categoryCount > 1 || $hasMultipleKinds)
+                    <!-- Barra de Filtros por Categoria e Tipo (Receitas / Despesas) -->
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 dz-reminder-filter-bar">
                         <div class="d-flex flex-wrap align-items-center gap-1">
                             <button type="button" class="dz-reminder-filter-btn active" data-filter="all">
                                 Todos <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ $totalRemindersCount }}</span>
                             </button>
-                            @if($hasMonthly)
-                                <button type="button" class="dz-reminder-filter-btn" data-filter="recurring">
-                                    <span>🔁</span> Recorrentes <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($monthlyReminders) }}</span>
+                            @if($hasMultipleKinds)
+                                <button type="button" class="dz-reminder-filter-btn" data-filter="expense" title="Filtrar apenas despesas a pagar">
+                                    <span>🔴</span> Despesas <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ $expensesCount }}</span>
                                 </button>
+                                <button type="button" class="dz-reminder-filter-btn" data-filter="income" title="Filtrar apenas receitas a receber">
+                                    <span>🟢</span> Receitas <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ $incomesCount }}</span>
+                                </button>
+                                @if($categoryCount > 1)
+                                    <span class="text-secondary opacity-25 d-none d-sm-inline mx-1" style="font-size: 0.85rem;">|</span>
+                                @endif
                             @endif
-                            @if($hasDebts)
-                                <button type="button" class="dz-reminder-filter-btn" data-filter="debt">
-                                    <span>📄</span> Boletos & Contas <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($debtReminders) }}</span>
-                                </button>
-                            @endif
-                            @if($hasInvoices)
-                                <button type="button" class="dz-reminder-filter-btn" data-filter="invoice">
-                                    <span>💳</span> Faturas de cartão <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($invoiceReminders) }}</span>
-                                </button>
-                            @endif
-                            @if($hasMultiple)
-                                <button type="button" class="dz-reminder-filter-btn" data-filter="shortcut">
-                                    <span>⚡</span> Atalhos <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($multipleReminders) }}</span>
-                                </button>
+                            @if($categoryCount > 1)
+                                @if($hasMonthly)
+                                    <button type="button" class="dz-reminder-filter-btn" data-filter="recurring">
+                                        <span>🔁</span> Recorrentes <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($monthlyReminders) }}</span>
+                                    </button>
+                                @endif
+                                @if($hasDebts)
+                                    <button type="button" class="dz-reminder-filter-btn" data-filter="debt">
+                                        <span>📄</span> Boletos & Contas <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($debtReminders) }}</span>
+                                    </button>
+                                @endif
+                                @if($hasInvoices)
+                                    <button type="button" class="dz-reminder-filter-btn" data-filter="invoice">
+                                        <span>💳</span> Faturas de cartão <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($invoiceReminders) }}</span>
+                                    </button>
+                                @endif
+                                @if($hasMultiple)
+                                    <button type="button" class="dz-reminder-filter-btn" data-filter="shortcut">
+                                        <span>⚡</span> Atalhos <span class="badge rounded-pill bg-light text-dark ms-1" style="font-size: 0.65rem;">{{ count($multipleReminders) }}</span>
+                                    </button>
+                                @endif
                             @endif
                         </div>
                     </div>
@@ -149,12 +197,22 @@
                         @foreach($monthlyReminders as $rec)
                             @php
                                 $predDay = $rec->effectiveDayInMonth($reminderCivilYear, $reminderCivilMonth);
+                                $isIncome = $rec->type === 'income';
                             @endphp
-                            <div class="dz-reminder-chip dz-reminder-chip--recurring" data-type="recurring">
+                            <div class="dz-reminder-chip dz-reminder-chip--recurring {{ $isIncome ? 'dz-reminder-chip--income' : 'dz-reminder-chip--expense' }}" data-type="recurring" data-kind="{{ $isIncome ? 'income' : 'expense' }}">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.85rem;">🔁</span>
-                                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;"><span class="d-none">Recorrentes</span>Mensal</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        @if($isIncome)
+                                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.75rem;">🟢</span>
+                                            <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;">
+                                                <span class="d-none">Recorrentes</span>Receita • Mensal
+                                            </span>
+                                        @else
+                                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: rgba(244, 63, 94, 0.15); font-size: 0.75rem;">🔴</span>
+                                            <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: #E11D48;">
+                                                <span class="d-none">Recorrentes</span>Despesa • Mensal
+                                            </span>
+                                        @endif
                                     </div>
                                     <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: var(--dz-border-subtle); color: var(--dz-text-secondary);">
                                         <span class="d-none">Dia previsto: {{ sprintf('%02d/%02d/%04d', $predDay, $reminderCivilMonth, $reminderCivilYear) }}</span>
@@ -163,13 +221,19 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
-                                    <div class="fw-bolder dz-privacy-blur text-success" style="font-size: 1.05rem; margin-top: 0.15rem;">
-                                        R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur {{ $isIncome ? 'text-success' : 'text-danger' }}" style="font-size: 1.05rem; margin-top: 0.15rem;">
+                                        {{ $isIncome ? '+' : '-' }} R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
                                     </div>
                                 </div>
-                                <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-success rounded-pill w-100 py-1 text-white fw-bold" style="font-size: 0.72rem; text-align: center;" title="Lançar este modelo no painel">
-                                    + Lançar Mensal
-                                </a>
+                                @if($isIncome)
+                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-success rounded-pill w-100 py-1 text-white fw-bold" style="font-size: 0.72rem; text-align: center;" title="Lançar esta receita no painel">
+                                        + Lançar Receita
+                                    </a>
+                                @else
+                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(244, 63, 94, 0.12); color: #E11D48; border: 1px solid rgba(244, 63, 94, 0.3);" title="Lançar esta despesa no painel">
+                                        + Lançar Despesa
+                                    </a>
+                                @endif
                             </div>
                         @endforeach
                     @endif
@@ -181,11 +245,13 @@
                                 $isOverdue = $dInst->isOverdue($nowForReminderOverdue);
                                 $due = $dInst->due_date ? \Carbon\Carbon::parse($dInst->due_date) : null;
                             @endphp
-                            <div class="dz-reminder-chip dz-reminder-chip--debt {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}" data-type="debt">
+                            <div class="dz-reminder-chip dz-reminder-chip--debt dz-reminder-chip--expense {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}" data-type="debt" data-kind="expense">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(245, 158, 11, 0.15); font-size: 0.85rem;">📄</span>
-                                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;">Boleto / Conta</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: rgba(244, 63, 94, 0.15); font-size: 0.75rem;">🔴</span>
+                                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: #E11D48;">
+                                            Despesa • Boleto / Conta
+                                        </span>
                                     </div>
                                     @if($isOverdue)
                                         <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: var(--dz-danger);">🔴 Vencido</span>
@@ -198,13 +264,13 @@
                                     @endif
                                 </div>
                                 <div class="dz-reminder-chip__body">
-                                    <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $dInst->debt->name }}">{{ $dInst->debt->name }}</div>
-                                    <div class="fw-bolder dz-privacy-blur {{ $isOverdue ? 'text-danger' : '' }}" style="font-size: 1.05rem; color: var(--dz-text-title); margin-top: 0.15rem;">
-                                        R$ {{ number_format((float) $dInst->amount, 2, ',', '.') }}
+                                    <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $dInst->debt->name }} (Boleto/Conta)">{{ $dInst->debt->name }}</div>
+                                    <div class="fw-bolder dz-privacy-blur text-danger" style="font-size: 1.05rem; margin-top: 0.15rem;">
+                                        - R$ {{ number_format((float) $dInst->amount, 2, ',', '.') }}
                                     </div>
                                 </div>
                                 <a href="{{ route('debts.index', ['tab' => 'agenda', 'month' => $due?->month ?? $month, 'year' => $due?->year ?? $year]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Pagar na agenda">
-                                    Pagar na Agenda ↗
+                                    Pagar Conta ↗
                                 </a>
                             </div>
                         @endforeach
@@ -216,11 +282,13 @@
                             @php
                                 $isOverdue = !empty($inv['is_overdue']);
                             @endphp
-                            <div class="dz-reminder-chip dz-reminder-chip--card {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}" data-type="invoice">
+                            <div class="dz-reminder-chip dz-reminder-chip--card dz-reminder-chip--expense {{ $isOverdue ? 'dz-reminder-chip--overdue' : '' }}" data-type="invoice" data-kind="expense">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(124, 58, 237, 0.15); font-size: 0.85rem;">💳</span>
-                                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(124, 58, 237, 0.15); color: #7C3AED;"><span class="d-none">Faturas de cartão</span>Fatura</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: rgba(124, 58, 237, 0.15); font-size: 0.75rem;">💳</span>
+                                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: #E11D48;">
+                                            <span class="d-none">Faturas de cartão</span>Despesa • Fatura
+                                        </span>
                                     </div>
                                     @if($isOverdue)
                                         <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: var(--dz-danger);">🔴 Vencida</span>
@@ -232,8 +300,8 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $inv['account_name'] }}">{{ $inv['account_name'] }}</div>
-                                    <div class="fw-bolder dz-privacy-blur {{ $isOverdue ? 'text-danger' : '' }}" style="font-size: 1.05rem; color: var(--dz-text-title); margin-top: 0.15rem;">
-                                        R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur text-danger" style="font-size: 1.05rem; margin-top: 0.15rem;">
+                                        - R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}
                                     </div>
                                 </div>
                                 <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-outline-primary rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center;" title="Ver fatura do cartão">
@@ -246,11 +314,23 @@
                     <!-- 4. Recorrentes Múltiplos / Atalhos -->
                     @if($hasMultiple)
                         @foreach($multipleReminders as $rec)
-                            <div class="dz-reminder-chip dz-reminder-chip--shortcut" data-type="shortcut">
+                            @php
+                                $isIncome = $rec->type === 'income';
+                            @endphp
+                            <div class="dz-reminder-chip dz-reminder-chip--shortcut {{ $isIncome ? 'dz-reminder-chip--income' : 'dz-reminder-chip--expense' }}" data-type="shortcut" data-kind="{{ $isIncome ? 'income' : 'expense' }}">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: rgba(245, 158, 11, 0.15); font-size: 0.85rem;">⚡</span>
-                                        <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #D97706;"><span class="d-none">Múltiplo</span>Atalho</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        @if($isIncome)
+                                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); font-size: 0.75rem;">🟢</span>
+                                            <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669;">
+                                                <span class="d-none">Múltiplo</span>Receita • Atalho
+                                            </span>
+                                        @else
+                                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: rgba(244, 63, 94, 0.15); font-size: 0.75rem;">🔴</span>
+                                            <span class="badge rounded-pill" style="font-size: 0.68rem; font-weight: 700; background: rgba(244, 63, 94, 0.15); color: #E11D48;">
+                                                <span class="d-none">Múltiplo</span>Despesa • Atalho
+                                            </span>
+                                        @endif
                                     </div>
                                     <span class="badge rounded-pill" style="font-size: 0.65rem; font-weight: 600; background: rgba(245, 158, 11, 0.12); color: #D97706;">
                                         Rápido
@@ -258,19 +338,25 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
-                                    <div class="fw-bolder dz-privacy-blur" style="font-size: 1.05rem; color: #D97706; margin-top: 0.15rem;">
-                                        R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur {{ $isIncome ? 'text-success' : 'text-danger' }}" style="font-size: 1.05rem; margin-top: 0.15rem;">
+                                        {{ $isIncome ? '+' : '-' }} R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
                                     </div>
                                 </div>
-                                <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Lançar este atalho no painel">
-                                    + Lançar Rápido
-                                </a>
+                                @if($isIncome)
+                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm btn-success rounded-pill w-100 py-1 text-white fw-bold" style="font-size: 0.72rem; text-align: center;" title="Lançar este atalho no painel">
+                                        + Lançar Receita
+                                    </a>
+                                @else
+                                    <a href="{{ route('dashboard', ['prefill_recurring' => $rec->id, 'period' => sprintf('%04d-%02d', $year, $month)]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(244, 63, 94, 0.12); color: #E11D48; border: 1px solid rgba(244, 63, 94, 0.3);" title="Lançar este atalho no painel">
+                                        + Lançar Despesa
+                                    </a>
+                                @endif
                             </div>
                         @endforeach
                     @endif
                 </div>
 
-                @if($categoryCount > 1)
+                @if($categoryCount > 1 || $hasMultipleKinds)
                     <script>
                         (function() {
                             function setupReminderFilters() {
@@ -285,7 +371,9 @@
                                         const filter = this.getAttribute('data-filter');
                                         const chips = track.querySelectorAll('.dz-reminder-chip');
                                         chips.forEach(chip => {
-                                            if (filter === 'all' || chip.getAttribute('data-type') === filter) {
+                                            const chipType = chip.getAttribute('data-type');
+                                            const chipKind = chip.getAttribute('data-kind');
+                                            if (filter === 'all' || chipType === filter || chipKind === filter) {
                                                 chip.style.display = '';
                                             } else {
                                                 chip.style.display = 'none';
