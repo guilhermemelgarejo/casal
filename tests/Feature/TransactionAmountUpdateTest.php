@@ -500,4 +500,135 @@ class TransactionAmountUpdateTest extends TestCase
         $this->assertSame(4, (int) $parent->reference_month);
         $this->assertSame(5, (int) $child->reference_month);
     }
+
+    public function test_atualiza_data_de_parcelamento_para_outro_mes_com_sucesso_e_reabre_modal(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Eletrônicos',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $parent = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Notebook (Parcela 1/2)',
+            'amount' => '100.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'installment_parent_id' => null,
+        ], [['category_id' => $category->id, 'amount' => '100.00']]);
+
+        $child = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Notebook (Parcela 2/2)',
+            'amount' => '100.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 5,
+            'reference_year' => 2026,
+            'installment_parent_id' => $parent->id,
+        ], [['category_id' => $category->id, 'amount' => '100.00']]);
+
+        $res = $this->actingAs($user)->put(route('transactions.update', $parent), [
+            'description' => 'Notebook',
+            'amount' => '100.00',
+            'date' => '2026-05-12',
+            'return_from_installment_modal' => '1',
+        ]);
+
+        $res->assertSessionHasNoErrors();
+        $res->assertSessionHas('open_installment_modal_root', $parent->id);
+        $res->assertSessionHas('success');
+
+        $parent->refresh();
+        $child->refresh();
+        $this->assertSame('2026-05-12', $parent->date->toDateString());
+        $this->assertSame('2026-05-12', $child->date->toDateString());
+
+        // Acessa a tela de lançamentos mesmo no mês antigo (abril) com a sessão de reabertura da modal
+        $indexRes = $this->actingAs($user)
+            ->withSession([
+                'open_installment_modal_root' => $parent->id,
+                'success' => 'Data do lançamento atualizada (o lançamento agora pertence a maio de 2026).',
+            ])
+            ->get(route('transactions.index', ['month' => 4, 'year' => 2026]));
+
+        $indexRes->assertOk();
+        // Alerta de sucesso renderizado dentro da modal de parcelas
+        $indexRes->assertSee('id="installment-modal-success-alert"', false);
+        $indexRes->assertSee('Data do lançamento atualizada');
+        // Payload da modal de parcelas contém o grupo mesmo o lançamento tendo mudado de mês
+        $indexRes->assertSee('"rootId":'.$parent->id, false);
+    }
+
+    public function test_linha_de_compra_parcelada_renderiza_botao_de_editar_compra(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Eletrônicos',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $parent = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Celular (Parcela 1/3)',
+            'amount' => '100.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'installment_parent_id' => null,
+        ], [['category_id' => $category->id, 'amount' => '100.00']]);
+
+        $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Celular (Parcela 2/3)',
+            'amount' => '100.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 5,
+            'reference_year' => 2026,
+            'installment_parent_id' => $parent->id,
+        ], [['category_id' => $category->id, 'amount' => '100.00']]);
+
+        $response = $this->actingAs($user)->get(route('transactions.index', ['period' => '2026-04']));
+        $response->assertOk();
+        $response->assertSee('data-tx-is-installment-root="1"', false);
+    }
 }

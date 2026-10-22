@@ -25,7 +25,7 @@
             'precheckUrl' => null,
         ];
         $ccRowMeta = $creditCardPurchaseRowMeta[$transaction->id] ?? null;
-        $hideListEditForCcInstallments = $delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard();
+        $isCcInstallment = $delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard();
         $blockedMsg = 'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
         $accRow = $transaction->accountModel;
         $registeredByLabel = $transaction->user?->firstGivenName() ?? '';
@@ -177,7 +177,6 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 2a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm8 12H6V4h4v3a1 1 0 001 1h3v6zM4 4a2 2 0 012-2h4.586a2 2 0 011.414.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /></svg>
                     </button>
                 @endif
-                @if (! $hideListEditForCcInstallments)
                     @if (! $editMeta['canEditAmount'])
                         <button
                             type="button"
@@ -194,8 +193,8 @@
                         <button
                             type="button"
                             class="btn btn-link text-primary btn-sm p-0 js-tx-edit-amount-open"
-                            title="Alterar data, descrição, valor ou categorias deste lançamento"
-                            aria-label="Alterar data, descrição ou valor do lançamento"
+                            title="{{ $isCcInstallment ? 'Alterar compra parcelada (data da compra, descrição ou categorias)' : 'Alterar data, descrição, valor ou categorias deste lançamento' }}"
+                            aria-label="{{ $isCcInstallment ? 'Alterar data da compra, descrição ou categorias' : 'Alterar data, descrição ou valor do lançamento' }}"
                             data-bs-toggle="modal"
                             data-bs-target="#modalEditTransactionAmount"
                             data-tx-action="{{ route('transactions.update', $transaction) }}"
@@ -211,11 +210,12 @@
                             data-tx-ref-month="{{ (int) ($transaction->reference_month ?? 0) }}"
                             data-tx-ref-year="{{ (int) ($transaction->reference_year ?? 0) }}"
                             data-tx-peer-count="{{ (int) ($delMeta['peerCount'] ?? 1) }}"
+                            data-tx-is-installment-root="{{ $isCcInstallment ? '1' : '0' }}"
+                            data-tx-from-installment-modal="0"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" class="d-block" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                         </button>
                     @endif
-                @endif
                 @if ($delMeta['paidInvoice'])
                     <button
                         type="button"

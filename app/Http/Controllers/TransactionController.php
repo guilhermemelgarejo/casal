@@ -579,7 +579,15 @@ class TransactionController extends Controller
         session()->forget('edit_transaction_id');
         $this->flashOpenInstallmentModalRootIfRequested($request, $transaction);
 
-        $msg = $this->transactionUpdateFlashMessage($amountChanged, $descriptionChanged, $categoryChanged, $dateChanged, $invoiceChanged);
+        $msg = $this->transactionUpdateFlashMessage(
+            $amountChanged,
+            $descriptionChanged,
+            $categoryChanged,
+            $dateChanged,
+            $invoiceChanged,
+            $newDate,
+            $oldDateStr
+        );
 
         return back()->with('success', $msg);
     }
@@ -659,7 +667,9 @@ class TransactionController extends Controller
         bool $descriptionChanged,
         bool $categoryChanged,
         bool $dateChanged = false,
-        bool $invoiceChanged = false
+        bool $invoiceChanged = false,
+        ?Carbon $newDate = null,
+        ?string $oldDateStr = null
     ): string {
         $changesCount = ($amountChanged ? 1 : 0) + ($descriptionChanged ? 1 : 0) + ($categoryChanged ? 1 : 0) + ($dateChanged ? 1 : 0) + ($invoiceChanged ? 1 : 0);
         if ($changesCount > 1) {
@@ -669,6 +679,13 @@ class TransactionController extends Controller
             return 'Fatura do lançamento atualizada.';
         }
         if ($dateChanged) {
+            if ($newDate !== null && $oldDateStr !== null) {
+                $oldCarbon = Carbon::parse($oldDateStr);
+                if ($newDate->format('Y-m') !== $oldCarbon->format('Y-m')) {
+                    return 'Data do lançamento atualizada (o lançamento agora pertence a '.$newDate->translatedFormat('F \d\e Y').').';
+                }
+            }
+
             return 'Data do lançamento atualizada.';
         }
         if ($amountChanged) {

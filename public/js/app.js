@@ -803,22 +803,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     returnInstInput.value = '0';
                 }
             }
+            const isInstallmentRoot = btn?.getAttribute('data-tx-is-installment-root') === '1';
+            const peerCount = Number.parseInt(btn?.getAttribute('data-tx-peer-count') || '1', 10);
+            const isCreditTx = btn?.getAttribute('data-tx-is-credit') === '1';
+            const isInstallment = peerCount > 1;
+
             const scopeWrap = txEditForm.querySelector('#edit-tx-scope-all-wrap');
             const scopeCheckbox = txEditForm.querySelector('#edit-tx-scope-all');
             const scopeInput = txEditForm.querySelector('#edit-tx-installment-scope');
             if (scopeWrap && scopeCheckbox && scopeInput) {
-                scopeWrap.classList.add('d-none');
-                scopeCheckbox.checked = false;
-                scopeInput.value = 'single';
-
-                if (
-                    btn?.classList.contains('js-tx-edit-amount-open') &&
-                    btn.getAttribute('data-tx-from-installment-modal') === '1'
-                ) {
-                    const peerCount = Number.parseInt(btn.getAttribute('data-tx-peer-count') || '0', 10);
-                    if (peerCount > 1) {
-                        scopeWrap.classList.remove('d-none');
+                if (isInstallment) {
+                    scopeWrap.classList.remove('d-none');
+                    if (isInstallmentRoot) {
+                        scopeCheckbox.checked = true;
+                        scopeInput.value = 'all';
+                    } else {
+                        scopeCheckbox.checked = false;
+                        scopeInput.value = 'single';
                     }
+                } else {
+                    scopeWrap.classList.add('d-none');
+                    scopeCheckbox.checked = false;
+                    scopeInput.value = 'single';
                 }
             }
             if (!btn || !btn.classList.contains('js-tx-edit-amount-open')) {
@@ -838,16 +844,38 @@ document.addEventListener('DOMContentLoaded', () => {
             txEditForm.setAttribute('action', action);
             txEditForm.dataset.txEditPrecheckUrl = precheck;
             const amtInput = txEditForm.querySelector('[name="amount"]');
+            const amtHint = txEditForm.querySelector('#edit-tx-amount-installment-hint');
             if (amtInput) {
                 amtInput.value = amt;
+                if (isInstallmentRoot && isCreditTx) {
+                    amtInput.readOnly = true;
+                    amtInput.classList.add('bg-light-subtle', 'text-muted');
+                    if (amtHint) {
+                        amtHint.classList.remove('d-none');
+                    }
+                } else {
+                    amtInput.readOnly = false;
+                    amtInput.classList.remove('bg-light-subtle', 'text-muted');
+                    if (amtHint) {
+                        amtHint.classList.add('d-none');
+                    }
+                }
             }
             const descInput = txEditForm.querySelector('[name="description"]');
             if (descInput) {
                 descInput.value = desc;
             }
             const dateInput = txEditForm.querySelector('[name="date"]');
+            const dateHint = txEditForm.querySelector('#edit-tx-date-installment-hint');
             if (dateInput) {
                 window.duozenFlatpickrSetDate(dateInput, dateVal);
+            }
+            if (dateHint) {
+                if (isInstallment && isCreditTx) {
+                    dateHint.classList.remove('d-none');
+                } else {
+                    dateHint.classList.add('d-none');
+                }
             }
 
             const allocWrap = txEditForm.querySelector('#edit-tx-category-allocations-wrap');
@@ -1310,6 +1338,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalValueEl = document.querySelector('.js-tx-inst-total-value');
         const refundTotalEl = document.querySelector('.js-tx-inst-refund-total');
         const purchaseDateEl = document.querySelector('.js-tx-inst-purchase-date');
+        const successAlert = document.getElementById('installment-modal-success-alert');
+        if (successAlert && String(window.__txInitialOpenInstallmentModalRoot || '') !== String(rootId)) {
+            successAlert.remove();
+        }
         if (!tbody || !group || !descEl) {
             return;
         }
@@ -2461,6 +2493,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pendingInstRoot = window.__txOpenInstallmentModalRoot;
     if (pendingInstRoot != null && Number(pendingInstRoot) > 0) {
+        window.__txInitialOpenInstallmentModalRoot = String(pendingInstRoot);
         dzOpenInstallmentGroupModal(Number(pendingInstRoot));
     }
     try {

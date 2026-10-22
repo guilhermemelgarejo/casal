@@ -28,6 +28,12 @@ abstract class TestCase extends BaseTestCase
         }
     }
 
+    protected function tearDown(): void
+    {
+        \Carbon\Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     public static function tearDownAfterClass(): void
     {
         parent::tearDownAfterClass();

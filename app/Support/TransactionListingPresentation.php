@@ -84,11 +84,16 @@ class TransactionListingPresentation
      */
     public static function installmentGroupsForPage(int $coupleId, Collection $pageTransactions): Collection
     {
-        if ($pageTransactions->isEmpty()) {
-            return collect();
+        $roots = $pageTransactions->map(fn (Transaction $t) => $t->installmentRootId())->unique()->values()->all();
+
+        $pendingRoot = session('open_installment_modal_root');
+        if ($pendingRoot && ! in_array((int) $pendingRoot, $roots, true)) {
+            $roots[] = (int) $pendingRoot;
         }
 
-        $roots = $pageTransactions->map(fn (Transaction $t) => $t->installmentRootId())->unique()->values()->all();
+        if ($roots === []) {
+            return collect();
+        }
 
         $groupMembers = Transaction::query()
             ->where('couple_id', $coupleId)

@@ -6,6 +6,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body">
+                    @if (session('success') && session('open_installment_modal_root'))
+                        <div class="alert alert-success d-flex align-items-center gap-2 mb-3 rounded-3 py-2 px-3 shadow-sm" role="alert" id="installment-modal-success-alert">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-check-circle-fill flex-shrink-0 text-success" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+                            <div class="small fw-semibold text-success">{{ session('success') }}</div>
+                        </div>
+                    @endif
                     <p class="small text-secondary mb-2 fw-medium js-tx-inst-summary-desc"></p>
                     <div class="tx-modal-installment-total px-4 py-3 mb-3 text-center">
                         <div class="small text-secondary fw-semibold text-uppercase mb-1">Total da compra</div>
@@ -82,6 +88,7 @@
                                     value="{{ ($editTransactionModalMeta ?? [])['amount'] ?? '' }}"
                                     placeholder="0,00"
                                 />
+                                <div class="form-text mt-1 d-none text-muted" id="edit-tx-amount-installment-hint">O valor é dividido nas parcelas. Para ajustar parcelas individuais, utilize "Parcelas da compra".</div>
                                 <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                             </div>
                             <div class="col-6">
@@ -96,6 +103,7 @@
                                     value="{{ old('date', ($editTransactionModalMeta ?? [])['date'] ?? date('Y-m-d')) }}"
                                     required
                                 />
+                                <div class="form-text mt-1 d-none text-muted" id="edit-tx-date-installment-hint">Em compras parceladas no cartão, a data refere-se à compra e será aplicada a todas as parcelas.</div>
                                 <x-input-error :messages="$errors->get('date')" class="mt-2" />
                             </div>
                         </div>
