@@ -52,7 +52,48 @@ jobs:
           # 5. Adicionar o extrator standalone para envio
           cp deploy_extractor.php .deploy_upload/
 
-      - name: 🚀 Fast FTP Upload (Zip Only)
+      - name: 🚀 Fast FTP Upload (Zip Only) - Tentativa 1
+        id: ftp1
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        continue-on-error: true
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: domains/duozen.com.br/public_html/
+          local-dir: .deploy_upload/
+          dangerous-clean-slate: false
+          port: 21
+          timeout: 300000
+          security: loose
+
+      - name: ⏳ Pausa antes de tentar novamente
+        if: steps.ftp1.outcome == 'failure'
+        run: sleep 5
+
+      - name: 🔄 Fast FTP Upload (Zip Only) - Tentativa 2
+        id: ftp2
+        if: steps.ftp1.outcome == 'failure'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        continue-on-error: true
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: domains/duozen.com.br/public_html/
+          local-dir: .deploy_upload/
+          dangerous-clean-slate: false
+          port: 21
+          timeout: 300000
+          security: loose
+
+      - name: ⏳ Pausa antes da tentativa final
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        run: sleep 10
+
+      - name: 🔄 Fast FTP Upload (Zip Only) - Tentativa 3 (Final)
+        id: ftp3
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -62,10 +103,11 @@ jobs:
           local-dir: .deploy_upload/
           dangerous-clean-slate: false
           port: 21
-          timeout: 60000
+          timeout: 300000
           security: loose
 
       - name: ⚡ Trigger Auto-Extraction & Migrations
+        if: steps.ftp1.outcome == 'success' || steps.ftp2.outcome == 'success' || steps.ftp3.outcome == 'success'
         run: |
           if [ -n "${{ secrets.DEPLOY_TOKEN }}" ] && [ -n "${{ secrets.APP_URL }}" ]; then
             echo "Disparando extração e pós-deploy..."
