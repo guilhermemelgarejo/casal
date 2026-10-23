@@ -292,9 +292,10 @@ class TransactionController extends Controller
                 ->with('edit_transaction_id', $transaction->id);
         }
 
+        $baseDescriptionInput = (string) $request->input('description');
         $newDescriptionFull = $this->normalizedDescriptionForUpdate(
             $transaction,
-            (string) $request->input('description')
+            $baseDescriptionInput
         );
 
         $amountNormalized = str_replace(',', '.', (string) $request->amount);
@@ -399,9 +400,6 @@ class TransactionController extends Controller
         }
 
         $categoryChanged = $splitRows !== null;
-        if ($applyToAllInstallments && ! $categoryChanged) {
-            $applyToAllInstallments = false;
-        }
 
         if (! $hasCategoryAllocations) {
             // Permite transformar um lançamento existente em cofrinho sem mexer nas categorias.
@@ -487,7 +485,7 @@ class TransactionController extends Controller
             }
         }
 
-        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId, $dateChanged, $newDateStr, $newDate, $invoiceChanged, $newRefMonth, $newRefYear) {
+        DB::transaction(function () use ($transaction, $newAmountFormatted, $splitRows, $newDescriptionFull, $amountChanged, $descriptionChanged, $categoryChanged, $applyToAllInstallments, $allocPairs, $financialProjectId, $dateChanged, $newDateStr, $newDate, $invoiceChanged, $newRefMonth, $newRefYear, $baseDescriptionInput) {
             if ($descriptionChanged) {
                 $transaction->description = $newDescriptionFull;
             }
@@ -511,6 +509,18 @@ class TransactionController extends Controller
             }
             if ($amountChanged || $descriptionChanged || $dateChanged || $invoiceChanged || (int) ($transaction->getOriginal('financial_project_id') ?? 0) !== (int) ($financialProjectId ?? 0)) {
                 $transaction->save();
+            }
+
+            if ($descriptionChanged && $applyToAllInstallments) {
+                $group = $this->installmentGroupTransactionsFor($transaction);
+                if ($group->count() > 1) {
+                    foreach ($group as $tx) {
+                        if ($tx->id !== $transaction->id) {
+                            $tx->description = $this->normalizedDescriptionForUpdate($tx, $baseDescriptionInput);
+                            $tx->save();
+                        }
+                    }
+                }
             }
 
             if ($dateChanged) {

@@ -803,9 +803,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     returnInstInput.value = '0';
                 }
             }
-            const isInstallmentRoot = btn?.getAttribute('data-tx-is-installment-root') === '1';
-            const peerCount = Number.parseInt(btn?.getAttribute('data-tx-peer-count') || '1', 10);
-            const isCreditTx = btn?.getAttribute('data-tx-is-credit') === '1';
+            if (!btn || !btn.classList.contains('js-tx-edit-amount-open')) {
+                return;
+            }
+
+            const isInstallmentRoot = btn.getAttribute('data-tx-is-installment-root') === '1';
+            const peerCount = Number.parseInt(btn.getAttribute('data-tx-peer-count') || '1', 10);
+            const isCreditTx = btn.getAttribute('data-tx-is-credit') === '1';
             const isInstallment = peerCount > 1;
 
             const scopeWrap = txEditForm.querySelector('#edit-tx-scope-all-wrap');
@@ -826,9 +830,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     scopeCheckbox.checked = false;
                     scopeInput.value = 'single';
                 }
-            }
-            if (!btn || !btn.classList.contains('js-tx-edit-amount-open')) {
-                return;
             }
             if (btn.getAttribute('data-tx-from-installment-modal') === '1') {
                 txEditModal.dataset.txReopenInstallmentModal = '1';
@@ -911,7 +912,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const fpWrap = document.getElementById('edit-tx-cofrinho-wrapper');
             const fpSel = document.getElementById('edit-financial-project-id');
-            const isCreditTx = btn.getAttribute('data-tx-is-credit') === '1';
             if (fpWrap) {
                 fpWrap.classList.toggle('d-none', isCreditTx);
             }
@@ -919,8 +919,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 fpSel.value = !isCreditTx && fpId ? String(fpId) : '';
             }
 
-            const peerCount = Number.parseInt(btn.getAttribute('data-tx-peer-count') || '1', 10);
-            const isInstallment = peerCount > 1;
             const accId = Number.parseInt(btn.getAttribute('data-tx-account-id') || '0', 10);
             const refMonth = btn.getAttribute('data-tx-ref-month') || '';
             const refYear = btn.getAttribute('data-tx-ref-year') || '';

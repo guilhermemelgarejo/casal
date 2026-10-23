@@ -631,4 +631,66 @@ class TransactionAmountUpdateTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-tx-is-installment-root="1"', false);
     }
+
+    public function test_atualizar_descricao_com_escopo_all_atualiza_todas_as_parcelas(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Eletrônicos',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $parent = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Celular (Parcela 1/2)',
+            'amount' => '150.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 4,
+            'reference_year' => 2026,
+            'installment_parent_id' => null,
+        ], [['category_id' => $category->id, 'amount' => '150.00']]);
+
+        $child = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Celular (Parcela 2/2)',
+            'amount' => '150.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 5,
+            'reference_year' => 2026,
+            'installment_parent_id' => $parent->id,
+        ], [['category_id' => $category->id, 'amount' => '150.00']]);
+
+        $res = $this->actingAs($user)->put(route('transactions.update', $parent), [
+            'description' => 'Smartphone Novo',
+            'amount' => '150.00',
+            'date' => '2026-04-10',
+            'installment_scope' => 'all',
+        ]);
+
+        $res->assertSessionHasNoErrors();
+        $parent->refresh();
+        $child->refresh();
+
+        $this->assertSame('Smartphone Novo (Parcela 1/2)', $parent->description);
+        $this->assertSame('Smartphone Novo (Parcela 2/2)', $child->description);
+    }
 }
