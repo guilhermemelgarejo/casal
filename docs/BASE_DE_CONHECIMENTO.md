@@ -14,7 +14,7 @@ Documento de referência do repositório **casal** (produto **DuoZen**). Use com
 
 | Camada | Tecnologia |
 |--------|------------|
-| Backend | PHP **8.2+**, **Laravel 11** |
+| Backend | PHP **8.4+**, **Laravel 13** |
 | Auth / scaffolding | **Laravel Breeze** (Blade), sessões web |
 | Views | **Blade**, componentes em `resources/views/components` |
 | CSS/JS | **Bootstrap 5.3.3** em `public/vendor/bootstrap` (sem CDN); **Flatpickr** em `public/vendor/flatpickr` (datas e mês do painel com plugin **monthSelect**; locale **pt**; `public/js/app.js` + `window.duozenFlatpickrSetDate` para inputs definidos em modais); `public/css/app.css` (inclui **modais** unificados: `body .modal .modal-content` com altura máxima de viewport e `.modal-body` rolável, cabeçalho em gradiente, rodapé com separador; `.tx-modal-head--danger` para exclusão de conta; `.tx-modal-table-wrap`, `.tx-modal-installment-total`; formulário novo lançamento em seções `#form-new-transaction .tx-form-section` / `.tx-form-section-title`; **recorrentes** `.recurring-page` / `.rt-item-card`; lembrete compartilhado **`.rt-reminder-strip`** (largura da viewport; `overflow-x: clip` em **`.dashboard-page`** e **`.recurring-page`**) + **`.rt-reminder-card`** / **`.rt-reminder-list`** / **`.rt-reminder-card__head-actions`** (painel e `/recorrentes`, `partials/rt-reminder-panel.blade.php` — recorrentes **e** faturas (grade **`.rt-reminder-columns--split`** em `md+`); **Ver fatura** → `credit-card-statements.index` + âncora; **`.rt-reminder-card--overdue`** quando há lembrete vencido); loading global de submit com `.duozen-submit-loading`; tour de onboarding `.duozen-onboarding-*`); `public/js/app.js` (inclui spinner e trava de duplo envio para formulários após confirmações/prechecks); `public/js/onboarding-tour.js` (tour curto **só** quando a sessão tem `duozen_onboarding_tour` e o usuário tem acesso à app com `couple-billing`) |
@@ -252,7 +252,7 @@ Layout autenticado: `resources/views/layouts/app.blade.php` + `layouts/partials/
 - `database/seeders/ProtectedUsersSeeder.php` — `firstOrCreate` por e-mail para `guilherme.melgarejo@gmail.com` e `tainarygg@gmail.com` (só insere se não existirem; não altera nome/senha de quem já existe). Senha inicial ao **criar**: `password`. Cria (ou reutiliza) um casal de desenvolvimento com `invite_code` fixo `DuoZenDev1`, categorias padrão iguais às do fluxo “criar casal” na app, e associa cada usuário protegido a esse casal **apenas** se `couple_id` estiver vazio.
 - `database/seeders/DatabaseSeeder.php` — chama apenas `ProtectedUsersSeeder`.
 
-Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base** e são bloqueados por padrão em bancos não descartáveis (`AppServiceProvider`). Só liberar conscientemente com `DUOZEN_ALLOW_DESTRUCTIVE_DB_COMMANDS=true`.
+Migrations são proibidas neste projeto, inclusive em testes e deploy. `AppServiceProvider` bloqueia os comandos de migration e limpeza de schema sem exceção. Testes usam exclusivamente a fixture SQLite em memória.
 
 ---
 
@@ -262,16 +262,16 @@ Comandos como `migrate:fresh` / `db:wipe` **apagam toda a base** e são bloquead
 2. E-mail verificado não obrigatório para uso normal.
 3. Casal pode ficar sem usuários no registro (não há delete automático ao sair o último).
 4. Navbar usa `route('dashboard')`; usuários sem casal são empurrados para `couple.index` pelo middleware.
-5. **Stripe:** é necessário produto + preço mensal no Dashboard Stripe, variáveis `.env` (`STRIPE_*`, `STRIPE_PRICE_ID`), webhook apontando para `{APP_URL}/stripe/webhook` com o segredo em `STRIPE_WEBHOOK_SECRET` (local: `php artisan cashier:webhook` / Stripe CLI). O Cashier mantém o estado atualizado via webhooks; a rota **billing success** também sincroniza a assinatura a partir da sessão de Checkout (útil quando o webhook não atinge o ambiente, p.ex. `localhost` sem Stripe CLI). Após `route:cache`, volte a gerar rotas se adicionar endpoints. **Admins de assinaturas:** membros do casal com id configurado em `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` (default **1**) ou e-mails em `DUOZEN_ADMIN_EMAILS`; `isCasalAdmin()` também isenta de cobrança. Em testes, `phpunit.xml` define `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID` vazio para não acoplar ao id 1.
-6. **Migrações:** baseline única em `database/migrations/2026_04_23_000000_initial_schema.php` (instalação nova), consolidando o schema atual como ponto de partida do projeto. `php artisan migrate` é bloqueado se essa baseline estiver pendente em um banco que já tem tabelas, para evitar recriação acidental; nesse caso, fazer backup e marcar a baseline como executada antes de qualquer ajuste aditivo necessário no banco existente.
+5. **Stripe:** configure as variáveis STRIPE_* e o webhook conforme a integração Cashier. **Administração:** use DUOZEN_ADMIN_USER_IDS ou DUOZEN_ADMIN_EMAILS, com e-mail verificado. A associação ao casal não concede privilégios.
+6. **Banco:** não criar nem executar migrations. Os arquivos históricos não são utilizados. Alterações de estrutura, quando indispensáveis, devem ser entregues como SQL explícito para revisão, sem execução automática.
 
 ---
 
 ## 13. Comandos úteis
 
 ```bash
-php artisan migrate
-# migrate:fresh/db:wipe sao bloqueados por padrao em bancos nao descartaveis
+
+
 php artisan accounts:sync-balances # realinhar accounts.balance com a soma dos lançamentos (contas regular)
 php artisan accounts:recalc-credit-card-limits # realinhar credit_card_limit_available nos cartões
 php artisan test

@@ -1,6 +1,12 @@
 # DuoZen
 
-Um aplicativo web moderno e responsivo para controle financeiro compartilhado entre casais, desenvolvido com Laravel 11.
+Um aplicativo web para controle financeiro compartilhado entre casais, desenvolvido com Laravel 13 e PHP 8.4+.
+
+O projeto não utiliza migrations. Não execute comandos de migration ou recriação de banco; o deploy também não altera a estrutura do banco. Os arquivos antigos em `database/migrations/` são históricos e não devem ser executados.
+
+Configure um banco existente no `.env`, instale as dependências com `composer install` e execute os testes com `php vendor/phpunit/phpunit/phpunit`. A suíte usa uma fixture independente em SQLite em memória, sem migrations nem dados reais.
+
+Administradores são configurados por `DUOZEN_ADMIN_USER_IDS` ou `DUOZEN_ADMIN_EMAILS`, sempre com e-mail verificado. O ID do casal não concede mais administração. Antes de publicar, selecione PHP 8.4+ na hospedagem e configure os administradores no `.env` de produção.
 
 ## 🚀 Funcionalidades
 
