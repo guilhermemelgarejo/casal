@@ -57,4 +57,79 @@ class AdministratorSecurityTest extends TestCase
         $this->actingAs($user)->patch('/profile', ['name' => 'Teste', 'email' => 'new-address@example.test']);
         $this->assertFalse($user->fresh()->isCasalAdmin());
     }
+
+    public function test_pinned_preexisting_administrator_keeps_access_without_changing_legacy_verification(): void
+    {
+        $user = User::factory()->unverified()->create([
+            'email' => 'existing-owner@example.test',
+            'couple_id' => null,
+            'created_at' => '2026-04-06 04:01:31',
+        ]);
+        config(['duozen.existing_admin_accounts' => [[
+            'id' => $user->id,
+            'email' => $user->email,
+            'created_before' => '2026-10-24T01:00:00+00:00',
+        ]]]);
+
+        $this->assertTrue($user->isCasalAdmin());
+        $this->assertTrue($user->isBillingExempt());
+        $this->actingAs($user)->get('/admin/assinaturas')->assertOk();
+        $this->assertNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_pinned_administrator_requires_original_id_email_and_creation_date(): void
+    {
+        $user = User::factory()->unverified()->create([
+            'email' => 'existing-owner@example.test',
+            'created_at' => '2026-04-06 04:01:31',
+        ]);
+        $account = [
+            'id' => $user->id,
+            'email' => $user->email,
+            'created_before' => '2026-10-24T01:00:00+00:00',
+        ];
+
+        foreach ([
+            ['id' => $user->id + 1],
+            ['email' => 'another-owner@example.test'],
+            ['created_before' => '2026-04-05T00:00:00+00:00'],
+        ] as $override) {
+            config(['duozen.existing_admin_accounts' => [array_replace($account, $override)]]);
+            $this->assertFalse($user->isCasalAdmin());
+            $this->actingAs($user)->get('/admin/assinaturas')->assertForbidden();
+        }
+    }
+
+    public function test_new_registration_cannot_claim_pinned_administration_even_with_same_id_and_email(): void
+    {
+        $user = User::factory()->unverified()->create(['created_at' => '2026-10-24T01:00:00+00:00']);
+        config(['duozen.existing_admin_accounts' => [[
+            'id' => $user->id,
+            'email' => $user->email,
+            'created_before' => '2026-10-24T01:00:00+00:00',
+        ]]]);
+
+        $this->assertFalse($user->isCasalAdmin());
+        $this->actingAs($user)->get('/admin/assinaturas')->assertForbidden();
+    }
+
+    public function test_changing_pinned_administrator_email_revokes_pinned_grant(): void
+    {
+        $user = User::factory()->unverified()->create([
+            'email' => 'existing-owner@example.test',
+            'created_at' => '2026-04-06 04:01:31',
+        ]);
+        config(['duozen.existing_admin_accounts' => [[
+            'id' => $user->id,
+            'email' => $user->email,
+            'created_before' => '2026-10-24T01:00:00+00:00',
+        ]]]);
+        $this->assertTrue($user->isCasalAdmin());
+
+        $this->actingAs($user)->patch('/profile', ['name' => 'Teste', 'email' => 'new-owner@example.test'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertFalse($user->fresh()->isCasalAdmin());
+        $this->get('/admin/assinaturas')->assertForbidden();
+    }
 }

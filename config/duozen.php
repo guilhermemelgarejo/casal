@@ -2,6 +2,19 @@
 
 return [
     /*
+    | Conta administrativa preexistente confirmada pelo responsável do projeto.
+    | O vínculo exige ID, e-mail e criação anterior à atualização de segurança.
+    | Não confirma e-mail no banco e não concede privilégios a novos cadastros.
+    */
+    'existing_admin_accounts' => [
+        [
+            'id' => 1,
+            'email' => 'guilherme.melgarejo@gmail.com',
+            'created_before' => '2026-10-24T01:00:00+00:00',
+        ],
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | Casal administrador das assinaturas (área /admin/assinaturas)
     |--------------------------------------------------------------------------

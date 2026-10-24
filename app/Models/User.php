@@ -78,10 +78,31 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isCasalAdmin(): bool
     {
+        if ($this->isExistingAdministrator()) {
+            return true;
+        }
+
         return $this->hasVerifiedEmail() && (
             $this->emailMatchesList(config('duozen.admin_emails', []))
             || in_array((int) $this->id, config('duozen.admin_user_ids', []), true)
         );
+    }
+
+    private function isExistingAdministrator(): bool
+    {
+        foreach (config('duozen.existing_admin_accounts', []) as $account) {
+            if (
+                isset($account['id'], $account['email'], $account['created_before'])
+                && (int) $this->id === (int) $account['id']
+                && strcasecmp((string) $this->email, (string) $account['email']) === 0
+                && $this->created_at !== null
+                && $this->created_at->lessThan($account['created_before'])
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function isBillingExempt(): bool
