@@ -23,6 +23,7 @@ class ProfileUpdateRequest extends FormRequest
                 'string',
                 'lowercase',
                 'email',
+                'not_regex:/@users\\.duozen\\.invalid$/i',
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],

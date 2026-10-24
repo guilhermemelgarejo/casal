@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class DebtController extends Controller
@@ -612,10 +613,14 @@ class DebtController extends Controller
             return redirect()->back()->withErrors(['amount' => 'O valor pago deve ser maior que zero.']);
         }
 
-        $account = Account::findOrFail($validated['account_id']);
-        $catId = $validated['category_id'] ?? $debt->default_category_id;
-
         DB::transaction(function () use ($installment, $debt, $couple, $validated, $amountNormalized) {
+            $debt = Debt::query()->lockForUpdate()->findOrFail($debt->id);
+            $installment = DebtInstallment::query()->lockForUpdate()->findOrFail($installment->id);
+            if (! $installment->isPending() || $installment->transaction_id !== null) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Esta parcela já foi paga ou cancelada. Nenhuma nova despesa foi criada.',
+                ]);
+            }
             $account = Account::findOrFail($validated['account_id']);
             $dateObj = Carbon::parse($validated['paid_at']);
             $totalCount = $debt->total_installments ?: $debt->installments()->count();

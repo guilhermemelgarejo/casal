@@ -3,15 +3,46 @@
 namespace App\Models;
 
 use App\Support\Billing;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
+
+    protected static function booted(): void
+    {
+        // Reserved tombstones retain ledger foreign keys but cannot authenticate.
+        static::addGlobalScope('activeProfiles', function (Builder $query) {
+            $query->where('users.email', 'not like', 'deleted+%@users.duozen.invalid');
+        });
+
+        static::deleting(function (User $user) {
+            if (DB::table('transactions')->where('user_id', $user->id)->exists()) {
+                $user->forceFill([
+                    'name' => 'Usuário excluído',
+                    'email' => 'deleted+'.Str::uuid().'@users.duozen.invalid',
+                    'password' => Str::random(80),
+                    'remember_token' => null,
+                    'email_verified_at' => null,
+                    'couple_id' => null,
+                    'stripe_id' => null,
+                    'pm_type' => null,
+                    'pm_last_four' => null,
+                    'trial_ends_at' => null,
+                ])->saveQuietly();
+
+                return false;
+            }
+        });
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -47,13 +78,10 @@ class User extends Authenticatable
 
     public function isCasalAdmin(): bool
     {
-        $adminCoupleId = config('duozen.subscription_admin_couple_id');
-
-        if ($adminCoupleId !== null && (int) $this->couple_id === (int) $adminCoupleId) {
-            return true;
-        }
-
-        return $this->emailMatchesList(config('duozen.admin_emails', []));
+        return $this->hasVerifiedEmail() && (
+            $this->emailMatchesList(config('duozen.admin_emails', []))
+            || in_array((int) $this->id, config('duozen.admin_user_ids', []), true)
+        );
     }
 
     public function isBillingExempt(): bool
@@ -62,7 +90,8 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->emailMatchesList(config('duozen.billing_exempt_emails', []));
+        return $this->hasVerifiedEmail()
+            && $this->emailMatchesList(config('duozen.billing_exempt_emails', []));
     }
 
     /**

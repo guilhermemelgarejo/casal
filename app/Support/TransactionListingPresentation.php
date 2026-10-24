@@ -197,7 +197,7 @@ class TransactionListingPresentation
                 $rows[] = [
                     'id' => $t->id,
                     'type' => (string) $t->type,
-                    'registered_by_name' => $t->user?->firstGivenName(),
+                    'registered_by_name' => $t->user?->firstGivenName() ?? 'Usuário excluído',
                     'parcel_label' => ($idx + 1).'/'.$total,
                     'description' => $t->description,
                     'description_edit_base' => $t->baseDescriptionWithoutInstallmentSuffix(),

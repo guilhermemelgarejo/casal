@@ -3,7 +3,7 @@
         <div>
             <span class="dz-kpi-card__label d-block mb-1 text-danger" style="font-size: 0.72rem; letter-spacing: 0.05em;">Zona de Risco</span>
             <h2 class="h5 fw-bold mb-1 text-danger">Excluir conta</h2>
-            <p class="small text-secondary mb-0" style="font-size: 0.82rem;">Excluir a conta remove seus dados de usuário de forma permanente. O casal e os dados compartilhados podem continuar a existir para o outro membro.</p>
+            <p class="small text-secondary mb-0" style="font-size: 0.82rem;">Excluir a conta remove seu perfil de forma permanente. Os lançamentos e saldos compartilhados do casal são preservados.</p>
         </div>
         <div class="dz-kpi-card__icon-box dz-kpi-card__icon-box--danger flex-shrink-0" style="width: 38px; height: 38px; border-radius: var(--dz-radius-md); font-size: 1.1rem;">
             ⚠️
@@ -32,8 +32,10 @@
             </div>
 
             <div class="modal-body p-3 p-sm-4">
+                <x-input-error :messages="$errors->userDeletion->get('membership')" class="mb-3" />
+                <x-input-error :messages="$errors->userDeletion->get('subscription')" class="mb-3" />
                 <p class="text-secondary small mb-3">
-                    Esta ação é <strong class="text-danger">irreversível</strong>. Todos os seus dados pessoais serão removidos permanentemente. Digite sua senha para confirmar:
+                    Esta ação é <strong class="text-danger">irreversível</strong>. Seu perfil será desativado e anonimizado. O histórico financeiro do casal será preservado. Digite sua senha para confirmar:
                 </p>
 
                 <div class="mb-2">

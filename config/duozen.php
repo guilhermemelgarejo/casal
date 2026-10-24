@@ -6,13 +6,15 @@ return [
     | Casal administrador das assinaturas (área /admin/assinaturas)
     |--------------------------------------------------------------------------
     |
-    | Todos os usuários com este couple_id são tratados como admin de
-    | assinaturas (além dos e-mails em admin_emails).
-    |
-    | Vazio no .env desativa esta regra (útil em testes). Por padrão: 1.
+    | Opção legada ignorada na autorização. Use IDs explícitos ou e-mails
+    | verificados. Novos membros de um casal nunca herdam administração.
     |
     */
-    'subscription_admin_couple_id' => ($raw = env('DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID', '1')) === '' ? null : (int) $raw,
+    'subscription_admin_couple_id' => ($raw = env('DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID', '')) === '' ? null : (int) $raw,
+
+    'admin_user_ids' => array_values(array_filter(array_map(
+        'intval', explode(',', (string) env('DUOZEN_ADMIN_USER_IDS', ''))
+    ), fn (int $id) => $id > 0)),
 
     /*
     |--------------------------------------------------------------------------

@@ -36,5 +36,7 @@
         <server name="NIGHTWATCH_ENABLED" value="false"/>
         <server name="DUOZEN_BILLING_DISABLED" value="true"/>
         <server name="DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID" value=""/>
+        <server name="DUOZEN_ADMIN_USER_IDS" value="" force="true"/>
+        <server name="DUOZEN_ADMIN_EMAILS" value="" force="true"/>
     </php>
 </phpunit>

@@ -28,8 +28,8 @@
         $isCcInstallment = $delMeta['peerCount'] > 1 && $transaction->accountModel?->isCreditCard();
         $blockedMsg = 'Este lançamento faz parte de um ciclo de fatura de cartão já marcado como pago. Desmarque o pagamento em Faturas de cartão se precisar alterar os lançamentos desse período.';
         $accRow = $transaction->accountModel;
-        $registeredByLabel = $transaction->user?->firstGivenName() ?? '';
-        $registeredByTitle = $transaction->user ? 'Registrado por '.$transaction->user->name : '';
+        $registeredByLabel = $transaction->user?->firstGivenName() ?? 'Usuário excluído';
+        $registeredByTitle = $transaction->user ? 'Registrado por '.$transaction->user->name : 'Perfil excluído; lançamento preservado';
         $txAllocationsMeta = $transaction->categorySplits
             ->map(fn ($sp) => ['category_id' => (int) $sp->category_id, 'amount' => number_format((float) $sp->amount, 2, '.', '')])
             ->values()

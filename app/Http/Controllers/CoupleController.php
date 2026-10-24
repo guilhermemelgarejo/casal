@@ -3,15 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Mail\InvitationMail;
-use App\Models\Category;
-use App\Models\Couple;
 use App\Models\CouplePlannedIncome;
+use App\Services\CoupleMembershipService;
 use App\Support\Billing;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CoupleController extends Controller
 {
@@ -57,79 +57,19 @@ class CoupleController extends Controller
         ));
     }
 
-    public function create(Request $request)
+    public function create(Request $request, CoupleMembershipService $memberships)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-        ]);
-
-        $couple = Couple::create([
-            'name' => $request->name,
-            'invite_code' => Str::random(10),
-        ]);
-
-        // Default categories
-        $defaults = [
-            ['name' => 'Alimentação', 'type' => 'expense', 'color' => '#ef4444'],
-            ['name' => 'Moradia', 'type' => 'expense', 'color' => '#3b82f6'],
-            ['name' => 'Transporte', 'type' => 'expense', 'color' => '#f59e0b'],
-            ['name' => 'Lazer', 'type' => 'expense', 'color' => '#10b981'],
-            [
-                'name' => Category::NAME_CREDIT_CARD_INVOICE_PAYMENT,
-                'type' => 'expense',
-                'color' => '#64748b',
-                'system_key' => Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT,
-            ],
-            [
-                'name' => Category::NAME_INTERNAL_TRANSFER_EXPENSE,
-                'type' => 'expense',
-                'color' => '#94a3b8',
-                'system_key' => Category::SYSTEM_KEY_INTERNAL_TRANSFER_EXPENSE,
-            ],
-            [
-                'name' => Category::NAME_INTERNAL_TRANSFER_INCOME,
-                'type' => 'income',
-                'color' => '#94a3b8',
-                'system_key' => Category::SYSTEM_KEY_INTERNAL_TRANSFER_INCOME,
-            ],
-            ['name' => 'Salário', 'type' => 'income', 'color' => '#8b5cf6'],
-        ];
-
-        foreach ($defaults as $default) {
-            $couple->categories()->create($default);
-        }
-
-        Category::ensureSavingsCategoriesForCouple((int) $couple->id);
-
-        $user = Auth::user();
-        $user->couple_id = $couple->id;
-        $user->save();
-
+        $validated = $request->validate(['name' => 'required|string|max:255']);
+        $memberships->create($request->user(), $validated['name']);
         $request->session()->put('duozen_onboarding_tour', true);
 
         return redirect()->route('dashboard')->with('success', 'Casal criado com sucesso! Bem-vindos ao DuoZen.');
     }
 
-    public function join(Request $request)
+    public function join(Request $request, CoupleMembershipService $memberships)
     {
-        $request->validate([
-            'invite_code' => 'required|string',
-        ]);
-
-        $couple = Couple::where('invite_code', $request->invite_code)->first();
-
-        if (! $couple) {
-            return back()->withErrors(['invite_code' => 'Código de convite inválido.']);
-        }
-
-        if ($couple->users()->count() >= 2) {
-            return back()->withErrors(['invite_code' => 'Este casal já possui dois membros.']);
-        }
-
-        $user = Auth::user();
-        $user->couple_id = $couple->id;
-        $user->save();
-
+        $validated = $request->validate(['invite_code' => 'required|string|max:255']);
+        $memberships->join($request->user(), $validated['invite_code']);
         $request->session()->put('duozen_onboarding_tour', true);
 
         return redirect()->route('dashboard')->with('success', 'Você entrou no casal! Bem-vindo(a) ao DuoZen.');
@@ -198,59 +138,40 @@ class CoupleController extends Controller
             'billing_owner_user_id' => 'required|integer|exists:users,id',
         ]);
 
-        $user = Auth::user();
-        $couple = $user->couple;
+        return DB::transaction(function () use ($request) {
+            $user = Auth::user();
+            $couple = $user->couple()->lockForUpdate()->first();
 
-        if (! $couple) {
-            return back()->with('error', 'Você não faz parte de um casal.');
-        }
+            if (! $couple) {
+                return back()->with('error', 'Você não faz parte de um casal.');
+            }
 
-        if ((int) $couple->billing_owner_user_id !== (int) $user->id) {
-            return back()->with('error', 'Apenas quem é responsável pela assinatura pode transferir esse papel.');
-        }
+            if ((int) $couple->billing_owner_user_id !== (int) $user->id) {
+                return back()->with('error', 'Apenas quem é responsável pela assinatura pode transferir esse papel.');
+            }
 
-        $newOwnerId = (int) $request->input('billing_owner_user_id');
-        if ($newOwnerId === (int) $user->id) {
-            return back()->with('error', 'Escolha outro membro do casal.');
-        }
+            $newOwnerId = (int) $request->input('billing_owner_user_id');
+            if ($newOwnerId === (int) $user->id) {
+                return back()->with('error', 'Escolha outro membro do casal.');
+            }
 
-        $newOwner = $couple->users()->whereKey($newOwnerId)->first();
-        if (! $newOwner) {
-            return back()->with('error', 'O membro escolhido não pertence a este casal.');
-        }
+            $newOwner = $couple->users()->whereKey($newOwnerId)->first();
+            if (! $newOwner) {
+                return back()->with('error', 'O membro escolhido não pertence a este casal.');
+            }
 
-        $couple->forceFill(['billing_owner_user_id' => $newOwnerId])->save();
+            $couple->forceFill(['billing_owner_user_id' => $newOwnerId])->save();
 
-        return back()->with('success', 'A responsabilidade pela assinatura foi transferida para '.$newOwner->name.'.');
+            return back()->with('success', 'A responsabilidade pela assinatura foi transferida para '.$newOwner->name.'.');
+        });
     }
 
-    public function leave()
+    public function leave(CoupleMembershipService $memberships)
     {
-        $user = Auth::user();
-        $couple = $user->couple;
-
-        if (! $couple) {
-            return back()->withErrors(['error' => 'Você não faz parte de um casal.']);
-        }
-
-        $otherMembersCount = $couple->users()->where('id', '!=', $user->id)->count();
-        if (
-            $couple->billing_owner_user_id !== null
-            && (int) $couple->billing_owner_user_id === (int) $user->id
-            && $otherMembersCount >= 1
-        ) {
-            return redirect()->route('couple.index')->with(
-                'error',
-                'Transfira primeiro a responsabilidade pela assinatura para o outro membro do casal antes de sair.'
-            );
-        }
-
-        $user->couple_id = null;
-        $user->save();
-
-        $couple->refresh();
-        if ($couple->users()->count() === 0) {
-            $couple->forceFill(['billing_owner_user_id' => null])->save();
+        try {
+            $memberships->leave(Auth::user());
+        } catch (ValidationException $e) {
+            return redirect()->route('couple.index')->with('error', collect($e->errors())->flatten()->first());
         }
 
         return redirect()->route('couple.index')->with('success', 'Você saiu do casal.');
