@@ -7,6 +7,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: duozen-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Build & Fast Deploy
@@ -16,13 +20,22 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🐘 Setup PHP 8.2
+      - name: 🐘 Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, bcmath, curl, fileinfo, zip
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, pdo_sqlite, bcmath, curl, fileinfo, zip
           coverage: none
           tools: composer:v2
+
+      - name: Validate dependencies and run tests
+        env:
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        run: |
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          composer audit --locked --no-interaction
+          php vendor/phpunit/phpunit/phpunit --no-progress
 
       - name: 📦 Install Composer Dependencies (Production)
         run: |
@@ -35,8 +48,12 @@ jobs:
           mkdir -p .deploy_upload
 
           # 2. Copiar arquivos necessários do Laravel
-          cp -r app bootstrap config database public resources routes storage vendor .deploy_staging/
+          cp -r app bootstrap config public resources routes storage vendor .deploy_staging/
           cp artisan composer.json composer.lock .htaccess .deploy_staging/
+
+          # Never publish local caches, sessions, logs, credentials or backup data.
+          find .deploy_staging/bootstrap/cache -type f ! -name .gitignore -delete
+          find .deploy_staging/storage -type f ! -name .gitignore -delete
 
           # 3. Garantir pastas de cache do framework
           mkdir -p .deploy_staging/storage/framework/cache/data
@@ -65,7 +82,8 @@ jobs:
           dangerous-clean-slate: false
           port: 21
           timeout: 300000
-          security: loose
+          security: strict
+          protocol: ftps
 
       - name: ⏳ Pausa antes de tentar novamente
         if: steps.ftp1.outcome == 'failure'
@@ -85,7 +103,8 @@ jobs:
           dangerous-clean-slate: false
           port: 21
           timeout: 300000
-          security: loose
+          security: strict
+          protocol: ftps
 
       - name: ⏳ Pausa antes da tentativa final
         if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
@@ -104,19 +123,26 @@ jobs:
           dangerous-clean-slate: false
           port: 21
           timeout: 300000
-          security: loose
+          security: strict
+          protocol: ftps
 
-      - name: ⚡ Trigger Auto-Extraction & Migrations
+      - name: ⚡ Trigger Auto-Extraction (No Database Changes)
         if: steps.ftp1.outcome == 'success' || steps.ftp2.outcome == 'success' || steps.ftp3.outcome == 'success'
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
-          if [ -n "${{ secrets.DEPLOY_TOKEN }}" ] && [ -n "${{ secrets.APP_URL }}" ]; then
+          set -euo pipefail
+          if [ -n "$DEPLOY_TOKEN" ] && [ -n "$APP_URL" ]; then
             echo "Disparando extração e pós-deploy..."
-            BASE_URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/*$::')
-            RESPONSE=$(curl -k -L -s -S \
-              -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-              "$BASE_URL/deploy_extractor.php?token=${{ secrets.DEPLOY_TOKEN }}" || echo "Erro ao conectar no extrator.")
+            BASE_URL="${APP_URL%/}"
+            RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 180 \
+              --request POST --header "X-Deploy-Token: $DEPLOY_TOKEN" \
+              "$BASE_URL/deploy_extractor.php")
             echo "Resultado do servidor:"
             echo "$RESPONSE"
+            echo "$RESPONSE" | jq -e '.status == "success"' >/dev/null
           else
             echo "Aviso: DEPLOY_TOKEN ou APP_URL não definidos nos Secrets do GitHub."
+            exit 1
           fi

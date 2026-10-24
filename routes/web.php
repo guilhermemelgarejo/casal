@@ -21,7 +21,7 @@ use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
-Route::match(['get', 'post'], '/system/deploy-hook/{token?}', DeployController::class)
+Route::post('/system/deploy-hook', DeployController::class)
     ->middleware('throttle:10,1')
     ->name('system.deploy-hook');
 

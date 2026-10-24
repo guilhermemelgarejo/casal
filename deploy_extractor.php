@@ -2,8 +2,14 @@
 
 /**
  * DuoZen Auto Deploy & Release Extractor
- * Descompacta release.zip, limpa arquivos temporários, limpa caches e executa migrações.
+ * Descompacta release.zip, limpa arquivos temporários, limpa caches sem alterar o banco de dados.
  */
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit;
+}
 
 // 1. Ler o DEPLOY_TOKEN do .env (suporta espaços antes e depois do igual)
 $envFile = __DIR__ . '/.env';
@@ -31,8 +37,8 @@ $headerToken = $headers['X-Deploy-Token']
     ?? $_SERVER['HTTP_X_DEPLOY_TOKEN'] 
     ?? null;
 
-$providedToken = $headerToken ?? $_POST['token'] ?? $_GET['token'] ?? null;
-$providedToken = $providedToken ? trim($providedToken, " \"'\t\n\r\0\x0B") : null;
+$providedToken = $headerToken ?? $_POST['token'] ?? null;
+$providedToken = is_string($providedToken) ? trim($providedToken, " \"'\t\n\r\0\x0B") : null;
 
 if (empty($configuredToken)) {
     http_response_code(500);
@@ -58,17 +64,40 @@ $startTime = microtime(true);
 $logs = [];
 $zipPath = __DIR__ . '/release.zip';
 
+if (PHP_VERSION_ID < 80400) {
+    http_response_code(503);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Configure PHP 8.4 ou superior antes de publicar esta versão. Nenhum arquivo foi extraído.']);
+    exit;
+}
+
+$deployLock = fopen(__DIR__.'/storage/framework/deploy.lock', 'c+');
+if ($deployLock === false || !flock($deployLock, LOCK_EX | LOCK_NB)) {
+    http_response_code(409);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Já existe um deploy em andamento.']);
+    exit;
+}
+
 // 3. Extrair release.zip
 if (file_exists($zipPath)) {
     $zip = new ZipArchive();
     $res = $zip->open($zipPath);
     if ($res === true) {
-        $zip->extractTo(__DIR__);
+        if (!$zip->extractTo(__DIR__)) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'error', 'message' => 'Falha ao extrair release.zip.']);
+            exit;
+        }
         $zip->close();
         @unlink($zipPath);
         $logs['unzip'] = 'release.zip descompactado e removido com sucesso.';
     } else {
-        $logs['unzip_error'] = 'Falha ao abrir release.zip (Código de erro: ' . $res . ')';
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Falha ao abrir release.zip.']);
+        exit;
     }
 } else {
     $logs['unzip'] = 'Nenhum release.zip pendente de extração.';
@@ -126,35 +155,33 @@ try {
         $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
         $kernel->bootstrap();
 
-        // Migrações do banco
-        try {
-            \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-            $logs['migrate'] = trim(\Illuminate\Support\Facades\Artisan::output());
-        } catch (\Throwable $e) {
-            $logs['migrate_error'] = $e->getMessage();
-        }
-
         // Limpeza e recriação de caches em produção
         try {
-            \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-            \Illuminate\Support\Facades\Artisan::call('config:cache');
-            \Illuminate\Support\Facades\Artisan::call('route:cache');
-            \Illuminate\Support\Facades\Artisan::call('view:cache');
+            // Não limpar o cache da aplicação: ele pode estar no banco de dados.
+            foreach (['config:clear', 'route:clear', 'view:clear', 'event:clear', 'clear-compiled', 'config:cache', 'route:cache', 'view:cache'] as $command) {
+                if (\Illuminate\Support\Facades\Artisan::call($command) !== 0) {
+                    throw new RuntimeException('Falha no comando '.$command.'.');
+                }
+            }
             $logs['cache'] = 'Caches de configuração, rotas e views gerados com sucesso.';
         } catch (\Throwable $e) {
             $logs['cache_error'] = $e->getMessage();
         }
+    } else {
+        throw new RuntimeException('Arquivos essenciais do Laravel ausentes após a extração.');
     }
 } catch (\Throwable $e) {
     $logs['laravel_init_error'] = $e->getMessage();
 }
 
 $duration = round(microtime(true) - $startTime, 3);
+$hasErrors = count(array_filter(array_keys($logs), fn ($key) => str_ends_with($key, '_error'))) > 0;
+http_response_code($hasErrors ? 500 : 200);
 
 header('Content-Type: application/json');
 echo json_encode([
-    'status' => 'success',
-    'message' => 'Deploy e extração concluídos com sucesso.',
+    'status' => $hasErrors ? 'error' : 'success',
+    'message' => $hasErrors ? 'O deploy falhou. Consulte os logs.' : 'Deploy concluído sem alterações no banco de dados.',
     'duration_seconds' => $duration,
     'timestamp' => date('c'),
     'logs' => $logs,
