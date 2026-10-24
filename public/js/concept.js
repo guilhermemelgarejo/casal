@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const payer = row.getAttribute('data-payer');
                     if (partner === 'all') {
                         row.style.display = 'flex';
-                    } else if (partner === 'user1' && (payer === 'Guilherme' || payer === 'Casal')) {
+                    } else if (partner === 'user1' && (payer === 'Bruno' || payer === 'Casal')) {
                         row.style.display = 'flex';
                     } else if (partner === 'user2' && (payer === 'Mariana' || payer === 'Casal')) {
                         row.style.display = 'flex';

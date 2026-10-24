@@ -36,6 +36,12 @@
             @include('partials.subscription-public-info', ['compact' => true])
         </div>
 
+        <p class="small text-secondary mt-3 mb-0">
+            Ao clicar em Cadastrar, você declara ter 18 anos ou mais e concorda com os
+            <a href="{{ route('legal.terms') }}" target="_blank" rel="noopener">Termos e Condições de Uso</a>
+            e declara ciência da <a href="{{ route('legal.privacy') }}" target="_blank" rel="noopener">Política de Privacidade</a>.
+        </p>
+
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
             <a class="small text-decoration-none" href="{{ route('login') }}">
                 Já tem conta?

@@ -36,3 +36,4 @@ Thumbs.db
 
 # Documentos locais (análises, registros de manutenção e rascunhos de marketing)
 /docs/local/
+!/docs/sql/*.sql

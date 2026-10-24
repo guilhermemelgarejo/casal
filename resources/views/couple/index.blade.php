@@ -89,6 +89,10 @@
                                 <span class="d-inline-flex align-items-center gap-1">
                                     <span>🔑 Código:</span>
                                     <code class="px-1.5 py-0.5 rounded bg-body-secondary text-primary font-monospace fw-bold user-select-all">{{ $couple->invite_code }}</code>
+                                    <form action="{{ route('couple.invite-code.regenerate') }}" method="POST" class="d-inline" data-confirm-title="Gerar novo código" data-confirm="O código atual deixará de funcionar, inclusive em convites já enviados. Continuar?" data-confirm-accept="Gerar novo código" data-confirm-cancel="Cancelar" data-confirm-icon="question">
+                                        @csrf
+                                        <button type="submit" class="btn btn-link btn-sm p-0 align-baseline" style="font-size: 0.75rem;" title="Invalidar o código atual e gerar outro">Gerar novo</button>
+                                    </form>
                                 </span>
                                 <span>•</span>
                                 <span>Renda base: <strong class="dz-privacy-blur text-body">R$ {{ number_format((float) $couple->monthly_income, 2, ',', '.') }}</strong></span>
@@ -97,7 +101,10 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-2 flex-wrap w-100 w-md-auto justify-content-start justify-content-md-end">
-                        <form action="{{ route('couple.leave') }}" method="POST" class="w-100 w-md-auto" data-confirm-title="Sair do casal" data-confirm="Tem certeza de que deseja sair do casal?" data-confirm-accept="Sim, sair" data-confirm-cancel="Cancelar" data-confirm-icon="question">
+                        <a href="{{ route('couple.export') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 w-100 w-md-auto" style="font-size: 0.82rem;" title="Baixar todos os lançamentos do casal em planilha (CSV)">
+                            Exportar dados
+                        </a>
+                        <form action="{{ route('couple.leave') }}" method="POST" class="w-100 w-md-auto" data-confirm-title="Sair do casal" data-confirm="Você perderá o acesso ao espaço do casal. Os lançamentos continuam com o outro membro e o código de convite será trocado. Se precisar, exporte os dados antes. Deseja sair?" data-confirm-accept="Sim, sair" data-confirm-cancel="Cancelar" data-confirm-icon="question">
                             @csrf
                             <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1.5 w-100 w-md-auto" style="font-size: 0.82rem;">
                                 Sair do casal
@@ -337,7 +344,7 @@
                                     <span class="couple-section-kicker mb-0">Titularidade Financeira</span>
                                     <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">Você é o titular</span>
                                 </div>
-                                <p class="small text-secondary mb-3" style="font-size: 0.8rem;">Para trocar o titular que gerencia a assinatura no DuoZen, selecione o parceiro(a) abaixo:</p>
+                                <p class="small text-secondary mb-3" style="font-size: 0.8rem;">Para trocar o titular que gerencia a assinatura no DuoZen, selecione o parceiro(a) abaixo. A cobrança continua no cartão de quem ativou o plano até que essa pessoa cancele a renovação no portal de pagamento.</p>
 
                                 <form action="{{ route('couple.transfer-billing-owner') }}" method="POST" class="row g-2 align-items-center">
                                     @csrf
@@ -534,7 +541,7 @@
                                                 <div class="min-w-0">
                                                     <h5 class="small fw-bold mb-1" style="color: var(--dz-text-title);">Experimentem {{ $trialDays }} dias sem compromisso</h5>
                                                     <p class="small text-secondary mb-0" style="line-height: 1.45;">
-                                                        Acesso total para o casal. O cartão é solicitado apenas para validação e você pode cancelar a qualquer momento sem taxas.
+                                                        Acesso total para o casal. Ao fim do teste, a assinatura é renovada automaticamente todo mês no cartão cadastrado, até você cancelar. Cancelando durante o teste, nada é cobrado.
                                                     </p>
                                                 </div>
                                             </div>
@@ -547,6 +554,10 @@
                                                 Cadastrar cartão e iniciar teste ({{ $trialDays }} dias grátis) ↗
                                             </button>
                                         </form>
+                                        <p class="small text-secondary text-center mb-0" style="font-size: 0.75rem;">
+                                            O valor mensal aparece na tela de pagamento antes da confirmação. Ao continuar, você concorda com os
+                                            <a href="{{ route('legal.terms') }}#assinatura" target="_blank" rel="noopener">Termos de uso</a>.
+                                        </p>
 
                                         <div class="d-flex align-items-center justify-content-center gap-2 gap-sm-3 flex-wrap mt-3">
                                             <span class="billing-trust-badge">🔒 Stripe Seguro</span>

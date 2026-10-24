@@ -11,6 +11,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CoupleController;
 use App\Http\Controllers\CreditCardStatementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DebtController;
 use App\Http\Controllers\DeployController;
 use App\Http\Controllers\FinancialProjectController;
@@ -29,6 +30,9 @@ Route::post('/system/deploy-hook', DeployController::class)
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::view('/termos', 'legal.terms')->name('legal.terms');
+Route::view('/privacidade', 'legal.privacy')->name('legal.privacy');
 
 Route::get('/conceito', [ConceptController::class, 'index'])->name('concept.index');
 
@@ -142,7 +146,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/couple', [CoupleController::class, 'index'])->name('couple.index');
     Route::post('/couple/create', [CoupleController::class, 'create'])->name('couple.create');
     Route::post('/couple/join', [CoupleController::class, 'join'])->name('couple.join');
-    Route::post('/couple/invite', [CoupleController::class, 'sendInvite'])->name('couple.invite');
+    Route::post('/couple/invite', [CoupleController::class, 'sendInvite'])
+        ->middleware('throttle:10,60')
+        ->name('couple.invite');
+    Route::post('/couple/invite-code', [CoupleController::class, 'regenerateInviteCode'])
+        ->middleware('throttle:10,60')
+        ->name('couple.invite-code.regenerate');
+    Route::get('/couple/export', [DataExportController::class, 'transactions'])
+        ->middleware(['has-couple', 'throttle:10,1'])
+        ->name('couple.export');
     Route::put('/couple/update', [CoupleController::class, 'update'])->name('couple.update');
     Route::post('/couple/transfer-billing-owner', [CoupleController::class, 'transferBillingOwner'])->name('couple.transfer-billing-owner');
     Route::post('/couple/leave', [CoupleController::class, 'leave'])->name('couple.leave');

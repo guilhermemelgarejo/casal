@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -50,6 +51,15 @@ class RegisteredUserController extends Controller
 
             return $user;
         }, 3);
+
+        Log::channel('legal')->info('Termos aceitos no cadastro', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'terms_version' => config('duozen.legal.terms_updated_at'),
+            'ip' => $request->ip(),
+            'user_agent' => (string) $request->userAgent(),
+            'accepted_at' => now()->toIso8601String(),
+        ]);
 
         event(new Registered($user));
 

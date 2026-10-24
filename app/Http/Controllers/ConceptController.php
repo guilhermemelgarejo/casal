@@ -24,9 +24,9 @@ class ConceptController extends Controller
         $currentUser = Auth::user();
         $user1 = [
             'id' => 1,
-            'name' => $currentUser ? $currentUser->name : 'Guilherme Melgarejo',
-            'short_name' => $currentUser ? explode(' ', $currentUser->name)[0] : 'Guilherme',
-            'email' => $currentUser ? $currentUser->email : 'guilherme@exemplo.com',
+            'name' => $currentUser ? $currentUser->name : 'Bruno Costa',
+            'short_name' => $currentUser ? explode(' ', $currentUser->name)[0] : 'Bruno',
+            'email' => $currentUser ? $currentUser->email : 'bruno@exemplo.com',
             'avatar_color' => '#7C3AED',
             'income_share' => 55,
         ];
@@ -56,7 +56,7 @@ class ConceptController extends Controller
             'user2_expense' => 4220.50,
             'settlement_balance' => 449.75, // Valor que um deve compensar ao outro para 50/50
             'settlement_debtor' => 'Mariana',
-            'settlement_creditor' => 'Guilherme',
+            'settlement_creditor' => 'Bruno',
         ];
 
         // Contas e Cartões
@@ -67,7 +67,7 @@ class ConceptController extends Controller
                 'bank_code' => 'nubank',
                 'type' => 'checking',
                 'type_label' => 'Conta Corrente',
-                'owner' => 'Guilherme',
+                'owner' => 'Bruno',
                 'balance' => 6420.50,
                 'color' => '#820ad1',
                 'icon' => 'bank',
@@ -103,7 +103,7 @@ class ConceptController extends Controller
                 'bank_code' => 'nubank',
                 'type' => 'credit_card',
                 'type_label' => 'Cartão Black',
-                'owner' => 'Guilherme',
+                'owner' => 'Bruno',
                 'current_invoice' => 3450.80,
                 'credit_limit' => 22000.00,
                 'available_limit' => 18549.20,
@@ -229,7 +229,7 @@ class ConceptController extends Controller
                 'kind' => 'income',
                 'status' => 'success',
                 'icon' => 'briefcase',
-                'account' => 'Itaú Guilherme',
+                'account' => 'Itaú Bruno',
             ],
         ];
 
@@ -265,7 +265,7 @@ class ConceptController extends Controller
                 'account' => 'Nubank Principal',
                 'payment_method' => 'TED / Pix',
                 'payer' => $user1,
-                'split' => '100% Guilherme',
+                'split' => '100% Bruno',
                 'installments' => null,
                 'tags' => ['Fixo'],
             ],

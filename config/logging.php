@@ -52,6 +52,23 @@ return [
 
     'channels' => [
 
+        // Aceite dos Termos no cadastro (prova do consentimento enquanto não há coluna no banco).
+        'legal' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/legal-acceptance.log'),
+            'level' => 'info',
+            'replace_placeholders' => true,
+        ],
+
+        // Registros de acesso exigidos pelo Marco Civil da Internet (art. 15): guarda mínima de 6 meses.
+        'access' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/access.log'),
+            'level' => 'info',
+            'days' => 190,
+            'replace_placeholders' => true,
+        ],
+
         'stack' => [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),

@@ -365,6 +365,8 @@
                     <a href="#recursos">Recursos</a>
                     <a href="#plano">Plano</a>
                     <a href="{{ route('contact.show') }}">Contato</a>
+                    <a href="{{ route('legal.terms') }}">Termos de uso</a>
+                    <a href="{{ route('legal.privacy') }}">Privacidade</a>
                     @guest
                         <a href="{{ route('login') }}">Entrar</a>
                     @endguest

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Mail;
 
 class ContactController extends Controller
 {
-    private const RECIPIENT_EMAIL = 'guilherme.melgarejo@gmail.com';
+    private const FALLBACK_RECIPIENT_EMAIL = 'guilherme.melgarejo@gmail.com';
 
     public function show(Request $request)
     {
@@ -31,7 +31,7 @@ class ContactController extends Controller
 
         $user = $request->user();
 
-        Mail::to(self::RECIPIENT_EMAIL)->send(new ContactMessageMail(
+        Mail::to(config('duozen.legal.contact_email') ?: self::FALLBACK_RECIPIENT_EMAIL)->send(new ContactMessageMail(
             name: $validated['name'],
             email: $validated['email'],
             contactSubject: $validated['subject'] ?? null,

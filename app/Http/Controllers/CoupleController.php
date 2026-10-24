@@ -88,6 +88,10 @@ class CoupleController extends Controller
             return back()->withErrors(['email' => 'Você não faz parte de um casal.']);
         }
 
+        if ($couple->users()->count() >= 2) {
+            return back()->withErrors(['email' => 'O casal já tem dois membros. Não é possível enviar novos convites.']);
+        }
+
         Mail::to($request->email)->send(new InvitationMail($user, $couple));
 
         return back()->with('success', 'Convite enviado com sucesso para '.$request->email.'!');
@@ -164,6 +168,17 @@ class CoupleController extends Controller
 
             return back()->with('success', 'A responsabilidade pela assinatura foi transferida para '.$newOwner->name.'.');
         });
+    }
+
+    public function regenerateInviteCode(CoupleMembershipService $memberships)
+    {
+        try {
+            $memberships->regenerateInviteCode(Auth::user());
+        } catch (ValidationException $e) {
+            return redirect()->route('couple.index')->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->route('couple.index')->with('success', 'Novo código de convite gerado. O código anterior deixou de funcionar.');
     }
 
     public function leave(CoupleMembershipService $memberships)

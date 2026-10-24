@@ -89,6 +89,25 @@ return [
     | O valor deve coincidir com o preço cadastrado no Stripe.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Identificação jurídica do fornecedor (Termos e condições)
+    |--------------------------------------------------------------------------
+    |
+    | Exigida pelo Decreto 7.962/2013 em serviços contratados pela internet.
+    | Campos vazios aparecem destacados como pendentes na página /termos.
+    |
+    */
+    'legal' => [
+        'terms_updated_at' => '2026-10-24',
+        'provider_name' => env('DUOZEN_LEGAL_NAME'),
+        'provider_document' => env('DUOZEN_LEGAL_DOCUMENT'),
+        'provider_address' => env('DUOZEN_LEGAL_ADDRESS'),
+        'contact_email' => env('DUOZEN_LEGAL_EMAIL'),
+        // Texto exibido na Política de Privacidade, ex.: "90 dias". Deve refletir a rotina real de backup.
+        'backup_retention' => env('DUOZEN_LEGAL_BACKUP_RETENTION'),
+    ],
+
     'marketing' => [
         'tagline' => 'Menos briga por dinheiro. Mais planos juntos.',
         'price_amount' => ($raw = trim((string) env('DUOZEN_PUBLIC_PRICE_AMOUNT', ''))) === '' ? null : (float) str_replace(',', '.', $raw),

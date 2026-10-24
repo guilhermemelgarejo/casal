@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
+use Monolog\Handler\NullHandler;
 use RuntimeException;
 
 abstract class TestCase extends BaseTestCase
@@ -70,6 +71,12 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutMiddleware(PreventRequestForgery::class);
+
+        // Aceites e acessos de teste não devem se misturar aos registros legais reais.
+        config([
+            'logging.channels.legal' => ['driver' => 'monolog', 'handler' => NullHandler::class],
+            'logging.channels.access' => ['driver' => 'monolog', 'handler' => NullHandler::class],
+        ]);
     }
 
     /**

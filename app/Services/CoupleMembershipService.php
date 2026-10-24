@@ -17,7 +17,7 @@ class CoupleMembershipService
             $member = User::query()->lockForUpdate()->findOrFail($user->id);
             $this->assertUnattached($member, 'name');
 
-            $couple = Couple::create(['name' => $name, 'invite_code' => Str::random(10)]);
+            $couple = Couple::create(['name' => $name, 'invite_code' => $this->newInviteCode()]);
             foreach ([
                 ['name' => 'Alimentação', 'type' => 'expense', 'color' => '#ef4444'],
                 ['name' => 'Moradia', 'type' => 'expense', 'color' => '#3b82f6'],
@@ -73,11 +73,49 @@ class CoupleMembershipService
                 ]);
             }
 
+            if ($this->hasRenewingSubscription($member)) {
+                throw ValidationException::withMessages([
+                    'subscription' => 'Sua assinatura está com renovação ativa e continuaria sendo cobrada. Cancele a renovação no portal de pagamento antes de sair do casal ou excluir a conta.',
+                ]);
+            }
+
             $member->update(['couple_id' => null]);
             if ((int) $couple->billing_owner_user_id === (int) $member->id) {
                 $couple->forceFill(['billing_owner_user_id' => null])->save();
             }
+
+            // The old code must not let a former member back into the shared history.
+            $couple->forceFill(['invite_code' => $this->newInviteCode()])->save();
         }, 3);
+    }
+
+    public function regenerateInviteCode(User $user): Couple
+    {
+        return DB::transaction(function () use ($user) {
+            $couple = Couple::query()->lockForUpdate()->find($user->couple_id);
+            if (! $couple) {
+                throw ValidationException::withMessages(['membership' => 'Você não faz parte de um casal.']);
+            }
+
+            $couple->forceFill(['invite_code' => $this->newInviteCode()])->save();
+
+            return $couple;
+        }, 3);
+    }
+
+    private function hasRenewingSubscription(User $user): bool
+    {
+        return $user->subscriptions()->get()
+            ->contains(fn ($subscription) => $subscription->valid() && ! $subscription->canceled());
+    }
+
+    private function newInviteCode(): string
+    {
+        do {
+            $code = Str::random(10);
+        } while (Couple::query()->where('invite_code', $code)->exists());
+
+        return $code;
     }
 
     private function assertUnattached(User $user, string $field): void
