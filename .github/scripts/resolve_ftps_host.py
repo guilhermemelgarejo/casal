@@ -1,9 +1,10 @@
-"""Resolve Hostinger IPs to a certificate hostname without disabling TLS checks."""
+"""Keep the configured FTP endpoint while verifying Hostinger's TLS identity."""
 
+import ftplib
 import ipaddress
 import os
 import re
-import socket
+import ssl
 import sys
 
 
@@ -23,7 +24,7 @@ def normalize_hostname(value):
     raise ValueError("FTP_HOSTNAME deve ser um nome DNS coberto pelo certificado, não um IP.")
 
 
-def resolve_host(server, hostname="", *, reverse=socket.gethostbyaddr, lookup=socket.getaddrinfo):
+def resolve_target(server, hostname=""):
     server = server.strip()
     if not server:
         raise ValueError("Configure o secret FTP_SERVER.")
@@ -33,31 +34,43 @@ def resolve_host(server, hostname="", *, reverse=socket.gethostbyaddr, lookup=so
     except ValueError:
         if hostname.strip():
             raise ValueError("Use FTP_HOSTNAME somente quando FTP_SERVER for um IP.")
-        return normalize_hostname(server)
+        return normalize_hostname(server), ""
 
-    if hostname.strip():
-        candidate = normalize_hostname(hostname)
-    else:
-        try:
-            candidate = normalize_hostname(reverse(server)[0])
-        except (OSError, ValueError) as error:
-            raise ValueError("Sem hostname reverso válido; configure a variável FTP_HOSTNAME com o hostname FTPS da Hostinger.") from error
-        # The observed Hostinger certificate covers *.hstgr.io. Do not trust an arbitrary PTR.
-        if not re.fullmatch(r"[a-z0-9-]+\.hstgr\.io", candidate):
-            raise ValueError("O DNS reverso não corresponde à Hostinger; confirme o hostname FTPS e configure FTP_HOSTNAME.")
+    # The Hostinger FTP certificate includes hstgr.io. Only the temporary
+    # runner maps this TLS name to the configured IP; no reverse DNS is needed.
+    candidate = normalize_hostname(hostname.strip() or "hstgr.io")
+    if candidate != "hstgr.io" and not re.fullmatch(r"[a-z0-9-]+\.hstgr\.io", candidate):
+        raise ValueError("FTP_HOSTNAME deve corresponder ao domínio certificado da Hostinger.")
+    return candidate, str(target_ip)
 
-    addresses = lookup(candidate, 21, type=socket.SOCK_STREAM)
-    if not any(ipaddress.ip_address(address[4][0]) == target_ip for address in addresses):
-        raise ValueError("O hostname FTPS não aponta para o IP de FTP_SERVER; confira a configuração na Hostinger.")
-    return candidate
+
+def verify_endpoint(hostname, address, *, ftp_factory=ftplib.FTP_TLS):
+    # No login or uploads: verify CA chain, expiry and hostname before the
+    # deployment action receives any FTP credentials.
+    with ftp_factory(context=ssl.create_default_context()) as ftp:
+        ftp.connect(address or hostname, 21, timeout=15)
+        ftp.host = hostname
+        ftp.auth()
+
+
+def prepare_target(server, hostname, output_path, *, verify=verify_endpoint):
+    hostname, address = resolve_target(server, hostname)
+    verify(hostname, address)
+    print(f"::add-mask::{hostname}")
+    if address:
+        print(f"::add-mask::{address}")
+    with open(output_path, "a", encoding="utf-8") as output:
+        output.write(f"hostname={hostname}\naddress={address}\n")
 
 
 if __name__ == "__main__":
     try:
-        hostname = resolve_host(os.environ.get("FTP_SERVER", ""), os.environ.get("FTP_HOSTNAME", ""))
-        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-            output.write(f"hostname={hostname}\n")
-        print("Hostname FTPS resolvido; o upload continuará com validação TLS estrita.")
-    except (OSError, ValueError) as error:
-        print(f"::error::{error}", file=sys.stderr)
+        prepare_target(
+            os.environ.get("FTP_SERVER", ""),
+            os.environ.get("FTP_HOSTNAME", ""),
+            os.environ["GITHUB_OUTPUT"],
+        )
+        print("Destino FTPS confirmado com certificado e hostname válidos; TLS estrito mantido.")
+    except (OSError, ValueError, ftplib.Error) as error:
+        print(f"::error::Não foi possível validar o destino FTPS ({type(error).__name__}); upload bloqueado.", file=sys.stderr)
         sys.exit(1)

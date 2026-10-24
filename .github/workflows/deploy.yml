@@ -20,17 +20,28 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v6
 
-      - name: Validate FTPS hostname resolution
+      - name: Validate FTPS endpoint preparation
         run: python3 -B -m unittest discover -s .github/scripts -p 'test_*.py'
 
-      - name: Resolve Hostinger hostname for strict TLS
+      - name: Verify Hostinger endpoint with strict TLS
         id: ftps
         timeout-minutes: 1
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          # Optional override if the provider has no reverse DNS record.
+          # Optional Hostinger certificate hostname; IP connections default to hstgr.io.
           FTP_HOSTNAME: ${{ vars.FTP_HOSTNAME }}
         run: python3 .github/scripts/resolve_ftps_host.py
+
+      - name: Pin FTPS hostname to the configured server IP
+        env:
+          FTPS_HOSTNAME: ${{ steps.ftps.outputs.hostname }}
+          FTPS_ADDRESS: ${{ steps.ftps.outputs.address }}
+        run: |
+          # Only this temporary runner changes. Preserve the exact configured
+          # FTP IP while the deployment action verifies the certificate name.
+          if [ -n "$FTPS_ADDRESS" ]; then
+            printf '%s\t%s\n' "$FTPS_ADDRESS" "$FTPS_HOSTNAME" | sudo tee -a /etc/hosts >/dev/null
+          fi
 
       - name: 🐘 Setup PHP 8.4
         uses: shivammathur/setup-php@v2

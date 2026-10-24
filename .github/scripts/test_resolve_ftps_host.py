@@ -1,68 +1,76 @@
+import contextlib
+import io
 import socket
+import ssl
+import tempfile
 import unittest
-from unittest.mock import Mock
+from pathlib import Path
+from unittest.mock import MagicMock, Mock
 
-from resolve_ftps_host import resolve_host
+from resolve_ftps_host import prepare_target, resolve_target, verify_endpoint
 
 
 class ResolveFtpsHostTest(unittest.TestCase):
-    def setUp(self):
-        self.reverse = Mock(return_value=("srv123.hstgr.io", [], ["192.0.2.10"]))
-        self.lookup = Mock(return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.10", 21))])
+    def test_ip_keeps_exact_endpoint_without_reverse_dns(self):
+        self.assertEqual(('hstgr.io', '192.0.2.10'), resolve_target('192.0.2.10'))
 
-    def resolve(self, server="192.0.2.10", hostname=""):
-        return resolve_host(server, hostname, reverse=self.reverse, lookup=self.lookup)
+    def test_existing_hostname_is_normalized(self):
+        self.assertEqual(('srv123.hstgr.io', ''), resolve_target(' SRV123.HSTGR.IO. '))
 
-    def test_ip_uses_hostinger_hostname_with_matching_forward_dns(self):
-        self.assertEqual("srv123.hstgr.io", self.resolve())
-        self.reverse.assert_called_once_with("192.0.2.10")
-        self.lookup.assert_called_once_with("srv123.hstgr.io", 21, type=socket.SOCK_STREAM)
+    def test_ipv6_address_is_normalized(self):
+        self.assertEqual(('hstgr.io', '2001:db8::10'), resolve_target('2001:0db8:0000::10'))
 
-    def test_existing_hostname_does_not_need_reverse_dns(self):
-        self.assertEqual("srv123.hstgr.io", self.resolve(" SRV123.HSTGR.IO. "))
-        self.reverse.assert_not_called()
-        self.lookup.assert_not_called()
+    def test_explicit_hostinger_hostname_preserves_ip(self):
+        self.assertEqual(('srv123.hstgr.io', '192.0.2.10'), resolve_target('192.0.2.10', 'srv123.hstgr.io'))
 
-    def test_ipv6_compares_addresses_after_normalization(self):
-        self.lookup.return_value = [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:db8::10", 21, 0, 0))]
-        self.assertEqual("srv123.hstgr.io", self.resolve("2001:0db8:0000::10"))
-
-    def test_explicit_hostname_works_without_reverse_dns(self):
-        self.assertEqual("srv123.hstgr.io", self.resolve(hostname="srv123.hstgr.io"))
-        self.reverse.assert_not_called()
-
-    def test_reverse_hostname_must_belong_to_hostinger_certificate_domain(self):
-        for hostname in ["attacker.example", "srv123.hstgr.io.attacker.example", "srv123.sub.hstgr.io"]:
-            with self.subTest(hostname=hostname):
-                self.reverse.return_value = (hostname, [], [])
-                with self.assertRaisesRegex(ValueError, "não corresponde à Hostinger"):
-                    self.resolve()
-
-    def test_rejects_hostname_pointing_to_another_server(self):
-        self.lookup.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.11", 21))]
-        for hostname in ["", "srv123.hstgr.io"]:
-            with self.subTest(hostname=hostname):
-                with self.assertRaisesRegex(ValueError, "não aponta para o IP"):
-                    self.resolve(hostname=hostname)
-
-    def test_missing_reverse_dns_explains_manual_configuration(self):
-        self.reverse.side_effect = socket.herror("missing PTR")
-        with self.assertRaisesRegex(ValueError, "configure a variável FTP_HOSTNAME"):
-            self.resolve()
-
-    def test_rejects_invalid_configuration_before_upload(self):
+    def test_rejects_invalid_configuration_before_connecting(self):
         for server, hostname in [
-            ("", ""),
-            ("ftps://srv123.hstgr.io", ""),
-            ("srv123.hstgr.io:21", ""),
-            ("srv123.hstgr.io", "another.hstgr.io"),
-            ("192.0.2.10", "192.0.2.10"),
-            ("192.0.2.10", "srv123.hstgr.io\nhostname=attacker.example"),
+            ('', ''),
+            ('ftps://srv123.hstgr.io', ''),
+            ('srv123.hstgr.io:21', ''),
+            ('srv123.hstgr.io', 'another.hstgr.io'),
+            ('192.0.2.10', '192.0.2.10'),
+            ('192.0.2.10', 'attacker.example'),
+            ('192.0.2.10', 'srv123.hstgr.io.attacker.example'),
+            ('192.0.2.10', 'srv123.sub.hstgr.io'),
+            ('192.0.2.10', 'srv123.hstgr.io\nhostname=attacker.example'),
         ]:
             with self.subTest(server=server, hostname=hostname):
                 with self.assertRaises(ValueError):
-                    self.resolve(server, hostname)
+                    resolve_target(server, hostname)
+
+    def test_preflight_requires_ca_and_hostname_validation_without_login(self):
+        factory = MagicMock()
+        verify_endpoint('hstgr.io', '192.0.2.10', ftp_factory=factory)
+        context = factory.call_args.kwargs['context']
+        self.assertEqual(ssl.CERT_REQUIRED, context.verify_mode)
+        self.assertTrue(context.check_hostname)
+        connection = factory.return_value.__enter__.return_value
+        connection.connect.assert_called_once_with('192.0.2.10', 21, timeout=15)
+        self.assertEqual('hstgr.io', connection.host)
+        connection.auth.assert_called_once_with()
+        connection.login.assert_not_called()
+
+    def test_failed_certificate_or_connection_produces_no_action_output(self):
+        for error in [ssl.SSLCertVerificationError('untrusted certificate'), socket.timeout('timeout')]:
+            with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / 'output'
+                with self.assertRaises(type(error)):
+                    prepare_target('192.0.2.10', '', output, verify=Mock(side_effect=error))
+                self.assertFalse(output.exists())
+
+    def test_action_output_preserves_ip_and_masks_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / 'output'
+            log = io.StringIO()
+            verify = Mock()
+            with contextlib.redirect_stdout(log):
+                prepare_target('192.0.2.10', '', output, verify=verify)
+            verify.assert_called_once_with('hstgr.io', '192.0.2.10')
+            self.assertEqual('hostname=hstgr.io\naddress=192.0.2.10\n', output.read_text(encoding='utf-8'))
+            self.assertIn('::add-mask::hstgr.io', log.getvalue())
+            self.assertIn('::add-mask::192.0.2.10', log.getvalue())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
