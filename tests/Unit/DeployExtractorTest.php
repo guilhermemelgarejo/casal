@@ -68,7 +68,7 @@ PHP);
         return hash_file('sha256', $this->directory.'/release.zip');
     }
 
-    private function request(string $hash = '', string $token = 'fixture-token', string $method = 'POST', bool $cacheFailure = false): array
+    private function request(string $hash = '', string $token = 'fixture-token', string $method = 'POST', bool $cacheFailure = false, bool $disableSymlinks = false): array
     {
         $script = <<<'PHP'
 $_SERVER['REQUEST_METHOD'] = getenv('FIXTURE_METHOD');
@@ -77,7 +77,12 @@ $_SERVER['HTTP_X_RELEASE_SHA256'] = getenv('FIXTURE_HASH');
 register_shutdown_function(function () { file_put_contents('response-status.txt', (string) http_response_code()); });
 require 'deploy_extractor.php';
 PHP;
-        $process = new Process([PHP_BINARY, '-r', $script], $this->directory, [
+        $arguments = [PHP_BINARY];
+        if ($disableSymlinks) {
+            array_push($arguments, '-d', 'disable_functions=symlink');
+        }
+        array_push($arguments, '-r', $script);
+        $process = new Process($arguments, $this->directory, [
             'FIXTURE_METHOD' => $method,
             'FIXTURE_TOKEN' => $token,
             'FIXTURE_HASH' => $hash,
@@ -158,5 +163,19 @@ PHP;
         $this->assertSame('route:cache', $response['json']['logs']['cache_error']['command']);
         $this->assertArrayHasKey('reference', $response['json']['logs']['cache_error']);
         $this->assertStringNotContainsString('PRIVATE_DEPLOY_DETAILS', $response['body']);
+    }
+
+    public function test_disabled_symlink_does_not_fail_an_otherwise_verified_deploy(): void
+    {
+        mkdir($this->directory.'/storage/app/public', 0777, true);
+        file_put_contents($this->directory.'/storage/app/public/user-upload.txt', 'preserve upload');
+        $response = $this->request($this->package(), disableSymlinks: true);
+
+        $this->assertSame(200, $response['status']);
+        $this->assertSame('success', $response['json']['status']);
+        $this->assertArrayHasKey('storage_link_warning', $response['json']['logs']);
+        $this->assertArrayNotHasKey('storage_link_error', $response['json']['logs']);
+        $this->assertSame('preserve upload', file_get_contents($this->directory.'/storage/app/public/user-upload.txt'));
+        $this->assertFileDoesNotExist($this->directory.'/public/storage/user-upload.txt');
     }
 }

@@ -195,12 +195,21 @@ if ($oldCache) {
 $storageTarget = __DIR__.'/storage/app/public';
 $storageLink = __DIR__.'/public/storage';
 if (! file_exists($storageLink) && ! is_link($storageLink) && file_exists($storageTarget)) {
-    try {
-        @symlink($storageTarget, $storageLink);
-        $logs['storage_link'] = 'Symlink do storage criado com sucesso.';
-    } catch (Throwable $e) {
-        error_log('[DuoZen deploy '.$deployId.'] storage_link: '.$e->getMessage());
-        $logs['storage_link_error'] = ['exception' => get_class($e), 'reference' => $deployId];
+    // Shared hosting may disable symlink(). Do not fail an otherwise completed
+    // release, or copy user uploads on every deploy to work around this limit.
+    if (! function_exists('symlink')) {
+        $logs['storage_link_warning'] = 'A hospedagem não permite criar links simbólicos. Configure o acesso ao disco público no painel caso a aplicação utilize arquivos de storage/app/public.';
+    } else {
+        try {
+            if (@symlink($storageTarget, $storageLink)) {
+                $logs['storage_link'] = 'Symlink do storage criado com sucesso.';
+            } else {
+                $logs['storage_link_warning'] = 'O link do disco público não pôde ser criado. Verifique as permissões da hospedagem se utilizar arquivos de storage/app/public.';
+            }
+        } catch (Throwable $e) {
+            error_log('[DuoZen deploy '.$deployId.'] storage_link: '.$e->getMessage());
+            $logs['storage_link_warning'] = ['message' => 'Link do disco público indisponível nesta hospedagem.', 'exception' => get_class($e), 'reference' => $deployId];
+        }
     }
 }
 
