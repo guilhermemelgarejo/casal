@@ -1,5 +1,6 @@
 <?php
 
+use App\DTO\AssetQuoteData;
 use Illuminate\Support\Str;
 
 return [
@@ -16,6 +17,8 @@ return [
     */
 
     'default' => env('CACHE_STORE', 'database'),
+
+    'serializable_classes' => [AssetQuoteData::class],
 
     /*
     |--------------------------------------------------------------------------

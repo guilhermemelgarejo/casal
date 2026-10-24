@@ -3,11 +3,12 @@
 namespace Tests;
 
 use App\Models\Transaction;
+use Carbon\Carbon;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -30,7 +31,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function tearDown(): void
     {
-        \Carbon\Carbon::setTestNow();
+        Carbon::setTestNow();
         parent::tearDown();
     }
 
@@ -42,11 +43,11 @@ abstract class TestCase extends BaseTestCase
 
     protected static function clearCachedConfig(): void
     {
-        $cachePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'bootstrap' . DIRECTORY_SEPARATOR . 'cache';
+        $cachePath = dirname(__DIR__).DIRECTORY_SEPARATOR.'bootstrap'.DIRECTORY_SEPARATOR.'cache';
         $files = [
-            $cachePath . DIRECTORY_SEPARATOR . 'config.php',
-            $cachePath . DIRECTORY_SEPARATOR . 'routes-v7.php',
-            $cachePath . DIRECTORY_SEPARATOR . 'events.php',
+            $cachePath.DIRECTORY_SEPARATOR.'config.php',
+            $cachePath.DIRECTORY_SEPARATOR.'routes-v7.php',
+            $cachePath.DIRECTORY_SEPARATOR.'events.php',
         ];
 
         foreach ($files as $file) {
@@ -68,7 +69,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        $this->withoutMiddleware(ValidateCsrfToken::class);
+        $this->withoutMiddleware(PreventRequestForgery::class);
     }
 
     /**

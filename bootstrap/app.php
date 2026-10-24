@@ -21,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'casal-admin' => EnsureCasalAdmin::class,
         ]);
 
-        $middleware->validateCsrfTokens(except: [
+        $middleware->preventRequestForgery(except: [
             'stripe/*',
             'system/deploy-hook*',
         ]);
