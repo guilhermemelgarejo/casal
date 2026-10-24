@@ -14,11 +14,23 @@ concurrency:
 jobs:
   deploy:
     name: Build & Fast Deploy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Validate FTPS hostname resolution
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_*.py'
+
+      - name: Resolve Hostinger hostname for strict TLS
+        id: ftps
+        timeout-minutes: 1
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          # Optional override if the provider has no reverse DNS record.
+          FTP_HOSTNAME: ${{ vars.FTP_HOSTNAME }}
+        run: python3 .github/scripts/resolve_ftps_host.py
 
       - name: 🐘 Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -71,10 +83,10 @@ jobs:
 
       - name: 🚀 Fast FTP Upload (Zip Only) - Tentativa 1
         id: ftp1
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         continue-on-error: true
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ steps.ftps.outputs.hostname }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: domains/duozen.com.br/public_html/
@@ -92,10 +104,10 @@ jobs:
       - name: 🔄 Fast FTP Upload (Zip Only) - Tentativa 2
         id: ftp2
         if: steps.ftp1.outcome == 'failure'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         continue-on-error: true
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ steps.ftps.outputs.hostname }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: domains/duozen.com.br/public_html/
@@ -113,9 +125,9 @@ jobs:
       - name: 🔄 Fast FTP Upload (Zip Only) - Tentativa 3 (Final)
         id: ftp3
         if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ steps.ftps.outputs.hostname }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: domains/duozen.com.br/public_html/
