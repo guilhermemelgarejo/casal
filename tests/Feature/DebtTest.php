@@ -10,7 +10,7 @@ use App\Models\DebtInstallment;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class DebtTest extends TestCase

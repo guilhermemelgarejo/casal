@@ -8,7 +8,7 @@ use App\Models\Couple;
 use App\Models\CreditCardStatement;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class TransactionAmountUpdateTest extends TestCase

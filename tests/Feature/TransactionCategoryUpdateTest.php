@@ -6,7 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class TransactionCategoryUpdateTest extends TestCase
@@ -77,4 +77,3 @@ class TransactionCategoryUpdateTest extends TestCase
         $this->assertSame('100.00', number_format((float) $tx->categorySplits->first()->amount, 2, '.', ''));
     }
 }
-

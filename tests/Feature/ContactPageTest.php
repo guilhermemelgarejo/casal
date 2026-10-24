@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Mail\ContactMessageMail;
 use App\Models\Couple;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 

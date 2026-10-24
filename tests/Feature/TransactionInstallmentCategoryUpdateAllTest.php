@@ -6,7 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class TransactionInstallmentCategoryUpdateAllTest extends TestCase
@@ -116,4 +116,3 @@ class TransactionInstallmentCategoryUpdateAllTest extends TestCase
         $this->assertSame([$catA->id, $catB->id], $p3->categorySplits->pluck('category_id')->map(fn ($x) => (int) $x)->all());
     }
 }
-

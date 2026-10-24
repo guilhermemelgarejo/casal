@@ -1,5 +1,6 @@
 *.log
 *.sql
+!/tests/Support/schema.sqlite.sql
 .DS_Store
 /bootstrap/cache/*
 !/bootstrap/cache/.gitignore

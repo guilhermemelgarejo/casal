@@ -6,7 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Couple;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class TransactionStoreRedirectTest extends TestCase
@@ -196,4 +196,3 @@ class TransactionStoreRedirectTest extends TestCase
         $this->assertStringContainsString('data-cofrinho-kind="retirada"', $html);
     }
 }
-

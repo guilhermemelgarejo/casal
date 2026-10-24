@@ -9,7 +9,7 @@ use App\Models\Couple;
 use App\Models\CreditCardStatement;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class ReportsPageTest extends TestCase

@@ -7,7 +7,7 @@ use App\Models\Category;
 use App\Models\Couple;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class AccountTransferTest extends TestCase
@@ -222,4 +222,3 @@ class AccountTransferTest extends TestCase
         $response->assertSessionHas('success');
     }
 }
-

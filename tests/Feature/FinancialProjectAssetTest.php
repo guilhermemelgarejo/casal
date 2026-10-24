@@ -9,7 +9,7 @@ use App\Models\FinancialProject;
 use App\Models\FinancialProjectEntry;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -792,6 +792,3 @@ class FinancialProjectAssetTest extends TestCase
         $this->assertEquals('Cartão de Débito', $saleTx->payment_method);
     }
 }
-
-
-

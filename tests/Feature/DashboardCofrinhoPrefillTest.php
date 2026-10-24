@@ -7,7 +7,7 @@ use App\Models\Category;
 use App\Models\Couple;
 use App\Models\FinancialProject;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class DashboardCofrinhoPrefillTest extends TestCase

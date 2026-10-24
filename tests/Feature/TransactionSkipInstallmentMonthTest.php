@@ -8,7 +8,7 @@ use App\Models\Couple;
 use App\Models\CreditCardStatement;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefreshDatabase;
 use Tests\TestCase;
 
 class TransactionSkipInstallmentMonthTest extends TestCase
@@ -191,4 +191,3 @@ class TransactionSkipInstallmentMonthTest extends TestCase
         $this->assertSame(5, (int) $child->reference_month);
     }
 }
-
