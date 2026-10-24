@@ -14,6 +14,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            throw new \RuntimeException('Dados de desenvolvimento não podem ser criados neste ambiente.');
+        }
         $this->call(ProtectedUsersSeeder::class);
     }
 }
