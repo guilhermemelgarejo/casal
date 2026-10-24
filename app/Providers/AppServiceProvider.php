@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\FinancialProject;
 use App\Models\FinancialProjectEntry;
+use App\Support\BackupRetention;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Pagination\Paginator;
@@ -80,7 +81,10 @@ class AppServiceProvider extends ServiceProvider
                 'contactEmail' => filled($legal['contact_email'] ?? null)
                     ? '<a href="mailto:'.e($legal['contact_email']).'">'.e($legal['contact_email']).'</a>'
                     : $field(null, 'e-mail de atendimento'),
-                'backupRetention' => $field($legal['backup_retention'] ?? null, 'prazo de guarda dos backups'),
+                'backupRetention' => $field(
+                    BackupRetention::days() !== null ? BackupRetention::days().' dias' : null,
+                    'prazo de guarda dos backups'
+                ),
             ]);
         });
 

@@ -12,6 +12,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Prazo de guarda (dias)
+    |--------------------------------------------------------------------------
+    | Após cada envio, backups da rotina mais antigos que este prazo são apagados
+    | definitivamente do Google Drive (os 7 mais recentes sempre ficam). O mesmo
+    | prazo aparece na Política de Privacidade. Vazio ou 0 desativa a limpeza.
+    */
+    'retention_days' => (int) env('BACKUP_RETENTION_DAYS', 0),
+
+    /*
+    |--------------------------------------------------------------------------
     | Integração com Google Drive
     |--------------------------------------------------------------------------
     | Caminho para o JSON da Conta de Serviço do Google Cloud (Service Account)

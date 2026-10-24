@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Mail\DatabaseBackupNotificationMail;
+use App\Support\BackupRetention;
 use Google\Client as GoogleClient;
 use Google\Service\Drive as GoogleDriveService;
 use Google\Service\Drive\DriveFile;
@@ -105,6 +106,9 @@ class BackupDatabaseToDrive extends Command
             $driveLink = $this->uploadToGoogleDrive($zipFilePath, $zipFileName, $googleFolderId);
             $this->info("Upload concluído! Link do arquivo: {$driveLink}");
             Log::info("[Backup DB] Upload concluído no Google Drive. Link: {$driveLink}");
+
+            // Só apaga cópias antigas depois que a nova está garantida no Drive.
+            $this->pruneExpiredBackups($googleFolderId);
 
             // 5. Envio do E-mail com o link
             if (!$this->option('no-email') && !empty($notifyEmail)) {
@@ -281,6 +285,56 @@ class BackupDatabaseToDrive extends Command
         ]);
 
         return $uploadedFile->webViewLink ?: "https://drive.google.com/file/d/{$uploadedFile->id}/view";
+    }
+
+    /**
+     * Apaga definitivamente (sem lixeira) os backups que passaram do prazo de guarda.
+     * Uma falha aqui não invalida o backup recém-enviado, mas é registrada como erro.
+     */
+    protected function pruneExpiredBackups(string $folderId): void
+    {
+        $days = BackupRetention::days();
+        if ($days === null) {
+            $this->line('Limpeza de backups antigos desativada (BACKUP_RETENTION_DAYS vazio).');
+            Log::warning('[Backup DB] BACKUP_RETENTION_DAYS não definido: backups antigos não são apagados.');
+
+            return;
+        }
+
+        try {
+            $service = $this->createGoogleDriveService();
+            $files = [];
+            $pageToken = null;
+
+            do {
+                $result = $service->files->listFiles(array_filter([
+                    'q' => "'{$folderId}' in parents and trashed = false and mimeType = 'application/zip'",
+                    'fields' => 'nextPageToken, files(id, name, createdTime)',
+                    'pageSize' => 1000,
+                    'pageToken' => $pageToken,
+                    'supportsAllDrives' => true,
+                    'includeItemsFromAllDrives' => true,
+                ]));
+
+                foreach ($result->getFiles() as $file) {
+                    $files[] = ['id' => $file->getId(), 'name' => $file->getName(), 'createdTime' => $file->getCreatedTime()];
+                }
+
+                $pageToken = $result->getNextPageToken();
+            } while ($pageToken);
+
+            $expired = BackupRetention::expired($files, now(), $days);
+
+            foreach ($expired as $file) {
+                $service->files->delete($file['id'], ['supportsAllDrives' => true]);
+                Log::info("[Backup DB] Backup expirado apagado do Google Drive: {$file['name']}");
+            }
+
+            $this->info(count($expired)." backup(s) com mais de {$days} dias apagado(s) do Google Drive.");
+        } catch (Throwable $e) {
+            Log::error('[Backup DB] Falha ao apagar backups expirados: '.$e->getMessage());
+            $this->error('Falha ao apagar backups expirados: '.$e->getMessage());
+        }
     }
 
     protected function formatBytes(int $bytes, int $precision = 2): string

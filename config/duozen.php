@@ -104,8 +104,7 @@ return [
         'provider_document' => env('DUOZEN_LEGAL_DOCUMENT'),
         'provider_address' => env('DUOZEN_LEGAL_ADDRESS'),
         'contact_email' => env('DUOZEN_LEGAL_EMAIL'),
-        // Texto exibido na Política de Privacidade, ex.: "90 dias". Deve refletir a rotina real de backup.
-        'backup_retention' => env('DUOZEN_LEGAL_BACKUP_RETENTION'),
+        // O prazo dos backups exibido na Política de Privacidade vem de backup.retention_days.
     ],
 
     'marketing' => [

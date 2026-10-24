@@ -113,10 +113,21 @@ class LegalComplianceTest extends TestCase
 
     public function test_politica_de_privacidade_e_publica(): void
     {
+        config(['backup.retention_days' => 0]);
+
         $this->get(route('legal.privacy'))
             ->assertOk()
             ->assertSee('Política de Privacidade')
             ->assertSee('art. 18 da LGPD', false)
             ->assertSee('[a preencher: prazo de guarda dos backups]', false);
+    }
+
+    public function test_politica_mostra_o_mesmo_prazo_usado_na_limpeza_dos_backups(): void
+    {
+        config(['backup.retention_days' => 90]);
+
+        $this->get(route('legal.privacy'))
+            ->assertSee('Cópias de segurança:</strong> até 90 dias', false)
+            ->assertDontSee('prazo de guarda dos backups', false);
     }
 }
