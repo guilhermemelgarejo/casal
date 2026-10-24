@@ -175,7 +175,7 @@ class BackupDatabaseToDrive extends Command
             return new GoogleDriveService($client);
         }
 
-        throw new Throwable('Credenciais do Google Drive não configuradas no .env.');
+        throw new \RuntimeException('Credenciais do Google Drive não configuradas no .env.');
     }
 
     protected function resolveCredentialsPath(?string $configuredPath): ?string
@@ -228,32 +228,38 @@ class BackupDatabaseToDrive extends Command
         if ($driver === 'sqlite') {
             $databasePath = $config['database'];
             if (!file_exists($databasePath)) {
-                throw new Throwable("Banco SQLite não encontrado no caminho: {$databasePath}");
+                throw new \RuntimeException("Banco SQLite não encontrado no caminho: {$databasePath}");
             }
             if (!copy($databasePath, $destinationPath)) {
-                throw new Throwable("Falha ao copiar banco SQLite para o arquivo temporário.");
+                throw new \RuntimeException("Falha ao copiar banco SQLite para o arquivo temporário.");
             }
             return;
         }
 
-        throw new Throwable("Driver de banco de dados '{$driver}' não suportado para dump automatizado.");
+        throw new \RuntimeException("Driver de banco de dados '{$driver}' não suportado para dump automatizado.");
     }
 
     protected function createEncryptedZip(string $sqlFilePath, string $internalFileName, string $zipFilePath, ?string $password): void
     {
         $zip = new ZipArchive();
         if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new Throwable("Não foi possível criar o arquivo ZIP em: {$zipFilePath}");
+            throw new \RuntimeException("Não foi possível criar o arquivo ZIP em: {$zipFilePath}");
         }
 
-        $zip->addFile($sqlFilePath, $internalFileName);
+        if (! $zip->addFile($sqlFilePath, $internalFileName)) {
+            throw new \RuntimeException('Falha ao adicionar o dump ao ZIP.');
+        }
 
         if (!empty($password)) {
             $zip->setPassword($password);
-            $zip->setEncryptionName($internalFileName, ZipArchive::EM_AES_256);
+            if (! $zip->setEncryptionName($internalFileName, ZipArchive::EM_AES_256)) {
+                throw new \RuntimeException('Falha ao ativar a criptografia do backup.');
+            }
         }
 
-        $zip->close();
+        if (! $zip->close()) {
+            throw new \RuntimeException('Falha ao concluir o arquivo de backup.');
+        }
     }
 
     protected function uploadToGoogleDrive(string $filePath, string $fileName, string $folderId): string
