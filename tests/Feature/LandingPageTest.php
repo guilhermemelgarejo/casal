@@ -21,8 +21,21 @@ class LandingPageTest extends TestCase
         $response->assertSee('application/ld+json', false);
     }
 
+    public function test_instagram_oficial_aparece_por_padrao(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertSee('https://www.instagram.com/duozen.app/', false);
+        $response->assertSee('@duozen.app');
+    }
+
     public function test_preco_e_redes_so_aparecem_quando_configurados(): void
     {
+        config([
+            'duozen.marketing.social' => [],
+            'duozen.marketing.social_handle' => null,
+        ]);
+
         $response = $this->get('/');
 
         $response->assertDontSee('/mês por casal');

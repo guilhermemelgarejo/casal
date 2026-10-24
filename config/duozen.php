@@ -92,9 +92,9 @@ return [
     'marketing' => [
         'tagline' => 'Menos briga por dinheiro. Mais planos juntos.',
         'price_amount' => ($raw = trim((string) env('DUOZEN_PUBLIC_PRICE_AMOUNT', ''))) === '' ? null : (float) str_replace(',', '.', $raw),
-        'social_handle' => env('DUOZEN_SOCIAL_HANDLE'),
+        'social_handle' => env('DUOZEN_SOCIAL_HANDLE', '@duozen.app'),
         'social' => array_filter([
-            'Instagram' => env('DUOZEN_SOCIAL_INSTAGRAM_URL'),
+            'Instagram' => env('DUOZEN_SOCIAL_INSTAGRAM_URL', 'https://www.instagram.com/duozen.app/'),
             'TikTok' => env('DUOZEN_SOCIAL_TIKTOK_URL'),
             'YouTube' => env('DUOZEN_SOCIAL_YOUTUBE_URL'),
             'Facebook' => env('DUOZEN_SOCIAL_FACEBOOK_URL'),

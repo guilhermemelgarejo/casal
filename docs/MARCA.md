@@ -72,20 +72,20 @@ Regras: não distorcer, não trocar as cores, manter área livre ao redor equiva
 
 ## 7. Perfis nas redes
 
+**Perfil oficial:** Instagram [@duozen.app](https://www.instagram.com/duozen.app/). Use o mesmo nome de usuário nas próximas redes (TikTok, YouTube, Facebook).
+
 **Bio sugerida (Instagram/TikTok, até 150 caracteres):**
 
 > Finanças a dois, em paz 💜💚 Menos briga por dinheiro, mais planos juntos. Teste 14 dias grátis 👇
 
-**Configuração na landing:** preencha no `.env` da hospedagem:
+**Configuração na landing:** o Instagram `@duozen.app` já é o padrão em `config/duozen.php`. Para as demais redes e o preço, preencha no `.env` da hospedagem:
 
 ```
 DUOZEN_PUBLIC_PRICE_AMOUNT=   # mesmo valor do preço no Stripe
-DUOZEN_SOCIAL_HANDLE=@seu.perfil
-DUOZEN_SOCIAL_INSTAGRAM_URL=https://www.instagram.com/seu.perfil
-DUOZEN_SOCIAL_TIKTOK_URL=https://www.tiktok.com/@seu.perfil
+DUOZEN_SOCIAL_TIKTOK_URL=https://www.tiktok.com/@duozen.app
 ```
 
-Os links e o preço só aparecem na página quando preenchidos. Use links com parâmetros UTM nos perfis (ex.: `?utm_source=instagram&utm_medium=bio`) para medir a origem dos cadastros.
+O preço e as demais redes só aparecem na página quando preenchidos. Use links com parâmetros UTM nos perfis (ex.: `?utm_source=instagram&utm_medium=bio`) para medir a origem dos cadastros.
 
 ## 8. Linhas de conteúdo
 
