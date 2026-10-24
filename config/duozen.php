@@ -79,4 +79,25 @@ return [
     |--------------------------------------------------------------------------
     */
     'billing_disabled' => filter_var(env('DUOZEN_BILLING_DISABLED', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Marca e divulgação (landing e redes sociais)
+    |--------------------------------------------------------------------------
+    |
+    | O preço público e os perfis só aparecem na landing quando configurados.
+    | O valor deve coincidir com o preço cadastrado no Stripe.
+    |
+    */
+    'marketing' => [
+        'tagline' => 'Menos briga por dinheiro. Mais planos juntos.',
+        'price_amount' => ($raw = trim((string) env('DUOZEN_PUBLIC_PRICE_AMOUNT', ''))) === '' ? null : (float) str_replace(',', '.', $raw),
+        'social_handle' => env('DUOZEN_SOCIAL_HANDLE'),
+        'social' => array_filter([
+            'Instagram' => env('DUOZEN_SOCIAL_INSTAGRAM_URL'),
+            'TikTok' => env('DUOZEN_SOCIAL_TIKTOK_URL'),
+            'YouTube' => env('DUOZEN_SOCIAL_YOUTUBE_URL'),
+            'Facebook' => env('DUOZEN_SOCIAL_FACEBOOK_URL'),
+        ], fn ($url) => is_string($url) && str_starts_with($url, 'https://')),
+    ],
 ];

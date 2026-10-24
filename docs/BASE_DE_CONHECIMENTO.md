@@ -57,7 +57,7 @@ public/vendor/bootstrap, public/css, public/js, `public/favicon.png` (marca; fal
 
 ## 4. Fluxo de acesso e rotas
 
-- **`/`** — `welcome` (landing), com seção pública sobre assinatura (`resources/views/partials/subscription-public-info.blade.php`).
+- **`/`** — `welcome` (landing comercial, estilos próprios em `public/css/landing.css`, prefixo `.lp-*`): hero com mockup ilustrativo do painel, perguntas do dia a dia, recursos, como funciona, plano, FAQ (`<details>`), CTA com compartilhamento no WhatsApp e rodapé. Metadados Open Graph/Twitter e JSON-LD `SoftwareApplication`; imagem de compartilhamento 1200×630 em `public/images/social/duozen-og.png`. Preço público (`DUOZEN_PUBLIC_PRICE_AMOUNT`), perfil (`DUOZEN_SOCIAL_HANDLE`) e redes (`DUOZEN_SOCIAL_*_URL`, só `https://`) vêm de `config('duozen.marketing')` e só aparecem quando configurados. Guia de marca e voz para redes em `docs/MARCA.md`. O partial `subscription-public-info` segue usado no registro (versão compacta).
 - **`/contato`** — página pública de contato (`contact.show` / `contact.send`), acessível também quando logado; envia e-mail para `guilherme.melgarejo@gmail.com` e inclui dados do usuário autenticado quando houver sessão.
 - **`auth`** sem `has-couple` — perfil (`profile.*`), casal (`couple.*`): criar, entrar, convidar, atualizar, sair.
 - **`auth` + `has-couple`** — assinatura (`billing.*`): página do plano, Checkout Stripe, sucesso, portal de faturamento.
