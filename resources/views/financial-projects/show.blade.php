@@ -943,12 +943,11 @@
                         </p>
                         <div>
                             <x-input-label for="interest_amount" value="Valor do rendimento (R$)" />
-                            <x-text-input
+                            <x-text-input data-money inputmode="decimal"
                                 id="interest_amount"
                                 name="amount"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
+                                type="text"
+                                data-money-min="0.01"
                                 class="mt-1 rounded-3"
                                 required
                                 placeholder="0,00"
@@ -1011,7 +1010,7 @@
 
                         <div>
                             <x-input-label for="fp-edit-target" value="Meta financeira (R$, opcional)" />
-                            <x-text-input id="fp-edit-target" name="target_amount" type="text" class="mt-1 rounded-3" value="{{ old('_cofrinho_form') === 'edit' ? old('target_amount') : ($cofrinho->target_amount !== null ? number_format((float) $cofrinho->target_amount, 2, ',', '.') : '') }}" placeholder="0,00" />
+                            <x-text-input data-money inputmode="decimal" id="fp-edit-target" name="target_amount" type="text" class="mt-1 rounded-3" value="{{ old('_cofrinho_form') === 'edit' ? old('target_amount') : ($cofrinho->target_amount !== null ? number_format((float) $cofrinho->target_amount, 2, ',', '.') : '') }}" placeholder="0,00" />
                             <x-input-error :messages="$errors->get('target_amount')" class="mt-2" />
                         </div>
                         <div>

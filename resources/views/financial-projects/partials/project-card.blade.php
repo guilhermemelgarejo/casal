@@ -319,12 +319,11 @@
                         </p>
                         <div>
                             <x-input-label for="interest_amount_{{ $p->id }}" value="Valor (R$)" />
-                            <x-text-input
+                            <x-text-input data-money inputmode="decimal"
                                 id="interest_amount_{{ $p->id }}"
                                 name="amount"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
+                                type="text"
+                                data-money-min="0.01"
                                 class="mt-1 rounded-3"
                                 required
                                 value="{{ old('amount') }}"

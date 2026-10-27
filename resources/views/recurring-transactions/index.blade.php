@@ -341,7 +341,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label" for="rt-amount">Valor total</label>
-                                <input type="number" step="0.01" min="0.01" name="amount" id="rt-amount" class="form-control @error('amount') is-invalid @enderror" value="{{ old('amount') }}" required placeholder="0,00">
+                                <input data-money inputmode="decimal" type="text" data-money-min="0.01" name="amount" id="rt-amount" class="form-control @error('amount') is-invalid @enderror" value="{{ old('amount') }}" required placeholder="0,00">
                                 @error('amount')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                         </div>
@@ -446,10 +446,9 @@
                                         </div>
                                         <div class="col-12 col-sm-6 col-md-4">
                                             <label class="form-label small text-secondary mb-0" for="rt-split-amt-{{ $i }}">Valor (R$)</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0.01"
+                                            <input data-money inputmode="decimal"
+                                                type="text"
+                                                data-money-min="0.01"
                                                 name="category_allocations[{{ $i }}][amount]"
                                                 id="rt-split-amt-{{ $i }}"
                                                 class="form-control form-control-sm mt-1 rt-cat-amount @if($errors->has('category_allocations.'.$i.'.amount') || $errors->has('category_allocations')) is-invalid @endif"
@@ -724,7 +723,7 @@
                 }
 
                 function formatCentsToMoney(cents) {
-                    return (Math.round(cents) / 100).toFixed(2);
+                    return window.DuozenMoney.format((Math.round(cents) / 100).toFixed(2));
                 }
 
                 function distributeAmountToCategories(totalCents) {

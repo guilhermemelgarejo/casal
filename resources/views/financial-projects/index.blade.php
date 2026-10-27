@@ -259,7 +259,7 @@
                                     <div class="row g-2">
                                         <div class="col-sm-7">
                                             <x-input-label for="fp-create-initial-balance" value="Saldo inicial (R$, opcional)" />
-                                            <x-text-input id="fp-create-initial-balance" name="initial_balance" type="text" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('initial_balance') : ''" placeholder="0,00" />
+                                            <x-text-input data-money inputmode="decimal" id="fp-create-initial-balance" name="initial_balance" type="text" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('initial_balance') : ''" placeholder="0,00" />
                                             <x-input-error :messages="$errors->get('initial_balance')" class="mt-2" />
                                         </div>
                                         <div class="col-sm-5">
@@ -289,7 +289,7 @@
                                         </div>
                                         <div class="col-6">
                                             <x-input-label for="fp-create-avg-price" value="Preço médio inicial (R$)" />
-                                            <x-text-input id="fp-create-avg-price" name="asset_avg_price" type="number" step="0.01" min="0" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('asset_avg_price') : ''" placeholder="0,00" />
+                                            <x-text-input data-money inputmode="decimal" id="fp-create-avg-price" name="asset_avg_price" type="text" data-money-min="0" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('asset_avg_price') : ''" placeholder="0,00" />
                                             <x-input-error :messages="$errors->get('asset_avg_price')" class="mt-2" />
                                         </div>
                                     </div>
@@ -297,7 +297,7 @@
 
                                 <div>
                                     <x-input-label for="fp-create-target" value="Meta financeira (R$, opcional)" />
-                                    <x-text-input id="fp-create-target" name="target_amount" type="text" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('target_amount') : ''" placeholder="0,00" />
+                                    <x-text-input data-money inputmode="decimal" id="fp-create-target" name="target_amount" type="text" class="mt-1 rounded-3" :value="old('_cofrinho_form') === 'create' ? old('target_amount') : ''" placeholder="0,00" />
                                     <x-input-error :messages="$errors->get('target_amount')" class="mt-2" />
                                 </div>
                                 <div>
@@ -388,7 +388,7 @@
                                         </div>
                                         <div class="col-6">
                                             <x-input-label for="fp-edit-avg-price" value="Preço médio (R$)" />
-                                            <x-text-input id="fp-edit-avg-price" name="asset_avg_price" type="number" step="0.01" min="0" class="mt-1 rounded-3" value="" placeholder="0,00" />
+                                            <x-text-input data-money inputmode="decimal" id="fp-edit-avg-price" name="asset_avg_price" type="text" data-money-min="0" class="mt-1 rounded-3" value="" placeholder="0,00" />
                                             <x-input-error :messages="$errors->get('asset_avg_price')" class="mt-2" />
                                         </div>
                                     </div>
@@ -396,7 +396,7 @@
 
                                 <div>
                                     <x-input-label for="fp-edit-target" value="Meta financeira (R$, opcional)" />
-                                    <x-text-input id="fp-edit-target" name="target_amount" type="text" class="mt-1 rounded-3" value="{{ old('_cofrinho_form') === 'edit' ? old('target_amount') : '' }}" placeholder="0,00" />
+                                    <x-text-input data-money inputmode="decimal" id="fp-edit-target" name="target_amount" type="text" class="mt-1 rounded-3" value="{{ old('_cofrinho_form') === 'edit' ? old('target_amount') : '' }}" placeholder="0,00" />
                                     <x-input-error :messages="$errors->get('target_amount')" class="mt-2" />
                                 </div>
                                 <div>

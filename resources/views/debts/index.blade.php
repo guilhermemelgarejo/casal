@@ -923,7 +923,7 @@
                         <div class="row g-2">
                             <div class="col-md-6">
                                 <label for="create_debt_total_amount" class="form-label fw-semibold small text-secondary mb-1">Valor Total da Dívida (R$) *</label>
-                                <input type="text" class="form-control rounded-3 fw-bold @error('total_amount') is-invalid @enderror" id="create_debt_total_amount" name="total_amount" placeholder="0,00" value="{{ old('total_amount') }}" required oninput="recalcInstallmentAmount('total')">
+                                <input data-money inputmode="decimal" type="text" class="form-control rounded-3 fw-bold @error('total_amount') is-invalid @enderror" id="create_debt_total_amount" name="total_amount" placeholder="0,00" value="{{ old('total_amount') }}" required oninput="recalcInstallmentAmount('total')">
                                 @error('total_amount')
                                     <div class="invalid-feedback d-block mt-1 small">{{ $message }}</div>
                                 @enderror
@@ -946,7 +946,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="create_debt_installment_amount" class="form-label fw-semibold small text-secondary mb-1">Valor da Parcela (R$)</label>
-                                    <input type="text" class="form-control rounded-3 @error('installment_amount') is-invalid @enderror" id="create_debt_installment_amount" name="installment_amount" placeholder="Calculado automaticamente" value="{{ old('installment_amount') }}" oninput="recalcInstallmentAmount('installment')">
+                                    <input data-money inputmode="decimal" type="text" class="form-control rounded-3 @error('installment_amount') is-invalid @enderror" id="create_debt_installment_amount" name="installment_amount" placeholder="Calculado automaticamente" value="{{ old('installment_amount') }}" oninput="recalcInstallmentAmount('installment')">
                                     @error('installment_amount')
                                         <div class="invalid-feedback d-block mt-1 small">{{ $message }}</div>
                                     @enderror
@@ -1039,7 +1039,7 @@
                                     Restaurar original
                                 </button>
                             </div>
-                            <input type="text" class="form-control rounded-3 fw-bold fs-5 text-success" id="pay_amount" name="amount" required>
+                            <input data-money inputmode="decimal" type="text" class="form-control rounded-3 fw-bold fs-5 text-success" id="pay_amount" name="amount" required>
                             <div class="small text-secondary mt-1">Você pode ajustar caso tenha ocorrido juros ou desconto.</div>
                         </div>
 
@@ -1158,7 +1158,7 @@
                                             </div>
                                             <div class="col-sm-6">
                                                 <label class="small text-secondary mb-1">Novo valor que esta parcela ficará (R$):</label>
-                                                <input type="text" class="form-control form-control-sm rounded-3" id="amortize_residual_amount" name="residual_new_amount" placeholder="0,00">
+                                                <input data-money inputmode="decimal" type="text" class="form-control form-control-sm rounded-3" id="amortize_residual_amount" name="residual_new_amount" placeholder="0,00">
                                             </div>
                                         </div>
                                     </div>
@@ -1173,7 +1173,7 @@
                                         <label for="amortize_new_installment_amount" class="form-label fw-semibold small text-secondary mb-1">
                                             Novo valor em que as parcelas restantes ficarão (R$)
                                         </label>
-                                        <input type="text" class="form-control rounded-3 fw-bold text-success" id="amortize_new_installment_amount" name="new_installment_amount" placeholder="0,00">
+                                        <input data-money inputmode="decimal" type="text" class="form-control rounded-3 fw-bold text-success" id="amortize_new_installment_amount" name="new_installment_amount" placeholder="0,00">
                                         <div class="form-text small" id="amortize_new_amount_hint">
                                             Calculado automaticamente com base no valor amortizado, mas você pode editar para definir o valor exato desejado.
                                         </div>
@@ -1210,7 +1210,7 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="amortize_amount" class="form-label fw-semibold small text-secondary mb-1">Valor Total a Amortizar / Pagar (R$) *</label>
-                                <input type="text" class="form-control rounded-3 fw-bold fs-5 text-primary" id="amortize_amount" name="amount" placeholder="0,00" required>
+                                <input data-money inputmode="decimal" type="text" class="form-control rounded-3 fw-bold fs-5 text-primary" id="amortize_amount" name="amount" placeholder="0,00" required>
                                 <div id="amortize_amount_discount_badge" class="small mt-1 text-success fw-semibold" style="display: none;"></div>
                             </div>
                             <div class="col-md-6">
@@ -1281,7 +1281,7 @@
                         <div class="row g-2">
                             <div class="col-md-7">
                                 <label for="edit_debt_total_amount" class="form-label fw-semibold small text-secondary mb-1">Valor Total da Dívida (R$)</label>
-                                <input type="text" class="form-control rounded-3 fw-bold" id="edit_debt_total_amount" name="total_amount" placeholder="0,00">
+                                <input data-money inputmode="decimal" type="text" class="form-control rounded-3 fw-bold" id="edit_debt_total_amount" name="total_amount" placeholder="0,00">
                                 <div class="form-text" style="font-size: 0.72rem;">Não pode ser menor que o total já pago e comprometido em parcelas.</div>
                             </div>
                             <div class="col-md-5">
@@ -1549,7 +1549,7 @@
                                     <label for="adjust_new_installment_amount" class="form-label fw-semibold small text-secondary mb-1">
                                         Novo Valor da Parcela (R$) *
                                     </label>
-                                    <input type="text" class="form-control form-control-lg rounded-3 fw-bold" id="adjust_new_installment_amount" name="new_installment_amount" placeholder="0,00" required>
+                                    <input data-money inputmode="decimal" type="text" class="form-control form-control-lg rounded-3 fw-bold" id="adjust_new_installment_amount" name="new_installment_amount" placeholder="0,00" required>
                                     <div class="form-text mt-1" style="font-size: 0.72rem;">
                                         Valor aplicado às parcelas restantes.
                                     </div>
@@ -1623,7 +1623,7 @@
                                 <label for="add_inst_amount" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Valor da Parcela <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text border-end-0 fw-semibold text-secondary" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border);">R$</span>
-                                    <input type="text" class="form-control border-start-0 ps-1 fw-bold" id="add_inst_amount" name="amount" placeholder="0,00" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                                    <input data-money inputmode="decimal" type="text" class="form-control border-start-0 ps-1 fw-bold" id="add_inst_amount" name="amount" placeholder="0,00" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
                                 </div>
                             </div>
                             <div class="col-12 col-sm-6">
@@ -1683,7 +1683,7 @@
                                 <label for="edit_inst_amount" class="form-label small fw-semibold" style="color: var(--dz-text-title);">Valor da Parcela <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text border-end-0 fw-semibold text-secondary" style="background: var(--dz-bg-card-subtle); border-color: var(--dz-border);">R$</span>
-                                    <input type="text" class="form-control border-start-0 ps-1 fw-bold" id="edit_inst_amount" name="amount" placeholder="0,00" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
+                                    <input data-money inputmode="decimal" type="text" class="form-control border-start-0 ps-1 fw-bold" id="edit_inst_amount" name="amount" placeholder="0,00" required style="background: var(--dz-bg-card); border-color: var(--dz-border); color: var(--dz-text-title);">
                                 </div>
                             </div>
                             <div class="col-12 col-sm-6">
@@ -2060,7 +2060,7 @@
                     <td>${item.due_date}</td>
                     <td>R$ ${formatMoneyNumber(item.amount)}</td>
                     <td>
-                        <input type="text" class="form-control form-control-sm js-select-inst-paid" name="selected_installments[${idx}][paid_amount]" value="${formatMoneyNumber(item.amount)}" disabled style="max-width: 120px;">
+                        <input data-money inputmode="decimal" type="text" class="form-control form-control-sm js-select-inst-paid" name="selected_installments[${idx}][paid_amount]" value="${formatMoneyNumber(item.amount)}" disabled style="max-width: 120px;">
                     </td>
                     <td>
                         <div class="d-flex flex-column gap-1">
@@ -2069,7 +2069,7 @@
                                 <label class="form-check-label text-muted" style="font-size: 0.72rem;">Parcial</label>
                             </div>
                             <div class="js-select-inst-residual-wrap" style="display: none;">
-                                <input type="text" class="form-control form-control-sm js-select-inst-remaining" name="selected_installments[${idx}][new_remaining_amount]" placeholder="Novo saldo (R$)" style="max-width: 110px;">
+                                <input data-money inputmode="decimal" type="text" class="form-control form-control-sm js-select-inst-remaining" name="selected_installments[${idx}][new_remaining_amount]" placeholder="Novo saldo (R$)" style="max-width: 110px;">
                             </div>
                         </div>
                     </td>

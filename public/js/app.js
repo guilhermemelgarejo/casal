@@ -586,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const formatCentsToMoney = (cents) => {
         const v = (Math.round(cents) / 100).toFixed(2);
-        return v;
+        return window.DuozenMoney.format(v);
     };
 
     const distributeTotalAcrossAllocations = (totalCents, wrapEl) => {

@@ -78,11 +78,10 @@
                         <div class="row g-2">
                             <div class="col-6">
                                 <x-input-label for="edit-tx-amount" value="Valor (R$)" />
-                                <x-text-input
+                                <x-text-input data-money inputmode="decimal"
                                     id="edit-tx-amount"
                                     name="amount"
-                                    type="number"
-                                    step="0.01"
+                                    type="text"
                                     class="mt-1"
                                     required
                                     value="{{ ($editTransactionModalMeta ?? [])['amount'] ?? '' }}"
@@ -198,10 +197,9 @@
                                         </div>
                                         <div class="col-12 col-sm-6 col-md-4">
                                             <label class="form-label small text-secondary mb-0" for="edit-tx-split-amt-{{ $si }}">Valor (R$)</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0.01"
+                                            <input data-money inputmode="decimal"
+                                                type="text"
+                                                data-money-min="0.01"
                                                 name="category_allocations[{{ $si }}][amount]"
                                                 id="edit-tx-split-amt-{{ $si }}"
                                                 class="form-control mt-1 js-tx-split-amount"
@@ -412,7 +410,7 @@
                                     <div class="row g-2">
                                         <div class="col-6">
                                             <x-input-label for="amount" value="Valor (R$)" />
-                                            <x-text-input id="amount" name="amount" type="number" step="0.01" class="mt-1" required value="{{ old('amount') }}" placeholder="0,00" />
+                                            <x-text-input data-money inputmode="decimal" id="amount" name="amount" type="text" class="mt-1" required value="{{ old('amount') }}" placeholder="0,00" />
                                             <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                                         </div>
                                         <div class="col-6">
@@ -522,10 +520,9 @@
                                                 </div>
                                                 <div class="col-12 col-sm-6 col-md-4">
                                                     <label class="form-label small text-secondary mb-0" for="tx-split-amt-{{ $si }}">Valor (R$)</label>
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0.01"
+                                                    <input data-money inputmode="decimal"
+                                                        type="text"
+                                                        data-money-min="0.01"
                                                         name="category_allocations[{{ $si }}][amount]"
                                                         id="tx-split-amt-{{ $si }}"
                                                         class="form-control mt-1 js-tx-split-amount"

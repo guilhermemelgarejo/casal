@@ -173,7 +173,7 @@
                         </div>
                         <div>
                             <x-input-label for="edit-limit-{{ $account->id }}" value="Limite total do cartão (R$)" />
-                            <x-text-input id="edit-limit-{{ $account->id }}" name="credit_card_limit_total" type="number" step="0.01" min="0.01" class="mt-1 rounded-3" placeholder="Ex.: 5000" value="{{ old('_form') === 'account-update-'.$account->id ? old('credit_card_limit_total') : ($account->credit_card_limit_total !== null ? $account->credit_card_limit_total : '') }}" />
+                            <x-text-input data-money inputmode="decimal" id="edit-limit-{{ $account->id }}" name="credit_card_limit_total" type="text" data-money-min="0.01" class="mt-1 rounded-3" placeholder="Ex.: 5000" value="{{ old('_form') === 'account-update-'.$account->id ? old('credit_card_limit_total') : ($account->credit_card_limit_total !== null ? $account->credit_card_limit_total : '') }}" />
                             <x-input-error :messages="$errors->get('credit_card_limit_total')" class="mt-1" />
                         </div>
                     @else
@@ -217,7 +217,7 @@
                     <div class="modal-body vstack gap-3 p-4">
                         <div>
                             <x-input-label for="yield_amount_{{ $account->id }}" value="Valor do rendimento (R$)" />
-                            <x-text-input id="yield_amount_{{ $account->id }}" name="amount" type="number" step="0.01" min="0.01" class="mt-1 rounded-3" placeholder="0,00" required autofocus />
+                            <x-text-input data-money inputmode="decimal" id="yield_amount_{{ $account->id }}" name="amount" type="text" data-money-min="0.01" class="mt-1 rounded-3" placeholder="0,00" required autofocus />
                         </div>
                         <div>
                             <x-input-label for="yield_date_{{ $account->id }}" value="Data do rendimento" />

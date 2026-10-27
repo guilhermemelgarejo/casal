@@ -440,7 +440,7 @@
                                                     </div>
                                                     <div>
                                                         <x-input-label for="payStatementAmount" value="Valor (opcional)" />
-                                                        <input type="text" inputmode="decimal" id="payStatementAmount" name="amount" class="form-control mt-1" value="{{ old('amount') }}" placeholder="">
+                                                        <input data-money type="text" inputmode="decimal" id="payStatementAmount" name="amount" class="form-control mt-1" value="{{ old('amount') }}" placeholder="">
                                                         <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                                                     </div>
                                                 </div>
@@ -473,7 +473,7 @@
                                                 <div class="vstack gap-3 mb-0">
                                                     <div id="editStatementTotalWrap" class="d-none">
                                                         <x-input-label for="editStatementTotal" value="Total da fatura (avulsa)" />
-                                                        <input type="text" inputmode="decimal" name="spent_total" id="editStatementTotal" class="form-control mt-1" value="{{ old('spent_total') }}">
+                                                        <input data-money type="text" inputmode="decimal" name="spent_total" id="editStatementTotal" class="form-control mt-1" value="{{ old('spent_total') }}">
                                                         <x-input-error :messages="$errors->get('spent_total')" class="mt-2" />
                                                     </div>
 
@@ -543,7 +543,7 @@
                                                 </div>
                                                 <div class="col-12">
                                                     <x-input-label for="avulsaTotal" value="Total da fatura" />
-                                                    <input type="text" inputmode="decimal" id="avulsaTotal" name="spent_total" class="form-control mt-1" required value="{{ old('spent_total') }}" placeholder="Ex.: 1234,56">
+                                                    <input data-money type="text" inputmode="decimal" id="avulsaTotal" name="spent_total" class="form-control mt-1" required value="{{ old('spent_total') }}" placeholder="Ex.: 1234,56">
                                                     <x-input-error :messages="$errors->get('spent_total')" class="mt-2" />
                                                 </div>
                                                 <div class="col-12">
@@ -625,39 +625,6 @@
                             </script>
                             <script>
                                 (function () {
-                                    const maskMoneyPtBr = (inputEl) => {
-                                        if (!inputEl) return;
-
-                                        const format = (raw) => {
-                                            let s = String(raw || '');
-                                            // Mantém apenas dígitos.
-                                            s = s.replace(/[^\d]/g, '');
-                                            if (s === '') return '';
-
-                                            // Converte para centavos (sempre 2 casas).
-                                            while (s.length < 3) s = '0' + s;
-                                            const cents = s.slice(-2);
-                                            let intPart = s.slice(0, -2);
-
-                                            // Remove zeros à esquerda (mas mantém pelo menos 0).
-                                            intPart = intPart.replace(/^0+(?=\d)/, '');
-                                            if (intPart === '') intPart = '0';
-
-                                            // Milhar com ponto.
-                                            intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                            return `${intPart},${cents}`;
-                                        };
-
-                                        const apply = () => {
-                                            const cur = inputEl.value;
-                                            const next = format(cur);
-                                            inputEl.value = next;
-                                        };
-
-                                        inputEl.addEventListener('input', apply);
-                                        inputEl.addEventListener('blur', apply);
-                                    };
-
                                     const itemsModalEl = document.getElementById('statementItemsModal');
                                     const itemsSubtitleEl = document.getElementById('statementItemsSubtitle');
                                     const itemsCountBadge = document.getElementById('statementItemsCountBadge');
@@ -727,7 +694,6 @@
                                     const editTotalWrap = document.getElementById('editStatementTotalWrap');
                                     const editTotalInput = document.getElementById('editStatementTotal');
                                     const editLockedHint = document.getElementById('editStatementLockedHint');
-                                    maskMoneyPtBr(editTotalInput);
                                     if (editModalEl && editForm) {
                                         editModalEl.addEventListener('show.bs.modal', function (e) {
                                             const btn = e.relatedTarget;
@@ -805,7 +771,6 @@
                                     }
 
                                     const avulsaTotalInput = document.getElementById('avulsaTotal');
-                                    maskMoneyPtBr(avulsaTotalInput);
 
                                     @if ($openEditReopen)
                                     document.addEventListener('DOMContentLoaded', function () {

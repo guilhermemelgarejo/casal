@@ -127,12 +127,11 @@
                     @csrf
                     <input type="hidden" name="_form" value="budget-store">
                     <input type="hidden" name="category_id" value="{{ $category->id }}">
-                    <input
-                        type="number"
+                    <input data-money
+                        type="text"
                         name="amount"
                         id="budget_amount_{{ $category->id }}"
-                        step="0.01"
-                        min="0"
+                        data-money-min="0"
                         required
                         class="form-control form-control-sm cat-item-card__budget-input flex-grow-1 {{ $isBudgetErrorRow && $errors->has('amount') ? 'is-invalid' : '' }}"
                         value="{{ $isBudgetErrorRow ? old('amount') : ($budget ? number_format((float) $budget->amount, 2, '.', '') : '') }}"

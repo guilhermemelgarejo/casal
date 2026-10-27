@@ -2,6 +2,7 @@
     $bsJs = public_path('lib/bootstrap/js/bootstrap.bundle.min.js');
     $swalJs = public_path('lib/sweetalert2/sweetalert2.all.min.js');
     $appJs = public_path('js/app.js');
+    $moneyJs = public_path('js/money.js');
 @endphp
 <script src="{{ asset('lib/bootstrap/js/bootstrap.bundle.min.js') }}?v={{ file_exists($bsJs) ? filemtime($bsJs) : 1 }}"></script>
 @if (file_exists($swalJs))
@@ -21,4 +22,5 @@
 @if (file_exists($fpMs))
     <script src="{{ asset('lib/flatpickr/plugins/monthSelect/index.js') }}?v={{ filemtime($fpMs) }}"></script>
 @endif
+<script src="{{ asset('js/money.js') }}?v={{ file_exists($moneyJs) ? filemtime($moneyJs) : 1 }}"></script>
 <script src="{{ asset('js/app.js') }}?v={{ file_exists($appJs) ? filemtime($appJs) : 1 }}" defer></script>

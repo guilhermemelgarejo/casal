@@ -37,7 +37,7 @@
 
                     <div>
                         <x-input-label for="asset_amount_{{ $p->id }}" value="Valor investido (R$)" />
-                        <x-text-input
+                        <x-text-input data-money
                             id="asset_amount_{{ $p->id }}"
                             name="amount"
                             type="text"
@@ -51,7 +51,7 @@
                     <div class="row g-2">
                         <div class="col-6">
                             <x-input-label for="asset_price_{{ $p->id }}" value="Cotação / Preço (R$)" />
-                            <x-text-input
+                            <x-text-input data-money data-money-precision="8"
                                 id="asset_price_{{ $p->id }}"
                                 name="asset_unit_price"
                                 type="text"

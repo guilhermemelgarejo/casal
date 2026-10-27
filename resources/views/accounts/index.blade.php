@@ -271,7 +271,7 @@
 
                         <div id="account-limit-wrap" class="{{ $kindOld === Account::KIND_CREDIT_CARD ? '' : 'd-none' }}">
                             <x-input-label for="credit_card_limit_total" value="Limite total do cartão (R$)" />
-                            <x-text-input id="credit_card_limit_total" name="credit_card_limit_total" type="number" step="0.01" min="0.01" class="mt-1" placeholder="Opcional — ex.: 5000" value="{{ old('_form') === 'account-store' ? old('credit_card_limit_total') : '' }}" />
+                            <x-text-input data-money inputmode="decimal" id="credit_card_limit_total" name="credit_card_limit_total" type="text" data-money-min="0.01" class="mt-1" placeholder="Opcional — ex.: 5000" value="{{ old('_form') === 'account-store' ? old('credit_card_limit_total') : '' }}" />
                             <x-input-error :messages="$errors->get('credit_card_limit_total')" class="mt-2" />
                             <p class="form-text mb-0">Sem limite, o cartão não é controlado nos lançamentos. Com limite, o disponível considera faturas em aberto.</p>
                         </div>

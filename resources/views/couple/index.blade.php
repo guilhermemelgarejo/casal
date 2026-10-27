@@ -725,7 +725,7 @@
 
                             <div class="couple-settings-modal__field">
                                 <x-input-label for="monthly_income" value="Renda mensal do casal (R$)" />
-                                <x-text-input id="monthly_income" name="monthly_income" type="number" step="0.01" class="mt-1 rounded-3" value="{{ $couple->monthly_income }}" />
+                                <x-text-input data-money inputmode="decimal" id="monthly_income" name="monthly_income" type="text" class="mt-1 rounded-3" value="{{ $couple->monthly_income }}" />
                                 <x-input-error :messages="$errors->get('monthly_income')" class="mt-2" />
                             </div>
 

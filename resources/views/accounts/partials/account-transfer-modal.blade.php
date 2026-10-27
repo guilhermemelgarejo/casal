@@ -65,7 +65,7 @@
 
                         <div>
                             <x-input-label for="transfer_amount" value="Valor (R$)" />
-                            <x-text-input
+                            <x-text-input data-money
                                 id="transfer_amount"
                                 name="amount"
                                 type="text"
