@@ -221,8 +221,8 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
-                                    <div class="fw-bolder dz-privacy-blur {{ $isIncome ? 'text-success' : 'text-danger' }}" style="font-size: 1.05rem; margin-top: 0.15rem;">
-                                        {{ $isIncome ? '+' : '-' }} R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur {{ $isIncome ? 'text-success' : '' }}" style="font-size: 1.05rem; margin-top: 0.15rem; color: var(--dz-text-title);">
+                                        {{ $isIncome ? '+ ' : '' }}R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
                                     </div>
                                 </div>
                                 @if($isIncome)
@@ -265,8 +265,8 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $dInst->debt->name }} (Boleto/Conta)">{{ $dInst->debt->name }}</div>
-                                    <div class="fw-bolder dz-privacy-blur text-danger" style="font-size: 1.05rem; margin-top: 0.15rem;">
-                                        - R$ {{ number_format((float) $dInst->amount, 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur" style="font-size: 1.05rem; margin-top: 0.15rem; color: var(--dz-text-title);">
+                                        R$ {{ number_format((float) $dInst->amount, 2, ',', '.') }}
                                     </div>
                                 </div>
                                 <a href="{{ route('debts.index', ['tab' => 'agenda', 'month' => $due?->month ?? $month, 'year' => $due?->year ?? $year]) }}" class="btn btn-sm rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center; background: rgba(245, 158, 11, 0.15); color: #D97706; border: 1px solid rgba(245, 158, 11, 0.35);" title="Pagar na agenda">
@@ -300,8 +300,8 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $inv['account_name'] }}">{{ $inv['account_name'] }}</div>
-                                    <div class="fw-bolder dz-privacy-blur text-danger" style="font-size: 1.05rem; margin-top: 0.15rem;">
-                                        - R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur" style="font-size: 1.05rem; margin-top: 0.15rem; color: var(--dz-text-title);">
+                                        R$ {{ number_format((float) $inv['remaining'], 2, ',', '.') }}
                                     </div>
                                 </div>
                                 <a href="{{ $inv['statements_url'] }}" class="btn btn-sm btn-outline-primary rounded-pill w-100 py-1 fw-bold" style="font-size: 0.72rem; text-align: center;" title="Ver fatura do cartão">
@@ -338,8 +338,8 @@
                                 </div>
                                 <div class="dz-reminder-chip__body">
                                     <div class="fw-bold text-truncate" style="font-size: 0.88rem; color: var(--dz-text-title);" title="{{ $rec->description }}">{{ $rec->description }}</div>
-                                    <div class="fw-bolder dz-privacy-blur {{ $isIncome ? 'text-success' : 'text-danger' }}" style="font-size: 1.05rem; margin-top: 0.15rem;">
-                                        {{ $isIncome ? '+' : '-' }} R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
+                                    <div class="fw-bolder dz-privacy-blur {{ $isIncome ? 'text-success' : '' }}" style="font-size: 1.05rem; margin-top: 0.15rem; color: var(--dz-text-title);">
+                                        {{ $isIncome ? '+ ' : '' }}R$ {{ number_format((float) $rec->amount, 2, ',', '.') }}
                                     </div>
                                 </div>
                                 @if($isIncome)

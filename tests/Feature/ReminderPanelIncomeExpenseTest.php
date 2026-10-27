@@ -101,9 +101,15 @@ class ReminderPanelIncomeExpenseTest extends TestCase
             $response->assertSee('+ Lançar Receita', false);
             $response->assertSee('+ Lançar Despesa', false);
 
-            // Valida formatação dos valores com + e -
+            // Receitas mantêm o sinal positivo; despesas aparecem sem sinal negativo.
             $response->assertSee('+ R$ 6.000,00', false);
-            $response->assertSee('- R$ 2.500,00', false);
+            $document = new \DOMDocument;
+            @$document->loadHTML($response->getContent());
+            $expenseAmount = (new \DOMXPath($document))
+                ->query('//div[@data-kind="expense"]//div[contains(@class, "dz-privacy-blur")]')->item(0);
+            $this->assertNotNull($expenseAmount);
+            $this->assertSame('R$ 2.500,00', trim($expenseAmount->textContent));
+            $this->assertStringNotContainsString('text-danger', $expenseAmount->getAttribute('class'));
         } finally {
             $this->travelBack();
         }
