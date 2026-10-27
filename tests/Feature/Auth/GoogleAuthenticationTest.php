@@ -243,16 +243,108 @@ class GoogleAuthenticationTest extends TestCase
         $this->get(route('google.redirect'))->assertStatus(429);
     }
 
-    public function test_matching_email_never_links_or_modifies_existing_account(): void
+    public function test_verified_gmail_links_and_logs_into_existing_password_account_without_changing_profile(): void
     {
-        $user = User::factory()->unverified()->create(['email' => 'google.person@gmail.com']);
+        $couple = Couple::factory()->create();
+        $user = User::factory()->unverified()->create([
+            'email' => 'google.person@gmail.com', 'couple_id' => $couple->id, 'stripe_id' => 'cus_existing_google_login',
+        ]);
         $before = $user->fresh()->getAttributes();
         $this->queueIdentity();
+        $this->get(route('google.redirect'));
+        $oldSession = session()->getId();
+        $this->withSession(['url.intended' => '/profile'])->get($this->callbackUrl())
+            ->assertRedirect('/profile')->assertSessionHasNoErrors()->assertSessionMissing('google_registration');
+        $this->assertAuthenticatedAs($user);
+        $this->assertNotSame($oldSession, session()->getId());
+        $this->assertSame($before, $user->fresh()->getAttributes());
+        $this->assertTrue(Hash::check('password', $user->fresh()->password));
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('social_accounts', 1);
+        $this->assertDatabaseHas('social_accounts', ['user_id' => $user->id, 'provider_user_id' => 'google-sub-123']);
+        Notification::assertNothingSent();
+    }
+
+    public function test_automatically_linked_account_can_still_login_with_original_password(): void
+    {
+        $user = User::factory()->create(['email' => 'google.person@gmail.com']);
+        $this->queueIdentity();
+        $this->get(route('google.redirect'));
+        $this->get($this->callbackUrl())->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($user);
+        $this->post('/logout');
+        $this->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_verified_workspace_matches_existing_email_case_insensitively(): void
+    {
+        $user = User::factory()->create(['email' => 'Pessoa@Empresa.Example']);
+        $before = $user->fresh()->getAttributes();
+        $this->queueIdentity(['email' => 'pessoa@empresa.example', 'hd' => 'empresa.example']);
+        $this->get(route('google.redirect'));
+        $this->get($this->callbackUrl())->assertRedirect('/dashboard')->assertSessionHasNoErrors();
+        $this->assertAuthenticatedAs($user);
+        $this->assertSame($before, $user->fresh()->getAttributes());
+        $this->assertDatabaseHas('social_accounts', ['user_id' => $user->id]);
+    }
+
+    public function test_matching_external_email_still_requires_password_before_first_link(): void
+    {
+        $user = User::factory()->create(['email' => 'person@example.com']);
+        $before = $user->fresh()->getAttributes();
+        $this->queueIdentity(['email' => $user->email]);
         $this->get(route('google.redirect'));
         $this->get($this->callbackUrl())->assertRedirect(route('login'))->assertSessionHasErrors('google');
         $this->assertGuest();
         $this->assertSame($before, $user->fresh()->getAttributes());
         $this->assertDatabaseCount('social_accounts', 0);
+    }
+
+    public function test_unverified_gmail_cannot_link_to_existing_password_account(): void
+    {
+        $user = User::factory()->create(['email' => 'google.person@gmail.com']);
+        $before = $user->fresh()->getAttributes();
+        $this->queueIdentity(['email_verified' => false]);
+        $this->get(route('google.redirect'));
+        $this->get($this->callbackUrl())->assertSessionHasErrors('google');
+        $this->assertGuest();
+        $this->assertSame($before, $user->fresh()->getAttributes());
+        $this->assertDatabaseCount('social_accounts', 0);
+    }
+
+    public function test_matching_email_cannot_replace_a_different_google_subject(): void
+    {
+        $user = $this->googleUser(['email' => 'google.person@gmail.com', 'password' => 'password'], 'original-google-sub');
+        $before = $user->fresh()->getAttributes();
+        $this->queueIdentity();
+        $this->get(route('google.redirect'));
+        $this->get($this->callbackUrl())->assertSessionHasErrors('google');
+        $this->assertGuest();
+        $this->assertSame($before, $user->fresh()->getAttributes());
+        $this->assertDatabaseCount('social_accounts', 1);
+        $this->assertDatabaseHas('social_accounts', ['user_id' => $user->id, 'provider_user_id' => 'original-google-sub']);
+    }
+
+    public function test_existing_user_login_ignores_registration_invite_and_reuses_the_link_on_next_login(): void
+    {
+        $original = Couple::factory()->create();
+        $invited = Couple::factory()->create();
+        $user = User::factory()->create(['email' => 'google.person@gmail.com', 'couple_id' => $original->id]);
+        $before = $user->fresh()->getAttributes();
+        $this->queueIdentity();
+        $this->get(route('google.redirect', ['invite_code' => $invited->invite_code]));
+        $this->get($this->callbackUrl())->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($user);
+        $this->assertSame($before, $user->fresh()->getAttributes());
+        $this->post('/logout');
+        $this->queueIdentity();
+        $this->get(route('google.redirect'));
+        $this->get($this->callbackUrl())->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('social_accounts', 1);
+        $this->assertSame($original->id, $user->fresh()->couple_id);
     }
 
     public function test_registration_rechecks_email_conflicts_after_callback(): void

@@ -54,9 +54,15 @@ necessários ao cadastro, por até dez minutos; o prazo é conferido a cada uso.
   aceite usa o canal `legal`, com a mesma versão dos termos do cadastro comum.
 - O convite é mantido na sessão e revalidado pelo `CoupleMembershipService` na
   conclusão. Convite inválido ou casal lotado desfaz usuário e vínculo na transação.
-- E-mail local já existente exige entrada na conta existente e vinculação no
-  perfil com a senha atual. Se a pessoa perdeu a senha, pode usar a recuperação
-  por e-mail. Não há associação automática nem atualização de usuários protegidos.
+- Para e-mail já cadastrado, Gmail ou Workspace (`hd` presente) com
+  `email_verified=true` permite vincular e entrar diretamente pelo botão Google,
+  mesmo que a conta tenha senha local. Apenas `social_accounts` recebe o novo
+  vínculo: senha, nome, verificação local, casal, assinatura e histórico continuam
+  intactos. Um vínculo existente com outro `sub` nunca é substituído.
+- Para outros domínios, o primeiro vínculo continua exigindo entrada com senha e
+  vinculação no perfil, pois o Google não comprova a posse atual desses e-mails.
+  A recuperação por e-mail também continua disponível. Após o vínculo, a entrada
+  usa o `sub`, inclusive quando o e-mail do Google muda.
 - `email_verified` do Google deve ser verdadeiro. Para novos usuários Gmail ou
   Workspace (`hd` presente), o e-mail local começa verificado. Para outros
   domínios, permanece não verificado e o Laravel envia seu link de verificação.

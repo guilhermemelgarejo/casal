@@ -135,8 +135,16 @@ class GoogleAuthController extends Controller
             return $this->login($request, $user);
         }
 
-        if ($this->emailExists($identity['email'])) {
-            return $this->fail($request, 'Este e-mail já possui cadastro. Entre com sua senha e vincule o Google em Meu Perfil. Se necessário, use Esqueceu a senha.');
+        try {
+            $user = $this->findOrLinkExistingUser($identity);
+        } catch (ValidationException $exception) {
+            return $this->fail($request, $exception->errors()['google'][0]);
+        } catch (UniqueConstraintViolationException) {
+            return $this->fail($request, 'Esta conta Google já possui um vínculo. Tente novamente ou entre com sua senha.');
+        }
+
+        if ($user) {
+            return $this->login($request, $user);
         }
 
         $request->session()->regenerate();
@@ -145,6 +153,39 @@ class GoogleAuthController extends Controller
         ]);
 
         return redirect()->route('google.register');
+    }
+
+    private function findOrLinkExistingUser(array $identity): ?User
+    {
+        return DB::transaction(function () use ($identity) {
+            $user = User::query()->whereRaw('LOWER(email) = ?', [$identity['email']])->lockForUpdate()->first();
+            if (! $user) {
+                return null;
+            }
+
+            // E-mail verificado de terceiros pode ter mudado de dono. Só Gmail ou
+            // Workspace comprovados pelo Google dispensam a senha no primeiro vínculo.
+            if (! $identity['authoritative_email']) {
+                throw ValidationException::withMessages([
+                    'google' => 'Para este e-mail, entre com sua senha e vincule o Google em Meu Perfil. Se necessário, use Esqueceu a senha.',
+                ]);
+            }
+
+            $account = $user->socialAccounts()->where('provider', 'google')->first();
+            if ($account && $account->provider_user_id !== $identity['sub']) {
+                throw ValidationException::withMessages([
+                    'google' => 'Seu perfil já está vinculado a outra conta Google. Use a conta vinculada ou entre com sua senha.',
+                ]);
+            }
+
+            if (! $account) {
+                // Somente a tabela de vínculos recebe escrita: dados e senha local
+                // permanecem intactos, inclusive para as contas protegidas existentes.
+                $user->socialAccounts()->create(['provider' => 'google', 'provider_user_id' => $identity['sub']]);
+            }
+
+            return $user;
+        }, 3);
     }
 
     public function create(Request $request): View|RedirectResponse

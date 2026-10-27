@@ -75,7 +75,7 @@ Comportamento:
 
 **Verificação de e-mail:** `User` implementa `MustVerifyEmail`; o cadastro envia verificação para usuários ainda não verificados. O acesso comum não exige middleware `verified`; administração e isenções por e-mail dependem de verificação, exceto a conta administrativa preexistente identificada explicitamente na configuração.
 
-**Google:** `GoogleAuthController`, `App\Support\GoogleLogin` e `EnsureGoogleLoginEnabled`. Desativado por padrão; exige `GOOGLE_LOGIN_*` e revisão/aplicação manual do SQL `docs/sql/2026-10-26_login_google.sql`. Login pelo `sub`, sem vincular automaticamente por e-mail. Cadastro em duas etapas, com aceite dos termos e convite revalidado na transação. Perfil permite vínculo com senha atual e confirmação Google para ações de contas sem senha. Guia completo, rotas e configuração: `docs/LOGIN_GOOGLE.md`.
+**Google:** `GoogleAuthController`, `App\Support\GoogleLogin` e `EnsureGoogleLoginEnabled`. Desativado por padrão; exige `GOOGLE_LOGIN_*` e revisão/aplicação manual do SQL `docs/sql/2026-10-26_login_google.sql`. Login pelo `sub`; no primeiro acesso, Gmail/Workspace com e-mail verificado pelo Google pode ser vinculado ao mesmo e-mail local e entrar diretamente, mesmo com senha existente. Só o vínculo é criado; dados e senha do usuário são preservados. Outros domínios exigem senha para o primeiro vínculo, e um `sub` já vinculado nunca é substituído. Cadastro em duas etapas, com aceite dos termos e convite revalidado na transação. Perfil permite vínculo com senha atual e confirmação Google para ações de contas sem senha. Guia completo, rotas e configuração: `docs/LOGIN_GOOGLE.md`.
 
 ---
 
