@@ -1,4 +1,4 @@
-<div class="dz-card p-3 p-sm-4 h-100 d-flex flex-column">
+<div id="profile-password" class="dz-card p-3 p-sm-4 h-100 d-flex flex-column dz-anchor-target">
     <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
         <div>
             <span class="dz-kpi-card__label d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Segurança</span>

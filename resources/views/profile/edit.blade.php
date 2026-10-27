@@ -120,10 +120,11 @@
             </div>
         </div>
 
-        {{-- ZONA DE RISCO: EXCLUIR CONTA --}}
-        @include('profile.partials.google-account')
-        <div class="row g-3 g-sm-4">
-            <div class="col-12">
+        <div class="row g-3 g-sm-4 align-items-stretch">
+            <div class="col-12 col-lg-6 d-flex flex-column">
+                @include('profile.partials.access-status')
+            </div>
+            <div class="col-12 col-lg-6 d-flex flex-column">
                 @include('profile.partials.delete-user-form')
             </div>
         </div>
