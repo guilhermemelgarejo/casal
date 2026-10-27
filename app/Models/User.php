@@ -6,9 +6,11 @@ use App\Support\Billing;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 
@@ -25,6 +27,12 @@ class User extends Authenticatable implements MustVerifyEmail
         });
 
         static::deleting(function (User $user) {
+            // Também revoga identidades quando a exclusão preserva um perfil anonimizado.
+            // A tabela pode ainda não existir: a implantação do SQL é manual.
+            if (Schema::hasTable('social_accounts')) {
+                $user->socialAccounts()->delete();
+            }
+
             if (DB::table('transactions')->where('user_id', $user->id)->exists()) {
                 $user->forceFill([
                     'name' => 'Usuário excluído',
@@ -59,6 +67,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function couple()
     {
         return $this->belongsTo(Couple::class);
+    }
+
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(SocialAccount::class);
+    }
+
+    public function hasLocalPassword(): bool
+    {
+        return filled($this->getAuthPassword());
     }
 
     /**

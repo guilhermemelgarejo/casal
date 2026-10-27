@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\User;
 use App\Services\CoupleMembershipService;
+use App\Support\GoogleLogin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +31,10 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        $changingEmail = $request->validated('email') !== $request->user()->email;
+        if ($changingEmail && ! $request->user()->hasLocalPassword() && ! GoogleLogin::confirmed($request, 'email')) {
+            throw ValidationException::withMessages(['email' => 'Confirme sua identidade com Google antes de alterar o e-mail.']);
+        }
         $request->user()->fill($request->validated());
 
         if ($request->user()->isDirty('email')) {
@@ -37,6 +42,9 @@ class ProfileController extends Controller
         }
 
         $request->user()->save();
+        if ($changingEmail) {
+            $request->session()->forget('google_confirmation');
+        }
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
@@ -46,9 +54,13 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request, CoupleMembershipService $memberships): RedirectResponse
     {
-        $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
-        ]);
+        if ($request->user()->hasLocalPassword()) {
+            $request->validateWithBag('userDeletion', ['password' => ['required', 'current_password']]);
+        } elseif (! GoogleLogin::confirmed($request, 'delete')) {
+            throw ValidationException::withMessages([
+                'password' => 'Confirme sua identidade com Google antes de excluir a conta.',
+            ])->errorBag('userDeletion');
+        }
 
         $user = $request->user();
 
@@ -59,7 +71,7 @@ class ProfileController extends Controller
                 }
                 $member = User::query()->lockForUpdate()->findOrFail($user->id);
                 if ($member->subscriptions()->get()->contains(fn ($subscription) => $subscription->valid()
-                    || !in_array($subscription->stripe_status, ['canceled', 'incomplete_expired'], true))) {
+                    || ! in_array($subscription->stripe_status, ['canceled', 'incomplete_expired'], true))) {
                     throw ValidationException::withMessages([
                         'subscription' => 'Encerre a assinatura e aguarde o fim do acesso antes de excluir sua conta.',
                     ]);

@@ -15,7 +15,7 @@ Documento de referência do repositório **casal** (produto **DuoZen**). Use com
 | Camada | Tecnologia |
 |--------|------------|
 | Backend | PHP **8.4+**, **Laravel 13** |
-| Auth / scaffolding | **Laravel Breeze** (Blade), sessões web |
+| Auth / scaffolding | **Laravel Breeze** (Blade), sessões web; **Laravel Socialite** para login/cadastro Google opcional |
 | Views | **Blade**, componentes em `resources/views/components` |
 | CSS/JS | **Bootstrap 5.3.3** em `public/vendor/bootstrap` (sem CDN); **Flatpickr** em `public/vendor/flatpickr` (datas e mês do painel com plugin **monthSelect**; locale **pt**; `public/js/app.js` + `window.duozenFlatpickrSetDate` para inputs definidos em modais); `public/css/app.css` (inclui **modais** unificados: `body .modal .modal-content` com altura máxima de viewport e `.modal-body` rolável, cabeçalho em gradiente, rodapé com separador; `.tx-modal-head--danger` para exclusão de conta; `.tx-modal-table-wrap`, `.tx-modal-installment-total`; formulário novo lançamento em seções `#form-new-transaction .tx-form-section` / `.tx-form-section-title`; **recorrentes** `.recurring-page` / `.rt-item-card`; lembrete compartilhado **`.rt-reminder-strip`** (largura da viewport; `overflow-x: clip` em **`.dashboard-page`** e **`.recurring-page`**) + **`.rt-reminder-card`** / **`.rt-reminder-list`** / **`.rt-reminder-card__head-actions`** (painel e `/recorrentes`, `partials/rt-reminder-panel.blade.php` — recorrentes **e** faturas (grade **`.rt-reminder-columns--split`** em `md+`); **Ver fatura** → `credit-card-statements.index` + âncora; **`.rt-reminder-card--overdue`** quando há lembrete vencido); loading global de submit com `.duozen-submit-loading`; tour de onboarding `.duozen-onboarding-*`); `public/js/app.js` (inclui spinner e trava de duplo envio para formulários após confirmações/prechecks); `public/js/onboarding-tour.js` (tour curto **só** quando a sessão tem `duozen_onboarding_tour` e o usuário tem acesso à app com `couple-billing`) |
 | Fonte | Figtree via Bunny Fonts (layouts) |
@@ -27,7 +27,7 @@ Documento de referência do repositório **casal** (produto **DuoZen**). Use com
 | Mail em testes | `MAIL_MAILER=array` |
 | Assinaturas / Stripe | **Laravel Cashier** (`laravel/cashier`): Checkout com trial, assinatura mensal, Customer Portal; webhooks em `/stripe/webhook` (prefixo configurável em `config/cashier.php` / `CASHIER_PATH`) |
 
-**Composer (`composer.json`):** `laravel/framework`, `laravel/tinker`, `laravel/cashier`. Dev: `laravel/breeze`, `laravel/pint`, `phpunit/phpunit`, etc.
+**Composer (`composer.json`):** `laravel/framework`, `laravel/tinker`, `laravel/cashier`, `laravel/socialite`, `google/apiclient` (backup). Dev: `laravel/breeze`, `laravel/pint`, `phpunit/phpunit`, etc.
 
 ---
 
@@ -44,7 +44,7 @@ app/
 bootstrap/app.php       # aliases de middleware; exceção CSRF `stripe/*`; redirect pós-login → dashboard
 config/duozen.php       # trial, admins, isentos, flags de faturamento (`DUOZEN_*` no `.env`)
 routes/web.php          # rotas da app + require auth.php
-routes/auth.php         # Breeze
+routes/auth.php         # Breeze + Google OAuth (GoogleAuthController)
 database/migrations/   # baseline `2026_04_23_000000_initial_schema.php` com o schema atual consolidado
 database/factories/
 database/seeders/DatabaseSeeder.php
@@ -63,17 +63,19 @@ public/vendor/bootstrap, public/css, public/js, `public/favicon.png` (marca; fal
 - **`auth`** sem `has-couple` — perfil (`profile.*`), casal (`couple.*`): criar, entrar, convidar, atualizar, sair.
 - **`auth` + `has-couple`** — assinatura (`billing.*`): página do plano, Checkout Stripe, sucesso, portal de faturamento.
 - **`auth` + `has-couple` + `couple-billing`** — dashboard (inclui **lista/filtros de lançamentos** e **transferências entre contas**), categorias (inclui planejamento mensal / orçamento na mesma página), **recorrentes** (`GET/POST/PUT/DELETE /recorrentes`), **cofrinhos** (`GET /cofrinhos`, CRUD, juros e visualização geral com gráficos/movimentações `GET /cofrinhos/{cofrinho}`), contas (exige plano ativo quando o faturamento está aplicado); `POST /onboarding/dismiss` (`onboarding.dismiss`) remove da sessão a flag do tour de onboarding; `POST /onboarding/restart` (`onboarding.restart`) volta a ativar o tour e redireciona ao painel (atalho na página **Casal** quando `passesCoupleBillingGate()`).
-- **`auth` + `duozen-admin`** — `admin/assinaturas`: listagem gerencial de assinaturas (Cashier). Acesso: usuários com `couple_id` = `config('duozen.subscription_admin_couple_id')` (por padrão casal **id 1**, via `DUOZEN_SUBSCRIPTION_ADMIN_COUPLE_ID`) **ou** e-mail em `DUOZEN_ADMIN_EMAILS`.
+- **`auth` + `duozen-admin`** — `admin/assinaturas`: listagem gerencial de assinaturas (Cashier). Acesso por ID ou e-mail explicitamente configurado e verificado, além da conta administrativa preexistente identificada na configuração. Pertencer a um casal não concede administração.
 
 Arquivo principal: `routes/web.php`.
 
 Comportamento:
 
 - Usuário autenticado **sem** `couple_id` acessa rotas `has-couple` → redirecionado para `couple.index` com flash de erro (`app/Http/Middleware/EnsureHasCouple.php`).
-- Com faturamento ativo (`App\Support\Billing::isEnforced()`: `STRIPE_SECRET` + `STRIPE_PRICE_ID` preenchidos e `DUOZEN_BILLING_DISABLED` falso), usuário com casal sem assinatura válida no casal → redirecionado para `billing.index` (`EnsureCoupleBillingActive`). **Isentos de cobrança:** e-mails em `DUOZEN_ADMIN_EMAILS` (ou `User::isCasalAdmin()` por casal administrador — inclui casal id 1 por padrão) ou `DUOZEN_BILLING_EXEMPT_EMAILS` (`config/duozen.php`). **Acesso ao casal:** basta **um** membro com assinatura `default` válida (trial ou paga) — `User::coupleHasBillingAccess()`.
+- Com faturamento ativo (`App\Support\Billing::isEnforced()`: `STRIPE_SECRET` + `STRIPE_PRICE_ID` preenchidos e `DUOZEN_BILLING_DISABLED` falso), usuário com casal sem assinatura válida no casal → redirecionado para `billing.index` (`EnsureCoupleBillingActive`). **Isentos de cobrança:** administradores (`User::isCasalAdmin()`) ou e-mails verificados em `DUOZEN_BILLING_EXEMPT_EMAILS` (`config/duozen.php`). **Acesso ao casal:** basta **um** membro com assinatura `default` válida (trial ou paga) — `User::coupleHasBillingAccess()`.
 - Após login, redirect intencionado: **dashboard** (`bootstrap/app.php` → `redirectUsersTo`).
 
-**Verificação de e-mail:** rotas existem em `routes/auth.php`, mas em `app/Models/User.php` a interface `MustVerifyEmail` está **comentada** — o acesso **não** exige e-mail verificado nas rotas `auth` atuais.
+**Verificação de e-mail:** `User` implementa `MustVerifyEmail`; o cadastro envia verificação para usuários ainda não verificados. O acesso comum não exige middleware `verified`; administração e isenções por e-mail dependem de verificação, exceto a conta administrativa preexistente identificada explicitamente na configuração.
+
+**Google:** `GoogleAuthController`, `App\Support\GoogleLogin` e `EnsureGoogleLoginEnabled`. Desativado por padrão; exige `GOOGLE_LOGIN_*` e revisão/aplicação manual do SQL `docs/sql/2026-10-26_login_google.sql`. Login pelo `sub`, sem vincular automaticamente por e-mail. Cadastro em duas etapas, com aceite dos termos e convite revalidado na transação. Perfil permite vínculo com senha atual e confirmação Google para ações de contas sem senha. Guia completo, rotas e configuração: `docs/LOGIN_GOOGLE.md`.
 
 ---
 
@@ -82,6 +84,7 @@ Comportamento:
 | Modelo | Notas |
 |--------|--------|
 | `User` | `couple_id` nullable; `couple()` belongsTo; **Cashier** `Billable` (colunas `stripe_id`, `pm_*`, `trial_ends_at`, tabelas `subscriptions` / `subscription_items`); `passesCoupleBillingGate()` alinha ao middleware `couple-billing` (faturamento desligado, isento ou `coupleHasBillingAccess()`) |
+| `SocialAccount` | `user_id`, `provider`, `provider_user_id`; `User::socialAccounts()` hasMany; únicos por identidade/provedor e usuário/provedor. Sem tokens persistidos. SQL manual proposto inclui senha nullable para novos usuários Google. Exclusão/anônimização revoga os vínculos mesmo com Google desativado; verifica existência da tabela para compatibilidade antes do SQL. |
 | `Couple` | `name`, `invite_code` (único), `billing_owner_user_id` (nullable, Cashier), `monthly_income`, `spending_alert_threshold` (%); hasMany users, categories, transactions, budgets, accounts, **recurringTransactions** |
 | `Category` | `couple_id`, `name`, `type` (`income` \| `expense`), `color`, `icon`, `system_key` (nullable), índice único (`couple_id`, `system_key`). Categoria de quitação de fatura: `system_key` = `Category::SYSTEM_KEY_CREDIT_CARD_INVOICE_PAYMENT` (nome por padrão `NAME_CREDIT_CARD_INVOICE_PAYMENT`). **Transferência entre contas:** duas categorias reservadas — `SYSTEM_KEY_INTERNAL_TRANSFER_EXPENSE` / `SYSTEM_KEY_INTERNAL_TRANSFER_INCOME` (nomes `NAME_INTERNAL_TRANSFER_*`), criadas ao criar o casal e garantidas por `Category::ensureInternalTransferCategoriesForCouple()` (migração inclui casais existentes). **Não** editáveis nem excluíveis com as demais reservas (`isReservedSystemCategory()`); **não** aparecem em orçamento, no formulário de lançamento do **Painel**, nem em Recorrentes, nem no select de categorias (`scopeExcludingCreditCardInvoicePayment`, `scopeExcludingInternalTransferCategories`). `transactionCategorySplits()` — linhas em `transaction_category_splits` que usam esta categoria (não há mais `transactions.category_id`). |
 | `Account` | `couple_id`, `name`, `kind` (`regular` \| `credit_card`), `color`, `credit_card_invoice_due_day` (nullable, 1–31, só cartão), **`balance`** (decimal, default 0): em contas **`regular`**, saldo persistido; **não** está em `$fillable` (não editável por formulários). Atualizado **apenas** pelos eventos Eloquent de `Transaction` (`Account::applyLedgerEffectToStoredBalance()` em `created` / `updated` / `deleted` — receitas somam, despesas subtraem; só `kind=regular` e `couple_id` coincidente). Cartões ignoram `balance` na prática (coluna pode ficar 0). **`credit_card_limit_total`** e **`credit_card_limit_available`** (decimais nullable, só cartão): limite total opcional no cadastro e limite disponível **materializado**; **fora de `$fillable`** — gravados via `forceFill` no `AccountController`. **`tracksCreditCardLimit()`** quando há limite total &gt; 0. **Utilização em aberto** (para o disponível): soma dos `remainingToPay()` apenas nas faturas (`CreditCardStatement`) **em aberto** (`!isPaid()`), ou seja, valores já materializados nas faturas (`Account::outstandingCreditCardUtilizationAmount()`). **`recalculateCreditCardLimitAvailable()`** faz `limite total − utilização em aberto` (o disponível **pode ser negativo**). Chamado após lançamentos em cartão (`Transaction` `created`/`updated`/`deleted`), após `CreditCardStatement::syncPaidMetadata()` e ao salvar limite no `AccountController`. **Conta `regular`:** formas de pagamento = `PaymentMethods::forRegularAccounts()` (`Account::getEffectivePaymentMethods()`). **Cartão:** só crédito no fluxo de lançamentos (sem `payment_method` na transação). **`Account::balancesFromTransactionsByAccountId()`** para conferência / `accounts:sync-balances`. |
@@ -206,7 +209,7 @@ O cadastro de contas **não** pergunta formas de pagamento: fica implícito conf
 
 ### `ProfileController`
 
-- Padrão Breeze (atualizar perfil, senha, apagar conta).
+- Perfil, senha e exclusão preservam o fluxo Breeze para contas com senha. Contas exclusivamente Google exigem confirmação da identidade por ação, válida por cinco minutos, antes de definir senha, trocar e-mail ou excluir. O vínculo Google é gerenciado no perfil quando a integração está ativada; desvincular exige senha local. A recuperação por e-mail também permite definir a primeira senha.
 - **UI** (`resources/views/profile/edit.blade.php` + `profile/partials/*`): wrapper `.profile-page`; cabeçalho com `.profile-page-title`, subtítulo e CTA **Ver casal** quando há vínculo; hero `.profile-hero` com avatar por iniciais `.profile-hero__avatar` e cards `.profile-summary-card` (conta, casal, segurança); cartões `.profile-section-card` em grid responsivo, cabeçalhos em gradiente (`.profile-section-head--account`, `--password`, `--danger`) com ícones `.profile-section-icon`, campos em `.profile-form-panel`, painel de exclusão `.profile-danger-panel`; botões pill; modal Bootstrap `#modal-confirm-user-deletion` com cabeçalho `.tx-modal-head--danger` (abre com erro de `userDeletion` via `data-show-error` em `public/js/app.js`); estilos em `public/css/app.css` (`.profile-page-title`, etc.).
 
 ### `BillingController`

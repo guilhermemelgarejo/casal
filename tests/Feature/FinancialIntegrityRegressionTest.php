@@ -77,10 +77,12 @@ class FinancialIntegrityRegressionTest extends TestCase
     {
         $f = $this->fixture();
         $tx = $this->expense($f);
+        $f['user']->socialAccounts()->create(['provider' => 'google', 'provider_user_id' => 'deleted-ledger-author']);
         $f['user']->delete();
         $this->assertNotNull($tx->fresh());
         $this->assertSame($f['user']->id, $tx->fresh()->user_id);
         $this->assertNull(User::find($f['user']->id));
+        $this->assertDatabaseMissing('social_accounts', ['provider_user_id' => 'deleted-ledger-author']);
         $this->assertSame('-100.00', $f['account']->fresh()->balance);
     }
 

@@ -19,6 +19,12 @@
         </button>
     </div>
 
+    @if (! $user->hasLocalPassword())
+        <div class="mt-3">
+            @include('profile.partials.google-confirmation', ['purpose' => 'delete', 'label' => 'Confirmar Google para excluir conta'])
+        </div>
+    @endif
+
     <x-modal name="confirm-user-deletion" maxWidth="md" :force-show="$errors->userDeletion->isNotEmpty()">
         <form method="post" action="{{ route('profile.destroy') }}">
             @csrf
@@ -35,9 +41,10 @@
                 <x-input-error :messages="$errors->userDeletion->get('membership')" class="mb-3" />
                 <x-input-error :messages="$errors->userDeletion->get('subscription')" class="mb-3" />
                 <p class="text-secondary small mb-3">
-                    Esta ação é <strong class="text-danger">irreversível</strong>. Seu perfil será desativado e anonimizado. O histórico financeiro do casal será preservado. Digite sua senha para confirmar:
+                    Esta ação é <strong class="text-danger">irreversível</strong>. Seu perfil será desativado e anonimizado. O histórico financeiro do casal será preservado.
                 </p>
 
+                @if ($user->hasLocalPassword())
                 <div class="mb-2">
                     <label for="password" class="form-label small fw-semibold mb-1" style="color: var(--dz-text-title);">Sua Senha Atual</label>
                     <input
@@ -51,6 +58,10 @@
                     />
                     <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-1" />
                 </div>
+                @else
+                    <p class="small text-secondary">Confirme sua identidade com Google no perfil antes de concluir a exclusão.</p>
+                    <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-1" />
+                @endif
             </div>
 
             <div class="modal-footer d-flex align-items-center justify-content-end gap-2">

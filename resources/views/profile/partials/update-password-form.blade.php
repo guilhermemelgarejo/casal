@@ -10,16 +10,25 @@
         </div>
     </div>
 
+    @if (! $user->hasLocalPassword())
+        <p class="small text-secondary">Você entra com Google. Confirme sua identidade para definir uma senha local.</p>
+        @include('profile.partials.google-confirmation', ['purpose' => 'password', 'label' => 'Confirmar Google para definir senha'])
+    @endif
+
     <form method="post" action="{{ route('password.update') }}" class="d-flex flex-column justify-content-between flex-grow-1">
         @csrf
         @method('put')
 
         <div class="d-flex flex-column gap-3 mb-3">
+            @if ($user->hasLocalPassword())
             <div>
                 <label for="update_password_current_password" class="form-label small fw-semibold mb-1" style="color: var(--dz-text-title);">Senha atual</label>
                 <input id="update_password_current_password" name="current_password" type="password" class="form-control rounded-3" autocomplete="current-password" style="background: var(--dz-bg-card); border-color: var(--dz-border);" />
                 <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-1" />
             </div>
+            @else
+                <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-1" />
+            @endif
 
             <div>
                 <label for="update_password_password" class="form-label small fw-semibold mb-1" style="color: var(--dz-text-title);">Nova senha</label>

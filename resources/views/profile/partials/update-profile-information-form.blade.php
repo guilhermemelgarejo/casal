@@ -10,6 +10,10 @@
         </div>
     </div>
 
+    @if (! $user->hasLocalPassword())
+        @include('profile.partials.google-confirmation', ['purpose' => 'email', 'label' => 'Confirmar Google para alterar e-mail'])
+    @endif
+
     <form id="send-verification" method="post" action="{{ route('verification.send') }}">
         @csrf
     </form>

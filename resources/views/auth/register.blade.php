@@ -1,5 +1,7 @@
 <x-guest-layout>
     <h1 class="h5 fw-semibold text-center text-dark mb-3">Criar conta</h1>
+    <x-input-error :messages="$errors->get('google')" class="mb-3" />
+    @include('partials.google-login-button')
 
     <form method="POST" action="{{ route('register') }}">
         @csrf

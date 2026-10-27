@@ -1,5 +1,7 @@
 <x-guest-layout>
     <x-auth-session-status class="mb-3" :status="session('status')" />
+    <x-input-error :messages="$errors->get('google')" class="mb-3" />
+    @include('partials.google-login-button')
 
     <form method="POST" action="{{ route('login') }}">
         @csrf

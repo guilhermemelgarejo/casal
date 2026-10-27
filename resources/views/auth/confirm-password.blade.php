@@ -1,4 +1,9 @@
 <x-guest-layout>
+    @if (! auth()->user()->hasLocalPassword())
+        <p class="small text-secondary mb-3">Confirme sua identidade com Google para continuar.</p>
+        <x-input-error :messages="$errors->get('google')" class="mb-3" />
+        @include('profile.partials.google-confirmation', ['purpose' => 'confirm', 'label' => 'Confirmar com Google'])
+    @else
     <p class="small text-secondary mb-4">
         Esta é uma área segura. Confirme sua senha para continuar.
     </p>
@@ -18,4 +23,5 @@
             </x-primary-button>
         </div>
     </form>
+    @endif
 </x-guest-layout>

@@ -7,9 +7,16 @@ CREATE TABLE couples (
 );
 CREATE TABLE users (
  id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR NOT NULL, email VARCHAR NOT NULL UNIQUE,
- email_verified_at DATETIME, password VARCHAR NOT NULL, remember_token VARCHAR,
+ email_verified_at DATETIME, password VARCHAR, remember_token VARCHAR,
  couple_id INTEGER REFERENCES couples(id) ON DELETE SET NULL, stripe_id VARCHAR,
  pm_type VARCHAR, pm_last_four VARCHAR, trial_ends_at DATETIME, created_at DATETIME, updated_at DATETIME
+);
+CREATE TABLE social_accounts (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ provider VARCHAR NOT NULL, provider_user_id VARCHAR COLLATE BINARY NOT NULL,
+ created_at DATETIME, updated_at DATETIME,
+ UNIQUE (provider, provider_user_id), UNIQUE (user_id, provider)
 );
 CREATE TABLE password_reset_tokens (email VARCHAR PRIMARY KEY, token VARCHAR NOT NULL, created_at DATETIME);
 CREATE TABLE sessions (

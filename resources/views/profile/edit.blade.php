@@ -27,6 +27,7 @@
     </x-slot>
 
     <div class="container-xxl py-3 py-sm-4 px-2 px-sm-3 px-lg-4 profile-page">
+        <x-input-error :messages="$errors->get('google')" class="mb-3" />
         @if (session('success'))
             <x-alert type="success" class="mb-3 mb-sm-4" :message="session('success')" />
         @endif
@@ -120,6 +121,7 @@
         </div>
 
         {{-- ZONA DE RISCO: EXCLUIR CONTA --}}
+        @include('profile.partials.google-account')
         <div class="row g-3 g-sm-4">
             <div class="col-12">
                 @include('profile.partials.delete-user-form')
