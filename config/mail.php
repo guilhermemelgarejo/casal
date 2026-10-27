@@ -115,4 +115,10 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'DuoZen')),
     ],
 
+    // Tema compartilhado por notificações de autenticação e e-mails do aplicativo.
+    'markdown' => [
+        'theme' => 'duozen',
+        'paths' => [resource_path('views/vendor/mail')],
+    ],
+
 ];
