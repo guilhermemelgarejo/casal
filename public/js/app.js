@@ -1031,8 +1031,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             e.preventDefault();
             const fd = new FormData();
+            // FormData sem formulário não dispara o evento formdata da máscara monetária.
             const amtVal = txEditForm.querySelector('[name="amount"]')?.value || '';
-            fd.append('amount', amtVal);
+            fd.append('amount', window.DuozenMoney.normalize(amtVal));
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
             fd.append('_token', csrf);
             let res;
