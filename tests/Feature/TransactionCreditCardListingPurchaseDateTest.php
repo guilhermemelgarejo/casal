@@ -129,6 +129,53 @@ class TransactionCreditCardListingPurchaseDateTest extends TestCase
         $response->assertSee('id="dashboard-tx-'.$parent->id.'"', false);
     }
 
+    public function test_excluir_lancamento_focado_no_painel_volta_sem_laco_de_redirecionamento(): void
+    {
+        $couple = Couple::factory()->create();
+        $user = User::factory()->create(['couple_id' => $couple->id]);
+
+        $card = Account::create([
+            'couple_id' => $couple->id,
+            'name' => 'Visa',
+            'kind' => Account::KIND_CREDIT_CARD,
+            'color' => '#000',
+        ]);
+
+        $category = Category::create([
+            'couple_id' => $couple->id,
+            'name' => 'Loja',
+            'type' => 'expense',
+            'color' => '#222',
+        ]);
+
+        $tx = $this->createTransactionWithSplits([
+            'couple_id' => $couple->id,
+            'user_id' => $user->id,
+            'account_id' => $card->id,
+            'description' => 'Fone',
+            'amount' => '80.00',
+            'payment_method' => null,
+            'type' => 'expense',
+            'date' => '2026-04-10',
+            'reference_month' => 5,
+            'reference_year' => 2026,
+        ], [['category_id' => $category->id, 'amount' => '80.00']]);
+
+        $focusUrl = route('dashboard', [
+            'period' => '2026-04',
+            'account_id' => $card->id,
+            'focus_transaction' => $tx->id,
+        ]);
+
+        $this->actingAs($user)->from($focusUrl)
+            ->delete(route('transactions.destroy', $tx))
+            ->assertRedirect($focusUrl);
+
+        $response = $this->actingAs($user)->from($focusUrl)->get($focusUrl);
+        $response->assertOk();
+        $response->assertDontSee('A mostrar apenas o lançamento aberto a partir da fatura', false);
+    }
+
     public function test_lista_de_lancamentos_e_painel_exibem_fatura_para_compra_no_cartao(): void
     {
         $couple = Couple::factory()->create();

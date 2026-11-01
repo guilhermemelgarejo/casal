@@ -52,11 +52,8 @@ class DashboardController extends Controller
                 'string',
                 Rule::in(['aporte', 'retirada']),
             ],
-            'focus_transaction' => [
-                'nullable',
-                'integer',
-                Rule::exists('transactions', 'id')->where('couple_id', $couple->id),
-            ],
+            // Sem exists: após excluir o lançamento focado, back() volta a esta URL e a falha de validação entraria em laço.
+            'focus_transaction' => ['nullable', 'integer'],
         ]);
 
         $period = (string) ($validated['period'] ?? '');
