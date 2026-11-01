@@ -70,7 +70,7 @@ class FinancialIntegrityRegressionTest extends TestCase
         $this->assertSame(-100.0, Account::balancesFromTransactionsByAccountId([$f['account']->id])[$f['account']->id]);
         $this->assertTrue($statement->fresh()->isPaid());
         $this->assertSame($f['couple']->id, $partner->fresh()->couple_id);
-        $this->actingAs($partner)->get('/transactions?month=10&year=2026')->assertOk()->assertSee('Usuário excluído');
+        $this->actingAs($partner)->get('/transactions?period=2026-10')->assertOk()->assertSee('Usuário excluído');
     }
 
     public function test_model_user_deletion_preserves_authored_transactions_even_with_cascade_foreign_key(): void
