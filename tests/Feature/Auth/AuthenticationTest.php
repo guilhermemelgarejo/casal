@@ -69,4 +69,22 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect('/');
     }
+
+    public function test_logging_out_preserves_remembered_access_on_other_devices(): void
+    {
+        $user = User::factory()->create(['remember_token' => 'existing-device-token']);
+
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'remember' => 'on',
+        ])->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertSame('existing-device-token', $user->fresh()->getRememberToken());
+
+        $this->post('/logout')->assertRedirect('/');
+
+        $this->assertGuest();
+        $this->assertSame('existing-device-token', $user->fresh()->getRememberToken());
+    }
 }
